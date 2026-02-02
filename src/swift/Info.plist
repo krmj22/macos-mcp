@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>EventKitCLI</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.mcp.apple-reminders.eventkitcli</string>
+	<string>com.krmj22.macos-mcp.eventkitcli</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

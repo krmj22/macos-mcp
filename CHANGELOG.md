@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-02-02
+
+### Added
+
+- Notes CRUD support via JXA (notes_items, notes_folders tools)
+- Mail read/send/reply/delete via JXA (mail_messages tool)
+- iMessage read/send via JXA (messages_chat tool)
+- JXA executor with retry logic, script templating, and string sanitization
+- Repository pattern for calendar events
+- Shared handler utilities (formatListMarkdown, extractAndValidateArgs)
+
+### Changed
+
+- **BREAKING**: Project forked and renamed from `mcp-server-apple-events` to `macos-mcp`
+- **BREAKING**: Binary renamed from `mcp-server-apple-events` to `macos-mcp`
+- Updated bundle identifier to `com.krmj22.macos-mcp.eventkitcli`
+- Updated author to Kyle Jensen with Frad Lee as contributor
+
+### Removed
+
+- Chinese-language permission script (rewritten in English)
+
 ## [1.2.0] - 2025-11-15
 
 ### Added
@@ -389,7 +411,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic Apple Reminders integration
 - Foundation for macOS native reminder management
 
-[unreleased]: https://github.com/FradSer/mcp-server-apple-events/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/krmj22/macos-mcp/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/krmj22/macos-mcp/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/FradSer/mcp-server-apple-events/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/FradSer/mcp-server-apple-events/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/FradSer/mcp-server-apple-events/compare/v1.0.0...v1.0.1

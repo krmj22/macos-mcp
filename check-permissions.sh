@@ -1,37 +1,37 @@
 #!/bin/bash
 
-# macOS权限检查和申请脚本
-# 用于Apple Events MCP Server
+# macOS permission check script for macos-mcp
+# Verifies EventKit and AppleScript automation permissions
 
-echo "🔐 检查 Apple Events MCP Server 权限..."
+echo "🔐 Checking macos-mcp permissions..."
 
-# 检查EventKit权限
-echo "📅 检查 EventKit (提醒) 权限..."
+# Check EventKit permissions
+echo "📅 Checking EventKit (Reminders) permissions..."
 EVENTKIT_CHECK=$(./bin/EventKitCLI --action read --limit 1 2>&1)
 if [[ $? -eq 0 ]]; then
-    echo "✅ EventKit 权限已授予"
+    echo "✅ EventKit permissions granted"
 else
-    echo "❌ EventKit 权限被拒绝或需要授权"
-    echo "请在系统设置 > 隐私与安全性 > 提醒事项 中授予权限"
-    echo "授权后请重新运行此脚本"
+    echo "❌ EventKit permissions denied or not yet authorized"
+    echo "Please grant access in System Settings > Privacy & Security > Reminders"
+    echo "Re-run this script after granting permission"
     exit 1
 fi
 
-# 检查AppleScript权限
-echo "🤖 检查 AppleScript 自动化权限..."
+# Check AppleScript automation permissions
+echo "🤖 Checking AppleScript automation permissions..."
 APPLESCRIPT_CHECK=$(osascript -e 'tell application "Reminders" to get the name of every list' 2>&1)
 if [[ $? -eq 0 ]]; then
-    echo "✅ AppleScript 自动化权限已授予"
-    echo "可用的提醒列表: $APPLESCRIPT_CHECK"
+    echo "✅ AppleScript automation permissions granted"
+    echo "Available reminder lists: $APPLESCRIPT_CHECK"
 else
-    echo "❌ AppleScript 自动化权限被拒绝或需要授权"
-    echo "请在系统设置 > 隐私与安全性 > 自动化 中授予权限"
-    echo "授权后请重新运行此脚本"
+    echo "❌ AppleScript automation permissions denied or not yet authorized"
+    echo "Please grant access in System Settings > Privacy & Security > Automation"
+    echo "Re-run this script after granting permission"
     exit 1
 fi
 
 echo ""
-echo "🎉 所有权限检查通过！"
-echo "📱 Apple Events MCP Server 现在可以正常运行"
+echo "🎉 All permission checks passed!"
+echo "📱 macos-mcp is ready to run"
 echo ""
-echo "启动命令: npx $HOME/.mcp-server/mcp-server-apple-events"
+echo "Start command: macos-mcp"

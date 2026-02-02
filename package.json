@@ -2,7 +2,10 @@
   "name": "macos-mcp",
   "version": "2.0.0",
   "description": "MCP server that provides native integration with Apple Reminders, Calendar, Notes, Mail, and Messages on macOS.",
-  "author": "Frad Lee <https://frad.me>",
+  "author": "Kyle Jensen",
+  "contributors": [
+    "Frad Lee <https://frad.me>"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/krmj22/macos-mcp",
   "repository": {
@@ -28,7 +31,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "bin": {
-    "mcp-server-apple-events": "./bin/run.cjs"
+    "macos-mcp": "./bin/run.cjs"
   },
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
