@@ -1,0 +1,61 @@
+{
+  "name": "mcp-server-apple-apps",
+  "version": "2.0.0",
+  "description": "MCP server that provides native integration with Apple Reminders, Calendar, Notes, Mail, and Messages on macOS.",
+  "author": "Frad Lee <https://frad.me>",
+  "license": "MIT",
+  "homepage": "https://frad.me",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fradser/mcp-server-apple-events.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fradser/mcp-server-apple-events/issues"
+  },
+  "keywords": [
+    "mcp",
+    "apple",
+    "reminders",
+    "calendar",
+    "notes",
+    "mail",
+    "messages",
+    "imessage",
+    "events",
+    "automation"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "bin": {
+    "mcp-server-apple-events": "./bin/run.cjs"
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:swift": "node scripts/build-swift.mjs",
+    "build": "pnpm run clean && pnpm run build:ts && pnpm run build:swift",
+    "test": "NODE_NO_WARNINGS=1 jest",
+    "lint": "pnpm exec biome check --write --unsafe && pnpm exec tsc --noEmit --project tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "exit-on-epipe": "^1.0.1",
+    "tsx": "^4.20.6",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.1",
+    "babel-jest": "^30.2.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
+}
