@@ -13,6 +13,12 @@ import {
   executeJxaWithRetry,
 } from '../../utils/jxaExecutor.js';
 import {
+  SqliteAccessError,
+  readChatMessages,
+  searchMessages,
+  getLastMessage,
+} from '../../utils/sqliteMessageReader.js';
+import {
   CreateMessageSchema,
   ReadMessagesSchema,
 } from '../../validation/schemas.js';
@@ -229,28 +235,100 @@ function formatSearchMessageMarkdown(msg: SearchMessageResult): string[] {
 
 // --- Handlers ---
 
+/**
+ * Attempts to read messages via JXA first, falls back to SQLite.
+ * JXA's c.messages() throws "Can't convert types" on modern macOS,
+ * so SQLite (requires Full Disk Access) is the primary read path.
+ */
+async function readMessagesWithFallback(
+  chatId: string,
+  limit: number,
+  offset: number,
+): Promise<MessageItem[]> {
+  // Try JXA first (works on some macOS versions)
+  try {
+    const script = buildScript(READ_CHAT_MESSAGES_SCRIPT, {
+      chatId,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const result = await executeJxaWithRetry<MessageItem[] | { error: string }>(
+      script,
+      15000,
+      'Messages',
+    );
+    if (Array.isArray(result) && result.length > 0) {
+      return result;
+    }
+  } catch {
+    // JXA failed, try SQLite
+  }
+
+  // SQLite fallback
+  try {
+    return await readChatMessages(chatId, limit, offset);
+  } catch (error) {
+    if (error instanceof SqliteAccessError && error.isPermissionError) {
+      throw new Error(
+        'Cannot read messages: JXA automation is unsupported for message reading on this macOS version, ' +
+          'and SQLite access requires Full Disk Access. ' +
+          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
+    }
+    throw error;
+  }
+}
+
+async function searchMessagesWithFallback(
+  search: string,
+  limit: number,
+): Promise<SearchMessageResult[]> {
+  // Try JXA first
+  try {
+    const script = buildScript(SEARCH_MESSAGES_SCRIPT, {
+      search,
+      limit: String(limit),
+    });
+    const results = await executeJxaWithRetry<SearchMessageResult[]>(
+      script,
+      30000,
+      'Messages',
+    );
+    if (results.length > 0) {
+      return results;
+    }
+  } catch {
+    // JXA failed, try SQLite
+  }
+
+  // SQLite fallback
+  try {
+    return await searchMessages(search, limit);
+  } catch (error) {
+    if (error instanceof SqliteAccessError && error.isPermissionError) {
+      throw new Error(
+        'Cannot search messages: JXA automation is unsupported for message reading on this macOS version, ' +
+          'and SQLite access requires Full Disk Access. ' +
+          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
+    }
+    throw error;
+  }
+}
+
 export async function handleReadMessages(
   args: MessagesToolArgs,
 ): Promise<CallToolResult> {
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, ReadMessagesSchema);
-    const paginationParams = {
-      limit: String(validated.limit),
-      offset: String(validated.offset),
-    };
     const paginationMeta = { limit: validated.limit, offset: validated.offset };
 
     // Search chats by participant/name or search messages by content
     if (validated.search) {
       if (validated.searchMessages) {
-        const script = buildScript(SEARCH_MESSAGES_SCRIPT, {
-          search: validated.search,
-          limit: String(validated.limit),
-        });
-        const results = await executeJxaWithRetry<SearchMessageResult[]>(
-          script,
-          30000,
-          'Messages',
+        const results = await searchMessagesWithFallback(
+          validated.search,
+          validated.limit ?? 50,
         );
         return formatListMarkdown(
           `Messages matching "${validated.search}"`,
@@ -277,31 +355,48 @@ export async function handleReadMessages(
     }
 
     if (validated.chatId) {
-      const script = buildScript(READ_CHAT_MESSAGES_SCRIPT, {
-        chatId: validated.chatId,
-        ...paginationParams,
-      });
-      const result = await executeJxaWithRetry<
-        MessageItem[] | { error: string }
-      >(script, 15000, 'Messages');
-      if (!Array.isArray(result) && 'error' in result) {
-        return `Unable to read messages from this chat. The Messages app may not support reading this chat format via automation.`;
-      }
+      const messages = await readMessagesWithFallback(
+        validated.chatId,
+        validated.limit ?? 50,
+        validated.offset ?? 0,
+      );
       return formatListMarkdown(
         'Messages',
-        result,
+        messages,
         formatMessageMarkdown,
         'No messages in this chat.',
         paginationMeta,
       );
     }
 
+    // List chats — enrich with last message via SQLite when possible
+    const paginationParams = {
+      limit: String(validated.limit),
+      offset: String(validated.offset),
+    };
     const script = buildScript(LIST_CHATS_SCRIPT, paginationParams);
     const chats = await executeJxaWithRetry<ChatItem[]>(
       script,
       15000,
       'Messages',
     );
+
+    // Try to enrich chats that are missing lastMessage with SQLite data
+    for (const chat of chats) {
+      if (!chat.lastMessage) {
+        try {
+          const last = await getLastMessage(chat.id);
+          if (last) {
+            chat.lastMessage = last.text;
+            chat.lastDate = last.date;
+          }
+        } catch {
+          // SQLite unavailable, skip enrichment
+          break; // No point trying other chats
+        }
+      }
+    }
+
     return formatListMarkdown(
       'Chats',
       chats,

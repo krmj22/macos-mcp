@@ -19,6 +19,34 @@ jest.mock('../utils/jxaExecutor.js', () => ({
   JxaError: jest.requireActual('../utils/jxaExecutor.js').JxaError,
 }));
 
+jest.mock('../utils/sqliteMessageReader.js', () => ({
+  SqliteAccessError: class SqliteAccessError extends Error {
+    isPermissionError: boolean;
+    constructor(message: string, isPermissionError: boolean) {
+      super(message);
+      this.name = 'SqliteAccessError';
+      this.isPermissionError = isPermissionError;
+    }
+  },
+  readChatMessages: jest.fn().mockRejectedValue(
+    (() => {
+      const e = new Error('Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.');
+      (e as any).name = 'SqliteAccessError';
+      (e as any).isPermissionError = true;
+      return e;
+    })(),
+  ),
+  searchMessages: jest.fn().mockRejectedValue(
+    (() => {
+      const e = new Error('Cannot access Messages database.');
+      (e as any).name = 'SqliteAccessError';
+      (e as any).isPermissionError = true;
+      return e;
+    })(),
+  ),
+  getLastMessage: jest.fn().mockRejectedValue(new Error('no access')),
+}));
+
 jest.mock('../utils/errorHandling.js', () => ({
   handleAsyncOperation: jest.fn(
     async (operation: () => Promise<string>, _name: string) => {
@@ -399,8 +427,9 @@ describe('Messages Handlers', () => {
         action: 'read',
         chatId: 'bad',
       });
-      expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('Unable to read messages');
+      // When JXA returns error object and SQLite is unavailable, handler reports error
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('Messages database');
     });
 
     it('searches chats by name', async () => {
