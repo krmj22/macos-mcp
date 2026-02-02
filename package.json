@@ -1,16 +1,16 @@
 {
-  "name": "mcp-server-apple-apps",
+  "name": "macos-mcp",
   "version": "2.0.0",
   "description": "MCP server that provides native integration with Apple Reminders, Calendar, Notes, Mail, and Messages on macOS.",
   "author": "Frad Lee <https://frad.me>",
   "license": "MIT",
-  "homepage": "https://frad.me",
+  "homepage": "https://github.com/krmj22/macos-mcp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fradser/mcp-server-apple-events.git"
+    "url": "git+https://github.com/krmj22/macos-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/fradser/mcp-server-apple-events/issues"
+    "url": "https://github.com/krmj22/macos-mcp/issues"
   },
   "keywords": [
     "mcp",
