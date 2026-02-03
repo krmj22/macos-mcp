@@ -516,7 +516,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'contacts_people',
     description:
-      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, creating new contacts, and updating existing contacts.',
+      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, creating, updating, and deleting contacts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -528,7 +528,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         id: {
           type: 'string',
           description:
-            'The unique identifier of the contact (REQUIRED for update; optional for read to get single contact).',
+            'The unique identifier of the contact (REQUIRED for update/delete; optional for read to get single contact).',
         },
         search: {
           type: 'string',
@@ -624,6 +624,10 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
             },
             {
               properties: { action: { const: 'update' } },
+              required: ['id'],
+            },
+            {
+              properties: { action: { const: 'delete' } },
               required: ['id'],
             },
           ],

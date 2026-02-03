@@ -27,6 +27,7 @@ import {
   handleCreateReminder,
   handleCreateReminderList,
   handleDeleteCalendarEvent,
+  handleDeleteContact,
   handleDeleteMail,
   handleDeleteNote,
   handleDeleteReminder,
@@ -179,6 +180,7 @@ const TOOL_ROUTER_MAP = {
       search: (contactsArgs) => handleSearchContacts(contactsArgs),
       create: (contactsArgs) => handleCreateContact(contactsArgs),
       update: (contactsArgs) => handleUpdateContact(contactsArgs),
+      delete: (contactsArgs) => handleDeleteContact(contactsArgs),
     },
   ),
 } satisfies Record<ToolName, ToolRouter>;

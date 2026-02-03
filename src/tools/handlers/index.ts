@@ -12,6 +12,7 @@ export {
 } from './calendarHandlers.js';
 export {
   handleCreateContact,
+  handleDeleteContact,
   handleReadContacts,
   handleSearchContacts,
   handleUpdateContact,
