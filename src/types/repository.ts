@@ -22,6 +22,13 @@ export interface ListJSON {
   title: string;
 }
 
+export interface RecurrenceJSON {
+  frequency: string;
+  interval: number;
+  endDate: string | null;
+  occurrenceCount: number | null;
+}
+
 export interface EventJSON {
   id: string;
   title: string;
@@ -32,6 +39,7 @@ export interface EventJSON {
   location: string | null;
   url: string | null;
   isAllDay: boolean;
+  recurrence: RecurrenceJSON | null;
 }
 
 export interface CalendarJSON {
@@ -75,6 +83,13 @@ export interface UpdateReminderData {
   dueDate?: string;
 }
 
+export interface RecurrenceData {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval?: number;
+  endDate?: string;
+  occurrenceCount?: number;
+}
+
 export interface CreateEventData {
   title: string;
   startDate: string;
@@ -84,6 +99,7 @@ export interface CreateEventData {
   location?: string;
   url?: string;
   isAllDay?: boolean;
+  recurrence?: RecurrenceData;
 }
 
 export interface UpdateEventData {
@@ -96,4 +112,5 @@ export interface UpdateEventData {
   location?: string;
   url?: string;
   isAllDay?: boolean;
+  recurrence?: RecurrenceData;
 }

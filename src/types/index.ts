@@ -25,6 +25,16 @@ export interface ReminderList {
 }
 
 /**
+ * Recurrence rule interface
+ */
+export interface Recurrence {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval: number;
+  endDate?: string;
+  occurrenceCount?: number;
+}
+
+/**
  * Calendar event interface
  */
 export interface CalendarEvent {
@@ -37,6 +47,7 @@ export interface CalendarEvent {
   location?: string;
   url?: string;
   isAllDay: boolean;
+  recurrence?: Recurrence;
 }
 
 /**
@@ -154,6 +165,11 @@ export interface CalendarToolArgs extends BaseToolArgs {
   isAllDay?: boolean;
   // Target calendar for create/update operations
   targetCalendar?: string;
+  // Recurrence parameters
+  recurrence?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrenceInterval?: number;
+  recurrenceEnd?: string;
+  recurrenceCount?: number;
 }
 
 export interface CalendarsToolArgs extends BaseToolArgs {
