@@ -272,3 +272,17 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 Messages database uses nanoseconds since 2001-01-01:
 - **SQLite**: `datetime(date/1000000000 + strftime('%s','2001-01-01'), 'unixepoch', 'localtime')`
 - **JavaScript**: `new Date(new Date('2001-01-01').getTime() + timestamp / 1_000_000)`
+
+## CRUD Capabilities
+
+| Subsystem | Create | Read | Update | Delete | Move | Limitations |
+|-----------|:------:|:----:|:------:|:------:|:----:|-------------|
+| **Reminders** | ✅ | ✅ | ✅ | ✅ | ✅ | No priority, recurrence, attachments |
+| **Reminder Lists** | ✅ | ✅ | ✅ | ✅ | — | Full CRUD |
+| **Calendar Events** | ✅ | ✅ | ✅ | ✅ | ✅ | No attendees, recurrence, alerts |
+| **Calendars** | ❌ | ✅ | ❌ | ❌ | — | Read-only |
+| **Notes** | ✅ | ✅ | ✅ | ✅ | ❌ | Cannot move between folders |
+| **Note Folders** | ✅ | ✅ | ❌ | ❌ | — | No rename/delete |
+| **Mail** | ✅ | ✅ | ⚠️ | ✅ | ❌ | Update = read/unread only, no attachments |
+| **Messages** | ✅ | ✅ | ❌ | ❌ | — | Send/read only, no edit/delete |
+| **Contacts** | ✅ | ✅ | ❌ | ❌ | — | No update/delete |
