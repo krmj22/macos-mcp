@@ -13,21 +13,34 @@ pnpm lint             # Lint and format with Biome
 
 ## Tools & Capabilities
 
-| Tool | Actions | Key Parameters | Limitations |
-|------|---------|----------------|-------------|
-| `reminders_tasks` | read, create, update, delete | `filterList`, `dueWithin`, `search` | No priority/recurrence |
-| `reminders_lists` | read, create, update, delete | `name` | Full CRUD |
-| `calendar_events` | read, create, update, delete | `startDate`, `endDate`, `calendarName` | No attendees/recurrence |
-| `calendar_calendars` | read | — | Read-only |
-| `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset` | Can't move folders |
-| `notes_folders` | read, create | `name` | No rename/delete |
-| `mail_messages` | read, create, update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | Update=read/unread only |
-| `messages_chat` | read, create | `chatId`, `search`, `to` | No edit/delete |
-| `contacts_people` | read, search, create | `search`, `firstName`, `lastName` | No update/delete |
+| Tool | Actions | Key Parameters | Status |
+|------|---------|----------------|--------|
+| `reminders_tasks` | read, create, update, delete | `filterList`, `dueWithin`, `search` | ✅ Working |
+| `reminders_lists` | read, ~~create~~, ~~update~~, ~~delete~~ | `name` | ⚠️ Read only (#19) |
+| `calendar_events` | read, create, update, delete | `startDate`, `endDate`, `calendarName`, `recurrence` | ✅ Working |
+| `calendar_calendars` | read | — | ✅ Working |
+| `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
+| `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
+| `mail_messages` | read, ~~create~~, update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ⚠️ Create broken (#20) |
+| `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
+| `contacts_people` | read, ~~create~~, ~~update~~, delete | `search`, `id` | ⚠️ Create/update broken (#21) |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
 ## Known Issues & Permissions
+
+### Critical Bugs (as of 2026-02-03 integration testing)
+
+| Issue | Subsystem | Problem | File |
+|-------|-----------|---------|------|
+| #19 | Reminders | List creation fails - missing `.source` assignment | `EventKitCLI.swift:332` |
+| #20 | Mail | Create sends email instead of saving draft | `mailHandlers.ts:208` |
+| #21 | Contacts | Create/update/search fail - JXA `pushOnto` bug | `contactsHandlers.ts:369` |
+
+### Minor Issues
+
+- **Calendar**: Recurring event deletion only removes single occurrence (uses `.thisEvent` span)
+- **Notes**: Update handler returns error despite succeeding (error handling issue)
 
 ### Messages JXA Broken (Sonoma+)
 
