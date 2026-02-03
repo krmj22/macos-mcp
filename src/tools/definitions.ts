@@ -516,7 +516,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'contacts_people',
     description:
-      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, and creating new contacts.',
+      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, creating new contacts, and updating existing contacts.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -528,7 +528,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         id: {
           type: 'string',
           description:
-            'The unique identifier of the contact (optional for read to get single contact).',
+            'The unique identifier of the contact (REQUIRED for update; optional for read to get single contact).',
         },
         search: {
           type: 'string',
@@ -537,19 +537,19 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         },
         firstName: {
           type: 'string',
-          description: 'First name for the contact (for create).',
+          description: 'First name for the contact (for create/update).',
         },
         lastName: {
           type: 'string',
-          description: 'Last name for the contact (for create).',
+          description: 'Last name for the contact (for create/update).',
         },
         organization: {
           type: 'string',
-          description: 'Organization/company name (for create).',
+          description: 'Organization/company name (for create/update).',
         },
         jobTitle: {
           type: 'string',
-          description: 'Job title (for create).',
+          description: 'Job title (for create/update).',
         },
         email: {
           type: 'string',
@@ -597,7 +597,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         },
         note: {
           type: 'string',
-          description: 'Notes for the contact (for create).',
+          description: 'Notes for the contact (for create/update).',
         },
         limit: {
           type: 'number',
@@ -621,6 +621,10 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
             },
             {
               properties: { action: { const: 'create' } },
+            },
+            {
+              properties: { action: { const: 'update' } },
+              required: ['id'],
             },
           ],
         },

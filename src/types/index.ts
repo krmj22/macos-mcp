@@ -244,12 +244,13 @@ export interface MessagesToolArgs extends BaseToolArgs {
 
 // --- Contacts ---
 
-export type ContactsAction = 'read' | 'search' | 'create';
+export type ContactsAction = 'read' | 'search' | 'create' | 'update';
 
 export const CONTACTS_ACTIONS: readonly ContactsAction[] = [
   'read',
   'search',
   'create',
+  'update',
 ] as const;
 
 /**

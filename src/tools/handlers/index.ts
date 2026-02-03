@@ -14,6 +14,7 @@ export {
   handleCreateContact,
   handleReadContacts,
   handleSearchContacts,
+  handleUpdateContact,
 } from './contactsHandlers.js';
 export {
   handleCreateReminderList,

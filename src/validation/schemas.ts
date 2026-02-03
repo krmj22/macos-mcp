@@ -361,6 +361,27 @@ export const CreateContactSchema = z
     message: 'At least one of firstName, lastName, or organization is required',
   });
 
+export const UpdateContactSchema = z.object({
+  id: SafeIdSchema,
+  firstName: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'First name',
+  ),
+  lastName: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'Last name',
+  ),
+  organization: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'Organization',
+  ),
+  jobTitle: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'Job title',
+  ),
+  note: SafeNoteSchema,
+});
+
 /**
  * Validation error wrapper for consistent error handling across the application
  * @extends Error
