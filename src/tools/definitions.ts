@@ -164,7 +164,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'calendar_events',
     description:
-      'Manages calendar events (time blocks). Supports reading, creating, updating, and deleting calendar events.',
+      'Manages calendar events (time blocks). Supports reading, creating, updating, and deleting calendar events, including recurring events.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -216,6 +216,28 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'string',
           description:
             'The name of the calendar for create or update operations.',
+        },
+        // Recurrence properties
+        recurrence: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'monthly', 'yearly'],
+          description:
+            'Recurrence frequency for the event (for create/update).',
+        },
+        recurrenceInterval: {
+          type: 'number',
+          description:
+            'How often the event recurs (e.g., 2 = every 2 days/weeks/months/years). Default: 1.',
+        },
+        recurrenceEnd: {
+          type: 'string',
+          description:
+            "End date for recurrence in 'YYYY-MM-DD' format. Specify either recurrenceEnd or recurrenceCount, not both.",
+        },
+        recurrenceCount: {
+          type: 'number',
+          description:
+            'Number of occurrences for the recurrence. Specify either recurrenceEnd or recurrenceCount, not both.',
         },
         // Read filters
         filterCalendar: {

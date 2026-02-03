@@ -58,6 +58,14 @@ export const handleCreateCalendarEvent = async (
       args,
       CreateCalendarEventSchema,
     );
+    const recurrence = validatedArgs.recurrence
+      ? {
+          frequency: validatedArgs.recurrence,
+          interval: validatedArgs.recurrenceInterval,
+          endDate: validatedArgs.recurrenceEnd,
+          occurrenceCount: validatedArgs.recurrenceCount,
+        }
+      : undefined;
     const event = await calendarRepository.createEvent({
       title: validatedArgs.title,
       startDate: validatedArgs.startDate,
@@ -67,6 +75,7 @@ export const handleCreateCalendarEvent = async (
       location: validatedArgs.location,
       url: validatedArgs.url,
       isAllDay: validatedArgs.isAllDay,
+      recurrence,
     });
     return formatSuccessMessage('created', 'event', event.title, event.id);
   }, 'create calendar event');
@@ -80,6 +89,14 @@ export const handleUpdateCalendarEvent = async (
       args,
       UpdateCalendarEventSchema,
     );
+    const recurrence = validatedArgs.recurrence
+      ? {
+          frequency: validatedArgs.recurrence,
+          interval: validatedArgs.recurrenceInterval,
+          endDate: validatedArgs.recurrenceEnd,
+          occurrenceCount: validatedArgs.recurrenceCount,
+        }
+      : undefined;
     const event = await calendarRepository.updateEvent({
       id: validatedArgs.id,
       title: validatedArgs.title,
@@ -90,6 +107,7 @@ export const handleUpdateCalendarEvent = async (
       location: validatedArgs.location,
       url: validatedArgs.url,
       isAllDay: validatedArgs.isAllDay,
+      recurrence,
     });
     return formatSuccessMessage('updated', 'event', event.title, event.id);
   }, 'update calendar event');

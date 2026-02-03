@@ -281,6 +281,7 @@ describe('Tool Handlers', () => {
         location: null,
         url: null,
         isAllDay: false,
+        recurrence: null,
       };
       mockCalendarRepository.createEvent.mockResolvedValue(mockEvent);
       const result = await handleCreateCalendarEvent({
@@ -308,6 +309,7 @@ describe('Tool Handlers', () => {
         location: null,
         url: null,
         isAllDay: false,
+        recurrence: null,
       };
       mockCalendarRepository.updateEvent.mockResolvedValue(mockEvent);
       const result = await handleUpdateCalendarEvent({

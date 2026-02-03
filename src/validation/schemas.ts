@@ -161,6 +161,18 @@ export const DeleteReminderSchema = z.object({
   id: SafeIdSchema,
 });
 
+// Recurrence schema
+export const RecurrenceSchema = z
+  .object({
+    frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+    interval: z.number().int().min(1).max(99).optional().default(1),
+    endDate: SafeDateSchema,
+    occurrenceCount: z.number().int().min(1).max(999).optional(),
+  })
+  .refine((data) => !(data.endDate && data.occurrenceCount), {
+    message: 'Specify either endDate or occurrenceCount, not both',
+  });
+
 // Calendar event schemas
 export const CreateCalendarEventSchema = z.object({
   title: SafeTextSchema,
@@ -174,6 +186,10 @@ export const CreateCalendarEventSchema = z.object({
   url: SafeUrlSchema,
   isAllDay: z.boolean().optional(),
   targetCalendar: SafeListNameSchema,
+  recurrence: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
+  recurrenceInterval: z.number().int().min(1).max(99).optional(),
+  recurrenceEnd: SafeDateSchema,
+  recurrenceCount: z.number().int().min(1).max(999).optional(),
 });
 
 export const ReadCalendarEventsSchema = z.object({
@@ -197,6 +213,10 @@ export const UpdateCalendarEventSchema = z.object({
   url: SafeUrlSchema,
   isAllDay: z.boolean().optional(),
   targetCalendar: SafeListNameSchema,
+  recurrence: z.enum(['daily', 'weekly', 'monthly', 'yearly']).optional(),
+  recurrenceInterval: z.number().int().min(1).max(99).optional(),
+  recurrenceEnd: SafeDateSchema,
+  recurrenceCount: z.number().int().min(1).max(999).optional(),
 });
 
 export const DeleteCalendarEventSchema = z.object({

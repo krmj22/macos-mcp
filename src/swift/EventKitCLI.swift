@@ -10,7 +10,8 @@ struct DeleteResult: Codable { let id: String; let deleted = true }
 struct DeleteListResult: Codable { let title: String; let deleted = true }
 struct ReminderJSON: Codable { let id: String, title: String, isCompleted: Bool, list: String, notes: String?, url: String?, dueDate: String? }
 struct ListJSON: Codable { let id: String, title: String }
-struct EventJSON: Codable { let id: String, title: String, calendar: String, startDate: String, endDate: String, notes: String?, location: String?, url: String?, isAllDay: Bool }
+struct RecurrenceJSON: Codable { let frequency: String, interval: Int, endDate: String?, occurrenceCount: Int? }
+struct EventJSON: Codable { let id: String, title: String, calendar: String, startDate: String, endDate: String, notes: String?, location: String?, url: String?, isAllDay: Bool, recurrence: RecurrenceJSON? }
 struct CalendarJSON: Codable { let id: String, title: String }
 struct EventsReadResult: Codable { let calendars: [CalendarJSON]; let events: [EventJSON] }
 
@@ -368,30 +369,51 @@ class RemindersManager {
         return filtered.map { $0.toJSON() }
     }
     
-    func createEvent(title: String, calendarName: String?, startDateString: String, endDateString: String, notes: String?, location: String?, urlString: String?, isAllDay: Bool?) throws -> EventJSON {
+    func createEvent(title: String, calendarName: String?, startDateString: String, endDateString: String, notes: String?, location: String?, urlString: String?, isAllDay: Bool?, recurrence: String?, recurrenceInterval: Int?, recurrenceEnd: String?, recurrenceCount: Int?) throws -> EventJSON {
         let event = EKEvent(eventStore: eventStore)
         event.calendar = try findCalendar(named: calendarName)
         event.title = title
-        
+
         guard let startDate = parseDate(from: startDateString),
               let endDate = parseDate(from: endDateString) else {
             throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid date format. Use 'YYYY-MM-DD HH:mm:ss' or ISO 8601 format."])
         }
-        
+
         if let startComponents = parseDateComponents(from: startDateString) {
             event.timeZone = startComponents.timeZone
         }
-        
+
         event.startDate = startDate
         event.endDate = endDate
         event.isAllDay = isAllDay ?? false
-        
+
         if let notesStr = notes { event.notes = notesStr }
         if let locationStr = location { event.location = locationStr }
         if let urlStr = urlString, !urlStr.isEmpty, let url = URL(string: urlStr) {
             event.url = url
         }
-        
+
+        // Handle recurrence rule
+        if let recurrenceStr = recurrence {
+            let frequency: EKRecurrenceFrequency
+            switch recurrenceStr.lowercased() {
+            case "daily": frequency = .daily
+            case "weekly": frequency = .weekly
+            case "monthly": frequency = .monthly
+            case "yearly": frequency = .yearly
+            default: throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid recurrence frequency '\(recurrenceStr)'. Must be 'daily', 'weekly', 'monthly', or 'yearly'."])
+            }
+            let interval = recurrenceInterval ?? 1
+            var end: EKRecurrenceEnd? = nil
+            if let endDateStr = recurrenceEnd, let endDate = parseDate(from: endDateStr) {
+                end = EKRecurrenceEnd(end: endDate)
+            } else if let count = recurrenceCount {
+                end = EKRecurrenceEnd(occurrenceCount: count)
+            }
+            let rule = EKRecurrenceRule(recurrenceWith: frequency, interval: interval, end: end)
+            event.recurrenceRules = [rule]
+        }
+
         do {
             try eventStore.save(event, span: .thisEvent, commit: true)
         } catch {
@@ -407,14 +429,14 @@ class RemindersManager {
         return eventStore.event(withIdentifier: id)
     }
     
-    func updateEvent(id: String, title: String?, calendarName: String?, startDateString: String?, endDateString: String?, notes: String?, location: String?, urlString: String?, isAllDay: Bool?) throws -> EventJSON {
+    func updateEvent(id: String, title: String?, calendarName: String?, startDateString: String?, endDateString: String?, notes: String?, location: String?, urlString: String?, isAllDay: Bool?, recurrence: String?, recurrenceInterval: Int?, recurrenceEnd: String?, recurrenceCount: Int?) throws -> EventJSON {
         guard let event = findEvent(withId: id) else {
             throw NSError(domain: "", code: 404, userInfo: [NSLocalizedDescriptionKey: "Event with ID '\(id)' not found."])
         }
-        
+
         if let newTitle = title { event.title = newTitle }
         if let newCalendar = calendarName { event.calendar = try findCalendar(named: newCalendar) }
-        
+
         if let startStr = startDateString {
             guard let startDate = parseDate(from: startStr) else {
                 throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid start date format."])
@@ -425,13 +447,13 @@ class RemindersManager {
             }
             event.startDate = startDate
         }
-        
+
         if let endStr = endDateString {
             guard let endDate = parseDate(from: endStr) else {
                 throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid end date format."])
             }
             event.endDate = endDate
-            
+
             // Handle end date timezone - EventKit only supports one timezone per event
             if let endComponents = parseDateComponents(from: endStr), let endTz = endComponents.timeZone {
                 if let existingTz = event.timeZone {
@@ -445,7 +467,7 @@ class RemindersManager {
                 }
             }
         }
-        
+
         if let notesStr = notes { event.notes = notesStr }
         if let locationStr = location { event.location = locationStr }
         if let urlStr = urlString {
@@ -456,7 +478,28 @@ class RemindersManager {
             }
         }
         if let allDay = isAllDay { event.isAllDay = allDay }
-        
+
+        // Handle recurrence rule update
+        if let recurrenceStr = recurrence {
+            let frequency: EKRecurrenceFrequency
+            switch recurrenceStr.lowercased() {
+            case "daily": frequency = .daily
+            case "weekly": frequency = .weekly
+            case "monthly": frequency = .monthly
+            case "yearly": frequency = .yearly
+            default: throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid recurrence frequency '\(recurrenceStr)'. Must be 'daily', 'weekly', 'monthly', or 'yearly'."])
+            }
+            let interval = recurrenceInterval ?? 1
+            var end: EKRecurrenceEnd? = nil
+            if let endDateStr = recurrenceEnd, let endDate = parseDate(from: endDateStr) {
+                end = EKRecurrenceEnd(end: endDate)
+            } else if let count = recurrenceCount {
+                end = EKRecurrenceEnd(occurrenceCount: count)
+            }
+            let rule = EKRecurrenceRule(recurrenceWith: frequency, interval: interval, end: end)
+            event.recurrenceRules = [rule]
+        }
+
         try eventStore.save(event, span: .thisEvent, commit: true)
         return event.toJSON()
     }
@@ -546,6 +589,29 @@ extension EKEvent {
         let eventTimeZone = self.timeZone ?? TimeZone.current
         let includeTime = !self.isAllDay
 
+        // Extract recurrence rule if present
+        var recurrence: RecurrenceJSON? = nil
+        if let rules = self.recurrenceRules, let rule = rules.first {
+            let freq: String
+            switch rule.frequency {
+            case .daily: freq = "daily"
+            case .weekly: freq = "weekly"
+            case .monthly: freq = "monthly"
+            case .yearly: freq = "yearly"
+            @unknown default: freq = "unknown"
+            }
+            var endDateStr: String? = nil
+            var occCount: Int? = nil
+            if let recEnd = rule.recurrenceEnd {
+                if let endDate = recEnd.endDate {
+                    endDateStr = formatEventDate(endDate, preferredTimeZone: eventTimeZone, includeTime: false)
+                } else if recEnd.occurrenceCount > 0 {
+                    occCount = recEnd.occurrenceCount
+                }
+            }
+            recurrence = RecurrenceJSON(frequency: freq, interval: rule.interval, endDate: endDateStr, occurrenceCount: occCount)
+        }
+
         return EventJSON(
             id: self.eventIdentifier,
             title: self.title,
@@ -555,7 +621,8 @@ extension EKEvent {
             notes: self.notes,
             location: self.location,
             url: self.url?.absoluteString,
-            isAllDay: self.isAllDay
+            isAllDay: self.isAllDay,
+            recurrence: recurrence
         )
     }
 }
@@ -668,11 +735,11 @@ func main() {
                 guard let title = parser.get("title") else { throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "--title required."]) }
                 guard let startDate = parser.get("startDate") else { throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "--startDate required."]) }
                 guard let endDate = parser.get("endDate") else { throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "--endDate required."]) }
-                let event = try manager.createEvent(title: title, calendarName: parser.get("targetCalendar"), startDateString: startDate, endDateString: endDate, notes: parser.get("note"), location: parser.get("location"), urlString: parser.get("url"), isAllDay: parser.get("isAllDay").map { $0 == "true" })
+                let event = try manager.createEvent(title: title, calendarName: parser.get("targetCalendar"), startDateString: startDate, endDateString: endDate, notes: parser.get("note"), location: parser.get("location"), urlString: parser.get("url"), isAllDay: parser.get("isAllDay").map { $0 == "true" }, recurrence: parser.get("recurrence"), recurrenceInterval: parser.get("recurrenceInterval").flatMap(Int.init), recurrenceEnd: parser.get("recurrenceEnd"), recurrenceCount: parser.get("recurrenceCount").flatMap(Int.init))
                 print(String(data: try encoder.encode(StandardOutput(result: event)), encoding: .utf8)!)
             case "update-event":
                 guard let id = parser.get("id") else { throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "--id required."]) }
-                let event = try manager.updateEvent(id: id, title: parser.get("title"), calendarName: parser.get("targetCalendar"), startDateString: parser.get("startDate"), endDateString: parser.get("endDate"), notes: parser.get("note"), location: parser.get("location"), urlString: parser.get("url"), isAllDay: parser.get("isAllDay").map { $0 == "true" })
+                let event = try manager.updateEvent(id: id, title: parser.get("title"), calendarName: parser.get("targetCalendar"), startDateString: parser.get("startDate"), endDateString: parser.get("endDate"), notes: parser.get("note"), location: parser.get("location"), urlString: parser.get("url"), isAllDay: parser.get("isAllDay").map { $0 == "true" }, recurrence: parser.get("recurrence"), recurrenceInterval: parser.get("recurrenceInterval").flatMap(Int.init), recurrenceEnd: parser.get("recurrenceEnd"), recurrenceCount: parser.get("recurrenceCount").flatMap(Int.init))
                 print(String(data: try encoder.encode(StandardOutput(result: event)), encoding: .utf8)!)
             case "delete-event":
                 guard let id = parser.get("id") else { throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "--id required."]) }

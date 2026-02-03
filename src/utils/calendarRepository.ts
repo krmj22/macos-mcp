@@ -15,6 +15,7 @@ import { executeCli } from './cliExecutor.js';
 import {
   addOptionalArg,
   addOptionalBooleanArg,
+  addOptionalNumberArg,
   nullToUndefined,
 } from './helpers.js';
 
@@ -86,6 +87,13 @@ class CalendarRepository {
     addOptionalArg(args, '--location', data.location);
     addOptionalArg(args, '--url', data.url);
     addOptionalBooleanArg(args, '--isAllDay', data.isAllDay);
+    // Recurrence parameters
+    if (data.recurrence) {
+      addOptionalArg(args, '--recurrence', data.recurrence.frequency);
+      addOptionalNumberArg(args, '--recurrenceInterval', data.recurrence.interval);
+      addOptionalArg(args, '--recurrenceEnd', data.recurrence.endDate);
+      addOptionalNumberArg(args, '--recurrenceCount', data.recurrence.occurrenceCount);
+    }
 
     return executeCli<EventJSON>(args);
   }
@@ -100,6 +108,13 @@ class CalendarRepository {
     addOptionalArg(args, '--location', data.location);
     addOptionalArg(args, '--url', data.url);
     addOptionalBooleanArg(args, '--isAllDay', data.isAllDay);
+    // Recurrence parameters
+    if (data.recurrence) {
+      addOptionalArg(args, '--recurrence', data.recurrence.frequency);
+      addOptionalNumberArg(args, '--recurrenceInterval', data.recurrence.interval);
+      addOptionalArg(args, '--recurrenceEnd', data.recurrence.endDate);
+      addOptionalNumberArg(args, '--recurrenceCount', data.recurrence.occurrenceCount);
+    }
 
     return executeCli<EventJSON>(args);
   }
