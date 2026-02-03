@@ -16,6 +16,7 @@ import {
   CreateContactSchema,
   ReadContactsSchema,
   SearchContactsSchema,
+  UpdateContactSchema,
 } from '../../validation/schemas.js';
 import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
 
@@ -186,6 +187,22 @@ const CREATE_CONTACT_SCRIPT = `
     id: person.id(),
     fullName: person.name() || ""
   });
+})()
+`;
+
+const UPDATE_CONTACT_SCRIPT = `
+(() => {
+  const Contacts = Application("Contacts");
+  const people = Contacts.people.whose({id: "{{id}}"})();
+  if (people.length === 0) throw new Error("Contact not found");
+  const p = people[0];
+  {{setFirstName}}
+  {{setLastName}}
+  {{setOrganization}}
+  {{setJobTitle}}
+  {{setNote}}
+  Contacts.save();
+  return JSON.stringify({id: p.id(), name: p.name() || ""});
 })()
 `;
 
@@ -382,4 +399,46 @@ export async function handleCreateContact(
     );
     return `Successfully created contact "${result.fullName}".\n- ID: ${result.id}`;
   }, 'create contact');
+}
+
+export async function handleUpdateContact(
+  args: ContactsToolArgs,
+): Promise<CallToolResult> {
+  return handleAsyncOperation(async () => {
+    const validated = extractAndValidateArgs(args, UpdateContactSchema);
+
+    // Build conditional set statements
+    const setFirstName = validated.firstName
+      ? `p.firstName = "${sanitizeForJxa(validated.firstName)}";`
+      : '';
+    const setLastName = validated.lastName
+      ? `p.lastName = "${sanitizeForJxa(validated.lastName)}";`
+      : '';
+    const setOrganization = validated.organization
+      ? `p.organization = "${sanitizeForJxa(validated.organization)}";`
+      : '';
+    const setJobTitle = validated.jobTitle
+      ? `p.jobTitle = "${sanitizeForJxa(validated.jobTitle)}";`
+      : '';
+    const setNote =
+      validated.note !== undefined
+        ? `p.note = "${sanitizeForJxa(validated.note)}";`
+        : '';
+
+    const script = buildScript(UPDATE_CONTACT_SCRIPT, {
+      id: validated.id,
+      setFirstName,
+      setLastName,
+      setOrganization,
+      setJobTitle,
+      setNote,
+    });
+
+    const result = await executeJxa<{ id: string; name: string }>(
+      script,
+      10000,
+      'Contacts',
+    );
+    return `Successfully updated contact "${result.name}".\n- ID: ${result.id}`;
+  }, 'update contact');
 }

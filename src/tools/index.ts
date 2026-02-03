@@ -42,6 +42,7 @@ import {
   handleReadReminders,
   handleSearchContacts,
   handleUpdateCalendarEvent,
+  handleUpdateContact,
   handleUpdateMail,
   handleUpdateNote,
   handleUpdateReminder,
@@ -177,6 +178,7 @@ const TOOL_ROUTER_MAP = {
       read: (contactsArgs) => handleReadContacts(contactsArgs),
       search: (contactsArgs) => handleSearchContacts(contactsArgs),
       create: (contactsArgs) => handleCreateContact(contactsArgs),
+      update: (contactsArgs) => handleUpdateContact(contactsArgs),
     },
   ),
 } satisfies Record<ToolName, ToolRouter>;
