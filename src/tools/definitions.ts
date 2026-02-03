@@ -268,7 +268,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_items',
     description:
-      'Manages Apple Notes. Supports reading, creating, updating, and deleting notes.',
+      'Manages Apple Notes. Supports reading, creating, updating (including moving between folders), and deleting notes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -294,6 +294,11 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'string',
           description:
             'The folder name — for create (defaults to Notes) or for read to filter by folder.',
+        },
+        targetFolder: {
+          type: 'string',
+          description:
+            'The destination folder name to move the note to (for update action).',
         },
         search: {
           type: 'string',
