@@ -382,6 +382,10 @@ export const UpdateContactSchema = z.object({
   note: SafeNoteSchema,
 });
 
+export const DeleteContactSchema = z.object({
+  id: SafeIdSchema,
+});
+
 /**
  * Validation error wrapper for consistent error handling across the application
  * @extends Error

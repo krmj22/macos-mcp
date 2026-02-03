@@ -14,6 +14,7 @@ import {
 } from '../../utils/jxaExecutor.js';
 import {
   CreateContactSchema,
+  DeleteContactSchema,
   ReadContactsSchema,
   SearchContactsSchema,
   UpdateContactSchema,
@@ -203,6 +204,18 @@ const UPDATE_CONTACT_SCRIPT = `
   {{setNote}}
   Contacts.save();
   return JSON.stringify({id: p.id(), name: p.name() || ""});
+})()
+`;
+
+const DELETE_CONTACT_SCRIPT = `
+(() => {
+  const Contacts = Application("Contacts");
+  const people = Contacts.people.whose({id: "{{id}}"})();
+  if (people.length === 0) throw new Error("Contact not found");
+  const name = people[0].name() || "";
+  Contacts.delete(people[0]);
+  Contacts.save();
+  return JSON.stringify({deleted: true, name: name});
 })()
 `;
 
@@ -441,4 +454,19 @@ export async function handleUpdateContact(
     );
     return `Successfully updated contact "${result.name}".\n- ID: ${result.id}`;
   }, 'update contact');
+}
+
+export async function handleDeleteContact(
+  args: ContactsToolArgs,
+): Promise<CallToolResult> {
+  return handleAsyncOperation(async () => {
+    const validated = extractAndValidateArgs(args, DeleteContactSchema);
+    const script = buildScript(DELETE_CONTACT_SCRIPT, { id: validated.id });
+    const result = await executeJxa<{ deleted: boolean; name: string }>(
+      script,
+      10000,
+      'Contacts',
+    );
+    return `Successfully deleted contact "${result.name}".\n- ID: ${validated.id}`;
+  }, 'delete contact');
 }
