@@ -30,6 +30,19 @@ else
     exit 1
 fi
 
+# Check Contacts automation permissions
+echo "📇 Checking Contacts automation permissions..."
+CONTACTS_CHECK=$(osascript -l JavaScript -e 'Application("Contacts").people.length' 2>&1)
+if [[ $? -eq 0 ]]; then
+    echo "✅ Contacts automation permissions granted"
+    echo "Total contacts: $CONTACTS_CHECK"
+else
+    echo "❌ Contacts automation permissions denied or not yet authorized"
+    echo "Please grant access in System Settings > Privacy & Security > Automation > Contacts"
+    echo "Re-run this script after granting permission"
+    exit 1
+fi
+
 echo ""
 echo "🎉 All permission checks passed!"
 echo "📱 macos-mcp is ready to run"

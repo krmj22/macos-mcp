@@ -13,10 +13,10 @@ import {
   executeJxaWithRetry,
 } from '../../utils/jxaExecutor.js';
 import {
-  SqliteAccessError,
-  readChatMessages,
-  searchMessages,
   getLastMessage,
+  readChatMessages,
+  SqliteAccessError,
+  searchMessages,
 } from '../../utils/sqliteMessageReader.js';
 import {
   CreateMessageSchema,

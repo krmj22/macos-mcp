@@ -23,10 +23,10 @@ pnpm lint
 
 ## Architecture
 
-This is an MCP (Model Context Protocol) server providing native macOS integration with six Apple apps: **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts** (planned). The server uses two bridging strategies:
+This is an MCP (Model Context Protocol) server providing native macOS integration with seven Apple apps: **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts**. The server uses two bridging strategies:
 
 - **EventKit (Swift binary)** — Reminders and Calendar
-- **JXA (JavaScript for Automation)** — Notes, Mail, Messages
+- **JXA (JavaScript for Automation)** — Notes, Mail, Messages, Contacts
 
 ### Layer Structure
 
@@ -48,6 +48,7 @@ src/
 │       ├── notesHandlers.ts      # JXA — notes CRUD + folder management
 │       ├── mailHandlers.ts       # JXA — mail read/send/reply/delete
 │       ├── messagesHandlers.ts   # JXA — iMessage read/send
+│       ├── contactsHandlers.ts   # JXA — contacts read/search/create
 │       ├── shared.ts             # Shared formatting (formatListMarkdown, extractAndValidateArgs)
 │       └── index.ts              # Handler barrel export
 ├── utils/
@@ -80,7 +81,7 @@ src/
 7. Swift binary performs EventKit operations, returns JSON
 8. Response flows back through layers as `CallToolResult`
 
-#### JXA Path (Notes, Mail, Messages)
+#### JXA Path (Notes, Mail, Messages, Contacts)
 
 1. MCP client sends tool call via stdio
 2. `handlers.ts` routes to `handleToolCall()` in `tools/index.ts`
@@ -103,7 +104,7 @@ The server implements a two-layer permission prompt strategy for EventKit:
 
 3. **Retry with AppleScript Fallback**: If a permission error occurs after the Swift binary runs, the system retries once with the AppleScript fallback.
 
-JXA-based tools rely on macOS Automation permissions (System Settings > Privacy & Security > Automation). The user must grant access for `osascript` to control Notes, Mail, and Messages.
+JXA-based tools rely on macOS Automation permissions (System Settings > Privacy & Security > Automation). The user must grant access for `osascript` to control Notes, Mail, Messages, and Contacts.
 
 ### Swift Bridge
 
@@ -163,6 +164,7 @@ Tools support both underscore and dot notation:
 - `notes_folders` / `notes.folders` — Notes folder management
 - `mail_messages` / `mail.messages` — Mail read/send/reply/delete
 - `messages_chat` / `messages.chat` — iMessage read/send
+- `contacts_people` / `contacts.people` — Contacts read/search/create
 
 ### Shared Formatting
 
@@ -185,3 +187,88 @@ JXA handlers use shared utilities from `handlers/shared.ts`:
 - **Binary security**: Path validation in `binaryValidator.ts` restricts allowed binary locations
 - **Date formats**: Prefer `YYYY-MM-DD HH:mm:ss` for local time, ISO 8601 with timezone for UTC
 - **JXA string safety**: Always use `sanitizeForJxa()` before interpolating user input into JXA scripts
+
+## Quick Tool Reference
+
+| Tool | Actions | Key Parameters |
+|------|---------|----------------|
+| `reminders_tasks` | read, create, update, delete | `filterList`, `dueWithin`, `search` |
+| `reminders_lists` | read, create, update, delete | `name` |
+| `calendar_events` | read, create, update, delete | `startDate`, `endDate`, `calendarName` |
+| `calendar_calendars` | read | - |
+| `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset` |
+| `notes_folders` | read, create | `name` |
+| `mail_messages` | read, create, update, delete | `mailbox`, `account`, `replyToId`, `cc`, `bcc` |
+| `messages_chat` | read, create | `chatId`, `search`, `searchMessages`, `to` |
+| `contacts_people` | read, search, create | `search`, `firstName`, `lastName`, `email`, `phone` |
+
+Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work identically.
+
+## Known Issues & Workarounds
+
+### Messages JXA Broken (Sonoma+)
+
+JXA `c.messages()` throws "Can't convert types" on modern macOS. The server automatically falls back to SQLite:
+
+1. **First attempt**: JXA (works on older macOS)
+2. **Fallback**: SQLite at `~/Library/Messages/chat.db`
+
+SQLite requires **Full Disk Access** for your terminal app:
+- System Settings → Privacy & Security → Full Disk Access → Enable for Terminal/iTerm
+
+### Permission Dialog Suppression
+
+Swift binary permission dialogs may not appear in non-interactive contexts. The server proactively triggers an AppleScript prompt before the first EventKit call to ensure the dialog surfaces.
+
+## Permission Troubleshooting
+
+| App | Permission | Location |
+|-----|------------|----------|
+| Reminders | Full Access | Privacy & Security → Reminders |
+| Calendar | Full Access | Privacy & Security → Calendars |
+| Notes | Automation | Privacy & Security → Automation → Notes |
+| Mail | Automation | Privacy & Security → Automation → Mail |
+| Messages | Automation + Full Disk Access | Automation → Messages, Full Disk Access |
+| Contacts | Automation | Privacy & Security → Automation → Contacts |
+
+## Verification Commands
+
+```bash
+# Test all tools work
+pnpm test
+
+# Test specific subsystems
+pnpm test -- src/swift/Info.plist.test.ts      # Permission keys declared
+pnpm test -- src/tools/jxaHandlers.test.ts     # JXA handlers
+pnpm test -- src/utils/cliExecutor.test.ts     # CLI with retry logic
+
+# Quick smoke test (requires permissions granted)
+node dist/index.js  # Start server, test via MCP client
+```
+
+## Direct Data Access (Debugging)
+
+When MCP tools aren't available, access data directly:
+
+```bash
+# Messages (SQLite - most reliable on modern macOS)
+sqlite3 -json ~/Library/Messages/chat.db "
+SELECT m.text, m.is_from_me,
+       datetime(m.date/1000000000 + strftime('%s','2001-01-01'), 'unixepoch', 'localtime') as time
+FROM message m ORDER BY m.date DESC LIMIT 20"
+
+# Notes (JXA - works reliably)
+osascript -l JavaScript -e 'Application("Notes").notes.slice(0,5).map(n=>n.name())'
+
+# Mail (JXA - works reliably)
+osascript -l JavaScript -e 'Application("Mail").inbox().messages.slice(0,5).map(m=>m.subject())'
+
+# Contacts (JXA - works reliably)
+osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.name())'
+```
+
+### Apple Timestamp Conversion
+
+Messages database uses nanoseconds since 2001-01-01:
+- **SQLite**: `datetime(date/1000000000 + strftime('%s','2001-01-01'), 'unixepoch', 'localtime')`
+- **JavaScript**: `new Date(new Date('2001-01-01').getTime() + timestamp / 1_000_000)`

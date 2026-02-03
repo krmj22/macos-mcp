@@ -50,6 +50,8 @@ export const TOOLS = {
   MAIL_MESSAGES: 'mail_messages',
   /** Messages chat management tool */
   MESSAGES_CHAT: 'messages_chat',
+  /** Contacts people management tool */
+  CONTACTS_PEOPLE: 'contacts_people',
 
   /** Aliases for dot notation support */
   ALIASES: {
@@ -61,6 +63,7 @@ export const TOOLS = {
     'notes.folders': 'notes_folders',
     'mail.messages': 'mail_messages',
     'messages.chat': 'messages_chat',
+    'contacts.people': 'contacts_people',
   } as const,
 } as const;
 

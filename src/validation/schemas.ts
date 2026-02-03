@@ -303,6 +303,64 @@ export const CreateMessageSchema = z.object({
   chatId: z.string().optional(),
 });
 
+// --- Contacts Schemas ---
+
+export const ReadContactsSchema = z.object({
+  id: SafeIdSchema.optional(),
+  ...PaginationFields,
+});
+
+export const SearchContactsSchema = z.object({
+  search: z
+    .string()
+    .min(1, 'Search term is required')
+    .max(VALIDATION.MAX_SEARCH_LENGTH),
+  ...PaginationFields,
+});
+
+export const CreateContactSchema = z
+  .object({
+    firstName: createOptionalSafeTextSchema(
+      VALIDATION.MAX_TITLE_LENGTH,
+      'First name',
+    ),
+    lastName: createOptionalSafeTextSchema(
+      VALIDATION.MAX_TITLE_LENGTH,
+      'Last name',
+    ),
+    organization: createOptionalSafeTextSchema(
+      VALIDATION.MAX_TITLE_LENGTH,
+      'Organization',
+    ),
+    jobTitle: createOptionalSafeTextSchema(
+      VALIDATION.MAX_TITLE_LENGTH,
+      'Job title',
+    ),
+    email: z.string().email('Invalid email format').optional(),
+    emailLabel: createOptionalSafeTextSchema(50, 'Email label'),
+    phone: createOptionalSafeTextSchema(50, 'Phone'),
+    phoneLabel: createOptionalSafeTextSchema(50, 'Phone label'),
+    street: createOptionalSafeTextSchema(
+      VALIDATION.MAX_LOCATION_LENGTH,
+      'Street',
+    ),
+    city: createOptionalSafeTextSchema(VALIDATION.MAX_LIST_NAME_LENGTH, 'City'),
+    state: createOptionalSafeTextSchema(
+      VALIDATION.MAX_LIST_NAME_LENGTH,
+      'State',
+    ),
+    zip: createOptionalSafeTextSchema(20, 'ZIP code'),
+    country: createOptionalSafeTextSchema(
+      VALIDATION.MAX_LIST_NAME_LENGTH,
+      'Country',
+    ),
+    addressLabel: createOptionalSafeTextSchema(50, 'Address label'),
+    note: SafeNoteSchema,
+  })
+  .refine((data) => data.firstName || data.lastName || data.organization, {
+    message: 'At least one of firstName, lastName, or organization is required',
+  });
+
 /**
  * Validation error wrapper for consistent error handling across the application
  * @extends Error

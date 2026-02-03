@@ -6,6 +6,7 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import {
   CALENDAR_ACTIONS,
+  CONTACTS_ACTIONS,
   DUE_WITHIN_OPTIONS,
   LIST_ACTIONS,
   MAIL_ACTIONS,
@@ -506,6 +507,120 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
             {
               properties: { action: { const: 'create' } },
               required: ['text'],
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
+    name: 'contacts_people',
+    description:
+      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, and creating new contacts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: CONTACTS_ACTIONS,
+          description: 'The operation to perform.',
+        },
+        id: {
+          type: 'string',
+          description:
+            'The unique identifier of the contact (optional for read to get single contact).',
+        },
+        search: {
+          type: 'string',
+          description:
+            'Search term to find contacts by name, email, or phone number (REQUIRED for search action).',
+        },
+        firstName: {
+          type: 'string',
+          description: 'First name for the contact (for create).',
+        },
+        lastName: {
+          type: 'string',
+          description: 'Last name for the contact (for create).',
+        },
+        organization: {
+          type: 'string',
+          description: 'Organization/company name (for create).',
+        },
+        jobTitle: {
+          type: 'string',
+          description: 'Job title (for create).',
+        },
+        email: {
+          type: 'string',
+          description: 'Email address (for create).',
+          format: 'email',
+        },
+        emailLabel: {
+          type: 'string',
+          description:
+            'Label for email address (e.g., "work", "home"). Default: "work".',
+        },
+        phone: {
+          type: 'string',
+          description: 'Phone number (for create).',
+        },
+        phoneLabel: {
+          type: 'string',
+          description:
+            'Label for phone number (e.g., "mobile", "home", "work"). Default: "mobile".',
+        },
+        street: {
+          type: 'string',
+          description: 'Street address (for create).',
+        },
+        city: {
+          type: 'string',
+          description: 'City (for create).',
+        },
+        state: {
+          type: 'string',
+          description: 'State/province (for create).',
+        },
+        zip: {
+          type: 'string',
+          description: 'ZIP/postal code (for create).',
+        },
+        country: {
+          type: 'string',
+          description: 'Country (for create).',
+        },
+        addressLabel: {
+          type: 'string',
+          description:
+            'Label for address (e.g., "home", "work"). Default: "home".',
+        },
+        note: {
+          type: 'string',
+          description: 'Notes for the contact (for create).',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of items to return (1-200, default 50).',
+          default: 50,
+        },
+        offset: {
+          type: 'number',
+          description: 'Number of items to skip for pagination (default 0).',
+          default: 0,
+        },
+      },
+      required: ['action'],
+      dependentSchemas: {
+        action: {
+          oneOf: [
+            { properties: { action: { const: 'read' } } },
+            {
+              properties: { action: { const: 'search' } },
+              required: ['search'],
+            },
+            {
+              properties: { action: { const: 'create' } },
             },
           ],
         },

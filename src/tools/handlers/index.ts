@@ -10,7 +10,11 @@ export {
   handleReadCalendars,
   handleUpdateCalendarEvent,
 } from './calendarHandlers.js';
-
+export {
+  handleCreateContact,
+  handleReadContacts,
+  handleSearchContacts,
+} from './contactsHandlers.js';
 export {
   handleCreateReminderList,
   handleDeleteReminderList,

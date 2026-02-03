@@ -29,7 +29,10 @@ function runSqlite(query: string, timeoutMs = 15000): Promise<string> {
       (error, stdout, stderr) => {
         if (error) {
           const msg = stderr || error.message;
-          if (msg.includes('authorization denied') || msg.includes('unable to open')) {
+          if (
+            msg.includes('authorization denied') ||
+            msg.includes('unable to open')
+          ) {
             reject(
               new SqliteAccessError(
                 'Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
@@ -116,7 +119,7 @@ export async function readChatMessages(
   return rows.reverse().map((row) => ({
     id: String(row.ROWID),
     text: row.text || '',
-    sender: row.is_from_me ? 'me' : (row.handle_id || 'unknown'),
+    sender: row.is_from_me ? 'me' : row.handle_id || 'unknown',
     date: appleTimestampToISO(row.date),
     isFromMe: row.is_from_me === 1,
   }));
@@ -157,7 +160,7 @@ export async function searchMessages(
   return rows.map((row) => ({
     id: String(row.ROWID),
     text: row.text || '',
-    sender: row.is_from_me ? 'me' : (row.handle_id || 'unknown'),
+    sender: row.is_from_me ? 'me' : row.handle_id || 'unknown',
     date: appleTimestampToISO(row.date),
     isFromMe: row.is_from_me === 1,
     chatId: row.chat_guid,

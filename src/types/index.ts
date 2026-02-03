@@ -242,6 +242,85 @@ export interface MessagesToolArgs extends BaseToolArgs {
   offset?: number;
 }
 
+// --- Contacts ---
+
+export type ContactsAction = 'read' | 'search' | 'create';
+
+export const CONTACTS_ACTIONS: readonly ContactsAction[] = [
+  'read',
+  'search',
+  'create',
+] as const;
+
+/**
+ * Represents an email address with optional label
+ */
+export interface ContactEmail {
+  value: string;
+  label?: string;
+}
+
+/**
+ * Represents a phone number with optional label
+ */
+export interface ContactPhone {
+  value: string;
+  label?: string;
+}
+
+/**
+ * Represents a physical address
+ */
+export interface ContactAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  label?: string;
+}
+
+/**
+ * Contact interface representing a person from Contacts app
+ */
+export interface Contact {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName: string;
+  organization?: string;
+  jobTitle?: string;
+  emails: ContactEmail[];
+  phones: ContactPhone[];
+  addresses: ContactAddress[];
+  note?: string;
+  birthday?: string;
+  modificationDate?: string;
+}
+
+export interface ContactsToolArgs extends BaseToolArgs {
+  action: ContactsAction;
+  id?: string;
+  search?: string;
+  firstName?: string;
+  lastName?: string;
+  organization?: string;
+  jobTitle?: string;
+  email?: string;
+  emailLabel?: string;
+  phone?: string;
+  phoneLabel?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  addressLabel?: string;
+  note?: string;
+  limit?: number;
+  offset?: number;
+}
+
 /**
  * Prompt-related type exports for consumers that need to interact with the
  * structured MCP prompt registry.

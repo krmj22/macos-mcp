@@ -7,6 +7,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type {
   CalendarsToolArgs,
   CalendarToolArgs,
+  ContactsToolArgs,
   ListsToolArgs,
   MailToolArgs,
   MessagesToolArgs,
@@ -18,6 +19,7 @@ import { MESSAGES, TOOLS as TOOL_NAMES } from '../utils/constants.js';
 import { TOOLS } from './definitions.js';
 import {
   handleCreateCalendarEvent,
+  handleCreateContact,
   handleCreateMail,
   handleCreateMessage,
   handleCreateNote,
@@ -31,12 +33,14 @@ import {
   handleDeleteReminderList,
   handleReadCalendarEvents,
   handleReadCalendars,
+  handleReadContacts,
   handleReadMail,
   handleReadMessages,
   handleReadNotes,
   handleReadNotesFolders,
   handleReadReminderLists,
   handleReadReminders,
+  handleSearchContacts,
   handleUpdateCalendarEvent,
   handleUpdateMail,
   handleUpdateNote,
@@ -58,7 +62,8 @@ type ToolArgs =
   | NotesToolArgs
   | NotesFoldersToolArgs
   | MailToolArgs
-  | MessagesToolArgs;
+  | MessagesToolArgs
+  | ContactsToolArgs;
 
 type ToolRouter = (args?: ToolArgs) => Promise<CallToolResult>;
 
@@ -73,7 +78,8 @@ type RoutedToolName =
   | 'notes_items'
   | 'notes_folders'
   | 'mail_messages'
-  | 'messages_chat';
+  | 'messages_chat'
+  | 'contacts_people';
 type ToolName = RoutedToolName | 'calendar_calendars';
 
 /**
@@ -163,6 +169,14 @@ const TOOL_ROUTER_MAP = {
     {
       read: (msgArgs) => handleReadMessages(msgArgs),
       create: (msgArgs) => handleCreateMessage(msgArgs),
+    },
+  ),
+  [TOOL_NAMES.CONTACTS_PEOPLE]: createActionRouter<ContactsToolArgs>(
+    TOOL_NAMES.CONTACTS_PEOPLE,
+    {
+      read: (contactsArgs) => handleReadContacts(contactsArgs),
+      search: (contactsArgs) => handleSearchContacts(contactsArgs),
+      create: (contactsArgs) => handleCreateContact(contactsArgs),
     },
   ),
 } satisfies Record<ToolName, ToolRouter>;

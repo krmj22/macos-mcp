@@ -30,7 +30,9 @@ jest.mock('../utils/sqliteMessageReader.js', () => ({
   },
   readChatMessages: jest.fn().mockRejectedValue(
     (() => {
-      const e = new Error('Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.');
+      const e = new Error(
+        'Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
       (e as any).name = 'SqliteAccessError';
       (e as any).isPermissionError = true;
       return e;

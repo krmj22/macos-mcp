@@ -7,6 +7,7 @@ import type { ZodSchema } from 'zod/v3';
 import type {
   CalendarsToolArgs,
   CalendarToolArgs,
+  ContactsToolArgs,
   ListsToolArgs,
   MailToolArgs,
   MessagesToolArgs,
@@ -29,6 +30,7 @@ export const extractAndValidateArgs = <T>(
     | NotesFoldersToolArgs
     | MailToolArgs
     | MessagesToolArgs
+    | ContactsToolArgs
     | undefined,
   schema: ZodSchema<T>,
 ): T => {
