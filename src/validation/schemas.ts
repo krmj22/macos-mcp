@@ -242,6 +242,7 @@ export const UpdateNoteSchema = z.object({
   id: SafeIdSchema,
   title: SafeTextSchema.optional(),
   body: SafeNoteSchema,
+  targetFolder: SafeListNameSchema,
 });
 
 export const DeleteNoteSchema = z.object({

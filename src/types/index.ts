@@ -177,6 +177,7 @@ export interface NotesToolArgs extends BaseToolArgs {
   title?: string;
   body?: string;
   folder?: string;
+  targetFolder?: string;
   search?: string;
   limit?: number;
   offset?: number;

@@ -122,7 +122,8 @@ const UPDATE_NOTE_SCRIPT = `
   const n = notes[0];
   {{setName}}
   {{setBody}}
-  return JSON.stringify({id: n.id(), name: n.name()});
+  {{moveToFolder}}
+  return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
 `;
 
@@ -321,17 +322,22 @@ export async function handleUpdateNote(
       validated.body !== undefined
         ? `n.body = "${sanitizeForJxa(validated.body)}";`
         : '';
+    const moveToFolder = validated.targetFolder
+      ? `const targetFolder = Notes.folders.whose({name: "${sanitizeForJxa(validated.targetFolder)}"})()[0]; if (!targetFolder) throw new Error("Folder not found: ${sanitizeForJxa(validated.targetFolder)}"); n.move({to: targetFolder});`
+      : '';
     const script = buildScript(UPDATE_NOTE_SCRIPT, {
       id: validated.id,
       setName,
       setBody,
+      moveToFolder,
     });
-    const result = await executeJxa<{ id: string; name: string }>(
+    const result = await executeJxa<{ id: string; name: string; folder: string }>(
       script,
       10000,
       'Notes',
     );
-    return `Successfully updated note "${result.name}".\n- ID: ${result.id}`;
+    const folderInfo = validated.targetFolder ? `\n- Folder: ${result.folder}` : '';
+    return `Successfully updated note "${result.name}".\n- ID: ${result.id}${folderInfo}`;
   }, 'update note');
 }
 
