@@ -124,33 +124,25 @@ const SEARCH_CONTACTS_SCRIPT = `
   let matched = 0;
   for (let i = 0; i < people.length && result.length < limit; i++) {
     const p = people[i];
+    // Only fetch name for initial match check (fast)
     const name = (p.name() || "").toLowerCase();
-    const firstName = (p.firstName() || "").toLowerCase();
-    const lastName = (p.lastName() || "").toLowerCase();
-    const org = (p.organization() || "").toLowerCase();
-    let emailMatch = false;
-    let phoneMatch = false;
-    const emails = [];
-    try {
-      const em = p.emails();
-      for (let j = 0; j < em.length; j++) {
-        const val = em[j].value();
-        emails.push({ value: val, label: em[j].label() || "" });
-        if (val.toLowerCase().includes(term)) emailMatch = true;
-      }
-    } catch(e) {}
-    const phones = [];
-    try {
-      const ph = p.phones();
-      for (let j = 0; j < ph.length; j++) {
-        const val = ph[j].value();
-        phones.push({ value: val, label: ph[j].label() || "" });
-        if (val.includes(term)) phoneMatch = true;
-      }
-    } catch(e) {}
-    if (name.includes(term) || firstName.includes(term) || lastName.includes(term) ||
-        org.includes(term) || emailMatch || phoneMatch) {
+    if (name.includes(term)) {
       if (matched >= offset) {
+        // Only fetch full details for matches
+        const emails = [];
+        try {
+          const em = p.emails();
+          for (let j = 0; j < em.length; j++) {
+            emails.push({ value: em[j].value(), label: em[j].label() || "" });
+          }
+        } catch(e) {}
+        const phones = [];
+        try {
+          const ph = p.phones();
+          for (let j = 0; j < ph.length; j++) {
+            phones.push({ value: ph[j].value(), label: ph[j].label() || "" });
+          }
+        } catch(e) {}
         result.push({
           id: p.id(),
           firstName: p.firstName() || "",
@@ -197,11 +189,11 @@ const UPDATE_CONTACT_SCRIPT = `
   const people = Contacts.people.whose({id: "{{id}}"})();
   if (people.length === 0) throw new Error("Contact not found");
   const p = people[0];
-  {{setFirstName}}
-  {{setLastName}}
-  {{setOrganization}}
-  {{setJobTitle}}
-  {{setNote}}
+  if ("{{hasFirstName}}" === "true") p.firstName = "{{firstName}}";
+  if ("{{hasLastName}}" === "true") p.lastName = "{{lastName}}";
+  if ("{{hasOrganization}}" === "true") p.organization = "{{organization}}";
+  if ("{{hasJobTitle}}" === "true") p.jobTitle = "{{jobTitle}}";
+  if ("{{hasNote}}" === "true") p.note = "{{note}}";
   Contacts.save();
   return JSON.stringify({id: p.id(), name: p.name() || ""});
 })()
@@ -334,7 +326,7 @@ export async function handleSearchContacts(
     const validated = extractAndValidateArgs(args, SearchContactsSchema);
 
     const scriptParams = {
-      search: sanitizeForJxa(validated.search),
+      search: validated.search,
       limit: String(validated.limit),
       offset: String(validated.offset),
     };
@@ -425,30 +417,18 @@ export async function handleUpdateContact(
     const validated = extractAndValidateArgs(args, UpdateContactSchema);
 
     // Build conditional set statements
-    const setFirstName = validated.firstName
-      ? `p.firstName = "${sanitizeForJxa(validated.firstName)}";`
-      : '';
-    const setLastName = validated.lastName
-      ? `p.lastName = "${sanitizeForJxa(validated.lastName)}";`
-      : '';
-    const setOrganization = validated.organization
-      ? `p.organization = "${sanitizeForJxa(validated.organization)}";`
-      : '';
-    const setJobTitle = validated.jobTitle
-      ? `p.jobTitle = "${sanitizeForJxa(validated.jobTitle)}";`
-      : '';
-    const setNote =
-      validated.note !== undefined
-        ? `p.note = "${sanitizeForJxa(validated.note)}";`
-        : '';
-
     const script = buildScript(UPDATE_CONTACT_SCRIPT, {
       id: validated.id,
-      setFirstName,
-      setLastName,
-      setOrganization,
-      setJobTitle,
-      setNote,
+      hasFirstName: validated.firstName ? 'true' : 'false',
+      firstName: validated.firstName || '',
+      hasLastName: validated.lastName ? 'true' : 'false',
+      lastName: validated.lastName || '',
+      hasOrganization: validated.organization ? 'true' : 'false',
+      organization: validated.organization || '',
+      hasJobTitle: validated.jobTitle ? 'true' : 'false',
+      jobTitle: validated.jobTitle || '',
+      hasNote: validated.note !== undefined ? 'true' : 'false',
+      note: validated.note ?? '',
     });
 
     const result = await executeJxa<{ id: string; name: string }>(
