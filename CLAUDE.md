@@ -16,26 +16,25 @@ pnpm lint             # Lint and format with Biome
 | Tool | Actions | Key Parameters | Status |
 |------|---------|----------------|--------|
 | `reminders_tasks` | read, create, update, delete | `filterList`, `dueWithin`, `search` | ✅ Working |
-| `reminders_lists` | read, ~~create~~, ~~update~~, ~~delete~~ | `name` | ⚠️ Read only (#19) |
+| `reminders_lists` | read, create, update, delete | `name` | ✅ Working |
 | `calendar_events` | read, create, update, delete | `startDate`, `endDate`, `calendarName`, `recurrence` | ✅ Working |
 | `calendar_calendars` | read | — | ✅ Working |
 | `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
 | `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
-| `mail_messages` | read, ~~create~~, update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ⚠️ Create broken (#20) |
+| `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
 | `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
-| `contacts_people` | read, ~~create~~, ~~update~~, delete | `search`, `id` | ⚠️ Create/update broken (#21) |
+| `contacts_people` | read, create, ~~update~~, delete | `search`, `id` | ⚠️ Update/search broken (#21) |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
 ## Known Issues & Permissions
 
-### Critical Bugs (as of 2026-02-03 integration testing)
+### Known Bugs (as of 2026-02-04)
 
 | Issue | Subsystem | Problem | File |
 |-------|-----------|---------|------|
-| #19 | Reminders | List creation fails - missing `.source` assignment | `EventKitCLI.swift:332` |
-| #20 | Mail | Create sends email instead of saving draft | `mailHandlers.ts:208` |
-| #21 | Contacts | Create/update/search fail - JXA `pushOnto` bug | `contactsHandlers.ts:369` |
+| #21 | Contacts | Update/search fail - JXA errors | `contactsHandlers.ts` |
+| — | Mail | Recipients use `pushOnto` which is broken | `mailHandlers.ts:414-431` |
 
 ### Minor Issues
 
