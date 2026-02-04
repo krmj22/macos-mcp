@@ -90,9 +90,17 @@ class CalendarRepository {
     // Recurrence parameters
     if (data.recurrence) {
       addOptionalArg(args, '--recurrence', data.recurrence.frequency);
-      addOptionalNumberArg(args, '--recurrenceInterval', data.recurrence.interval);
+      addOptionalNumberArg(
+        args,
+        '--recurrenceInterval',
+        data.recurrence.interval,
+      );
       addOptionalArg(args, '--recurrenceEnd', data.recurrence.endDate);
-      addOptionalNumberArg(args, '--recurrenceCount', data.recurrence.occurrenceCount);
+      addOptionalNumberArg(
+        args,
+        '--recurrenceCount',
+        data.recurrence.occurrenceCount,
+      );
     }
 
     return executeCli<EventJSON>(args);
@@ -111,9 +119,17 @@ class CalendarRepository {
     // Recurrence parameters
     if (data.recurrence) {
       addOptionalArg(args, '--recurrence', data.recurrence.frequency);
-      addOptionalNumberArg(args, '--recurrenceInterval', data.recurrence.interval);
+      addOptionalNumberArg(
+        args,
+        '--recurrenceInterval',
+        data.recurrence.interval,
+      );
       addOptionalArg(args, '--recurrenceEnd', data.recurrence.endDate);
-      addOptionalNumberArg(args, '--recurrenceCount', data.recurrence.occurrenceCount);
+      addOptionalNumberArg(
+        args,
+        '--recurrenceCount',
+        data.recurrence.occurrenceCount,
+      );
     }
 
     return executeCli<EventJSON>(args);

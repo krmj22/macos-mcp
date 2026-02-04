@@ -195,20 +195,6 @@ const GET_MAIL_SCRIPT = `
 })()
 `;
 
-const SEND_MAIL_SCRIPT = `
-(() => {
-  const Mail = Application("Mail");
-  const msg = Mail.OutgoingMessage({
-    subject: "{{subject}}",
-    content: "{{body}}",
-    visible: true
-  });
-  Mail.outgoingMessages.push(msg);
-  {{recipients}}
-  return JSON.stringify({drafted: true, subject: "{{subject}}"});
-})()
-`;
-
 const MARK_READ_SCRIPT = `
 (() => {
   const Mail = Application("Mail");
@@ -410,7 +396,7 @@ export async function handleCreateMail(
     recipientLines.push(
       ...validated.to.map(
         (addr) =>
-          `Mail.ToRecipient({address: "${sanitizeForJxa(addr)}"}).pushOnto(msg.toRecipients);`,
+          `msg.toRecipients.push(Mail.ToRecipient({address: "${sanitizeForJxa(addr)}"}));`,
       ),
     );
 
@@ -418,7 +404,7 @@ export async function handleCreateMail(
       recipientLines.push(
         ...validated.cc.map(
           (addr) =>
-            `Mail.CcRecipient({address: "${sanitizeForJxa(addr)}"}).pushOnto(msg.ccRecipients);`,
+            `msg.ccRecipients.push(Mail.CcRecipient({address: "${sanitizeForJxa(addr)}"}));`,
         ),
       );
     }
@@ -427,16 +413,25 @@ export async function handleCreateMail(
       recipientLines.push(
         ...validated.bcc.map(
           (addr) =>
-            `Mail.BccRecipient({address: "${sanitizeForJxa(addr)}"}).pushOnto(msg.bccRecipients);`,
+            `msg.bccRecipients.push(Mail.BccRecipient({address: "${sanitizeForJxa(addr)}"}));`,
         ),
       );
     }
 
-    const script = buildScript(SEND_MAIL_SCRIPT, {
-      subject,
-      body,
-      recipients: recipientLines.join('\n  '),
-    });
+    // Build script manually to avoid double-escaping the recipient code
+    const script = `
+(() => {
+  const Mail = Application("Mail");
+  const msg = Mail.OutgoingMessage({
+    subject: "${sanitizeForJxa(subject)}",
+    content: "${sanitizeForJxa(body)}",
+    visible: true
+  });
+  Mail.outgoingMessages.push(msg);
+  ${recipientLines.join('\n  ')}
+  return JSON.stringify({drafted: true, subject: "${sanitizeForJxa(subject)}"});
+})()
+`;
     await executeJxa(script, 15000, 'Mail');
     return `Successfully drafted mail "${subject}" to ${validated.to.join(', ')}.`;
   }, 'create mail draft');

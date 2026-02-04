@@ -120,8 +120,8 @@ const UPDATE_NOTE_SCRIPT = `
   const notes = Notes.notes.whose({id: "{{id}}"})();
   if (notes.length === 0) throw new Error("Note not found");
   const n = notes[0];
-  {{setName}}
-  {{setBody}}
+  if ("{{hasName}}" === "true") n.name = "{{newName}}";
+  if ("{{hasBody}}" === "true") n.body = "{{newBody}}";
   {{moveToFolder}}
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
@@ -315,28 +315,25 @@ export async function handleUpdateNote(
 ): Promise<CallToolResult> {
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, UpdateNoteSchema);
-    const setName = validated.title
-      ? `n.name = "${sanitizeForJxa(validated.title)}";`
-      : '';
-    const setBody =
-      validated.body !== undefined
-        ? `n.body = "${sanitizeForJxa(validated.body)}";`
-        : '';
     const moveToFolder = validated.targetFolder
       ? `const targetFolder = Notes.folders.whose({name: "${sanitizeForJxa(validated.targetFolder)}"})()[0]; if (!targetFolder) throw new Error("Folder not found: ${sanitizeForJxa(validated.targetFolder)}"); n.move({to: targetFolder});`
       : '';
     const script = buildScript(UPDATE_NOTE_SCRIPT, {
       id: validated.id,
-      setName,
-      setBody,
+      hasName: validated.title ? 'true' : 'false',
+      newName: validated.title ?? '',
+      hasBody: validated.body !== undefined ? 'true' : 'false',
+      newBody: validated.body ?? '',
       moveToFolder,
     });
-    const result = await executeJxa<{ id: string; name: string; folder: string }>(
-      script,
-      10000,
-      'Notes',
-    );
-    const folderInfo = validated.targetFolder ? `\n- Folder: ${result.folder}` : '';
+    const result = await executeJxa<{
+      id: string;
+      name: string;
+      folder: string;
+    }>(script, 10000, 'Notes');
+    const folderInfo = validated.targetFolder
+      ? `\n- Folder: ${result.folder}`
+      : '';
     return `Successfully updated note "${result.name}".\n- ID: ${result.id}${folderInfo}`;
   }, 'update note');
 }

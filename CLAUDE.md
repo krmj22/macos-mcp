@@ -22,7 +22,7 @@ pnpm lint             # Lint and format with Biome
 | `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
 | `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
 | `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
-| `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
+| `messages_chat` | read, create | `chatId`, `search`, `to` | ⚠️ Chat listing broken (#23) |
 | `contacts_people` | read, create, ~~update~~, delete | `search`, `id` | ⚠️ Update/search broken (#21) |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
@@ -34,12 +34,11 @@ Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 | Issue | Subsystem | Problem | File |
 |-------|-----------|---------|------|
 | #21 | Contacts | Update/search fail - JXA errors | `contactsHandlers.ts` |
-| — | Mail | Recipients use `pushOnto` which is broken | `mailHandlers.ts:414-431` |
+| #23 | Messages | Chat listing fails (SQLite fallback missing) | `messagesHandlers.ts` |
 
 ### Minor Issues
 
 - **Calendar**: Recurring event deletion only removes single occurrence (uses `.thisEvent` span)
-- **Notes**: Update handler returns error despite succeeding (error handling issue)
 
 ### Messages JXA Broken (Sonoma+)
 
