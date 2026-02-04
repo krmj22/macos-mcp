@@ -329,7 +329,15 @@ class RemindersManager {
         }
         try eventStore.remove(reminder, commit: true)
     }
-    func createList(title: String) throws -> ListJSON { let list = EKCalendar(for: .reminder, eventStore: eventStore); list.title = title; try eventStore.saveCalendar(list, commit: true); return list.toJSON() }
+    func createList(title: String) throws -> ListJSON {
+        let list = EKCalendar(for: .reminder, eventStore: eventStore)
+        list.title = title
+        if let defaultSource = eventStore.defaultCalendarForNewReminders()?.source {
+            list.source = defaultSource
+        }
+        try eventStore.saveCalendar(list, commit: true)
+        return list.toJSON()
+    }
     func updateList(currentName: String, newName: String) throws -> ListJSON { let list = try findList(named: currentName); list.title = newName; try eventStore.saveCalendar(list, commit: true); return list.toJSON() }
     func deleteList(title: String) throws { try eventStore.removeCalendar(try findList(named: title), commit: true) }
     
