@@ -2,7 +2,7 @@
 
 > Based on [FradSer/mcp-server-apple-events](https://github.com/FradSer/mcp-server-apple-events)
 
-A Model Context Protocol (MCP) server for native macOS app integration: **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts** (planned).
+A Model Context Protocol (MCP) server for native macOS app integration: **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts**.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ The server uses two bridging strategies to communicate with Apple apps:
 - Organization strategies (priority, category, due date, completion)
 
 ### Calendar (EventKit)
-- Full CRUD for calendar events
+- Full CRUD for calendar events with recurrence support
 - List available calendars
 - Date range and keyword filtering
 
@@ -30,11 +30,17 @@ The server uses two bridging strategies to communicate with Apple apps:
 
 ### Mail (JXA)
 - Read inbox, specific mailboxes, or individual messages
-- Send new mail with CC/BCC support
+- Create drafts with CC/BCC support
 - Reply to existing messages (auto-quotes original)
 - Mark messages read/unread, delete messages
 - List all mailboxes across accounts
 - Search by subject, sender, or body content
+
+### Contacts (JXA)
+- List contacts with pagination
+- Create new contacts with email, phone, address
+- Delete contacts
+- *Note: Update and search have known issues*
 
 ### Messages (JXA)
 - List iMessage chats with pagination
@@ -54,6 +60,7 @@ The server uses two bridging strategies to communicate with Apple apps:
 | `notes_folders` | Notes | JXA | read, create |
 | `mail_messages` | Mail | JXA | read, create, update, delete |
 | `messages_chat` | Messages | JXA | read, create |
+| `contacts_people` | Contacts | JXA | read, create, delete |
 
 All tools support both underscore (`reminders_tasks`) and dot (`reminders.tasks`) notation.
 
