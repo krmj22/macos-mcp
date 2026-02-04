@@ -14,6 +14,7 @@ import {
 } from '../../utils/jxaExecutor.js';
 import {
   getLastMessage,
+  listChats,
   readChatMessages,
   SqliteAccessError,
   searchMessages,
@@ -316,6 +317,63 @@ async function searchMessagesWithFallback(
   }
 }
 
+/**
+ * Attempts to list chats via JXA first, falls back to SQLite.
+ * JXA's Messages.chats() throws errors on macOS Sonoma+,
+ * so SQLite (requires Full Disk Access) is the fallback.
+ */
+async function listChatsWithFallback(
+  limit: number,
+  offset: number,
+): Promise<ChatItem[]> {
+  // Try JXA first (works on some macOS versions)
+  try {
+    const script = buildScript(LIST_CHATS_SCRIPT, {
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const chats = await executeJxaWithRetry<ChatItem[]>(
+      script,
+      15000,
+      'Messages',
+    );
+    if (Array.isArray(chats) && chats.length > 0) {
+      // Try to enrich chats that are missing lastMessage with SQLite data
+      for (const chat of chats) {
+        if (!chat.lastMessage) {
+          try {
+            const last = await getLastMessage(chat.id);
+            if (last) {
+              chat.lastMessage = last.text;
+              chat.lastDate = last.date;
+            }
+          } catch {
+            // SQLite unavailable, skip enrichment
+            break; // No point trying other chats
+          }
+        }
+      }
+      return chats;
+    }
+  } catch {
+    // JXA failed, try SQLite
+  }
+
+  // SQLite fallback
+  try {
+    return await listChats(limit, offset);
+  } catch (error) {
+    if (error instanceof SqliteAccessError && error.isPermissionError) {
+      throw new Error(
+        'Cannot list chats: JXA automation is unsupported on this macOS version, ' +
+          'and SQLite access requires Full Disk Access. ' +
+          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
+    }
+    throw error;
+  }
+}
+
 export async function handleReadMessages(
   args: MessagesToolArgs,
 ): Promise<CallToolResult> {
@@ -369,33 +427,11 @@ export async function handleReadMessages(
       );
     }
 
-    // List chats — enrich with last message via SQLite when possible
-    const paginationParams = {
-      limit: String(validated.limit),
-      offset: String(validated.offset),
-    };
-    const script = buildScript(LIST_CHATS_SCRIPT, paginationParams);
-    const chats = await executeJxaWithRetry<ChatItem[]>(
-      script,
-      15000,
-      'Messages',
+    // List chats — try JXA first, fall back to SQLite
+    const chats = await listChatsWithFallback(
+      validated.limit ?? 50,
+      validated.offset ?? 0,
     );
-
-    // Try to enrich chats that are missing lastMessage with SQLite data
-    for (const chat of chats) {
-      if (!chat.lastMessage) {
-        try {
-          const last = await getLastMessage(chat.id);
-          if (last) {
-            chat.lastMessage = last.text;
-            chat.lastDate = last.date;
-          }
-        } catch {
-          // SQLite unavailable, skip enrichment
-          break; // No point trying other chats
-        }
-      }
-    }
 
     return formatListMarkdown(
       'Chats',

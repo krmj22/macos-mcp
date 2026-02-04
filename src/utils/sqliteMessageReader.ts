@@ -192,3 +192,69 @@ export async function getLastMessage(
     date: appleTimestampToISO(rows[0].date),
   };
 }
+
+/**
+ * List all chats from the Messages database.
+ * Returns chats with their last message and participants.
+ */
+export async function listChats(
+  limit: number,
+  offset: number,
+): Promise<ReadChatResult[]> {
+  // Query chats with their last message and participant handles
+  const query = `
+    SELECT
+      c.guid as chat_guid,
+      COALESCE(c.display_name, '') as display_name,
+      (
+        SELECT GROUP_CONCAT(h.id, ', ')
+        FROM chat_handle_join chj
+        JOIN handle h ON h.ROWID = chj.handle_id
+        WHERE chj.chat_id = c.ROWID
+      ) as participants,
+      (
+        SELECT m.text
+        FROM message m
+        JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+        WHERE cmj.chat_id = c.ROWID
+        ORDER BY m.date DESC
+        LIMIT 1
+      ) as last_message,
+      (
+        SELECT m.date
+        FROM message m
+        JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+        WHERE cmj.chat_id = c.ROWID
+        ORDER BY m.date DESC
+        LIMIT 1
+      ) as last_date
+    FROM chat c
+    WHERE last_date IS NOT NULL
+    ORDER BY last_date DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const output = await runSqlite(query, 15000);
+  const rows = parseSqliteJson<{
+    chat_guid: string;
+    display_name: string;
+    participants: string | null;
+    last_message: string | null;
+    last_date: number | null;
+  }>(output);
+
+  return rows.map((row) => {
+    const participants = row.participants
+      ? row.participants.split(', ').filter((p) => p.trim())
+      : [];
+    const name =
+      row.display_name || participants.join(', ') || row.chat_guid || 'Unknown';
+    return {
+      id: row.chat_guid,
+      name,
+      participants,
+      lastMessage: (row.last_message || '').substring(0, 100),
+      lastDate: row.last_date ? appleTimestampToISO(row.last_date) : '',
+    };
+  });
+}

@@ -47,6 +47,14 @@ jest.mock('../utils/sqliteMessageReader.js', () => ({
     })(),
   ),
   getLastMessage: jest.fn().mockRejectedValue(new Error('no access')),
+  listChats: jest.fn().mockRejectedValue(
+    (() => {
+      const e = new Error('Cannot access Messages database.');
+      (e as any).name = 'SqliteAccessError';
+      (e as any).isPermissionError = true;
+      return e;
+    })(),
+  ),
 }));
 
 jest.mock('../utils/errorHandling.js', () => ({
@@ -69,6 +77,14 @@ const mockExecuteJxa = jest.requireMock('../utils/jxaExecutor.js')
   .executeJxa as jest.Mock;
 const mockExecuteJxaWithRetry = jest.requireMock('../utils/jxaExecutor.js')
   .executeJxaWithRetry as jest.Mock;
+const mockListChats = jest.requireMock('../utils/sqliteMessageReader.js')
+  .listChats as jest.Mock;
+const MockSqliteAccessError = jest.requireMock(
+  '../utils/sqliteMessageReader.js',
+).SqliteAccessError as new (
+  message: string,
+  isPermissionError: boolean,
+) => Error & { isPermissionError: boolean };
 
 // biome-ignore lint: test helper
 function getTextContent(result: any): string {
@@ -474,6 +490,61 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Messages matching "meet"');
       expect(getTextContent(result)).toContain('John');
+    });
+
+    it('falls back to SQLite when JXA fails to list chats', async () => {
+      // JXA fails
+      mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
+      // SQLite succeeds
+      mockListChats.mockResolvedValue([
+        {
+          id: 'iMessage;-;+1234567890',
+          name: 'Jane Doe',
+          participants: ['+1234567890'],
+          lastMessage: 'Hello from SQLite',
+          lastDate: '2025-06-01T12:00:00.000Z',
+        },
+      ]);
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Chats');
+      expect(getTextContent(result)).toContain('Jane Doe');
+      expect(getTextContent(result)).toContain('Hello from SQLite');
+      expect(mockListChats).toHaveBeenCalledWith(50, 0);
+    });
+
+    it('falls back to SQLite when JXA returns empty chat list', async () => {
+      // JXA returns empty
+      mockExecuteJxaWithRetry.mockResolvedValue([]);
+      // SQLite succeeds
+      mockListChats.mockResolvedValue([
+        {
+          id: 'chat123',
+          name: 'Bob',
+          participants: ['bob@example.com'],
+          lastMessage: 'From SQLite',
+          lastDate: '2025-06-01',
+        },
+      ]);
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Bob');
+    });
+
+    it('reports error when both JXA and SQLite fail for chat listing', async () => {
+      // JXA fails
+      mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
+      // SQLite also fails with permission error - use the mocked class for instanceof check
+      mockListChats.mockRejectedValue(
+        new MockSqliteAccessError('DB access denied', true),
+      );
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(true);
+      // The handler wraps SQLite permission errors with a helpful message
+      expect(getTextContent(result)).toContain('Full Disk Access');
     });
   });
 });

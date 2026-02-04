@@ -22,8 +22,8 @@ pnpm lint             # Lint and format with Biome
 | `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
 | `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
 | `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
-| `messages_chat` | read, create | `chatId`, `search`, `to` | ⚠️ Chat listing broken (#23) |
-| `contacts_people` | read, create, ~~update~~, delete | `search`, `id` | ⚠️ Update/search broken (#21) |
+| `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
+| `contacts_people` | read, create, ~~update~~, delete | `search`, `id` | ✅ Create working, update/search deferred |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
@@ -31,10 +31,7 @@ Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
 ### Known Bugs (as of 2026-02-04)
 
-| Issue | Subsystem | Problem | File |
-|-------|-----------|---------|------|
-| #21 | Contacts | Update/search fail - JXA errors | `contactsHandlers.ts` |
-| #23 | Messages | Chat listing fails (SQLite fallback missing) | `messagesHandlers.ts` |
+Currently no critical bugs. Deferred work tracked in separate issues.
 
 ### Minor Issues
 
