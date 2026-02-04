@@ -3,21 +3,16 @@
  * Tests for JXA-based handlers: Notes, Mail, Messages (Issues 1-5)
  */
 
-// Mock jxaExecutor
-jest.mock('../utils/jxaExecutor.js', () => ({
-  executeJxa: jest.fn(),
-  executeJxaWithRetry: jest.fn(),
-  executeAppleScript: jest.fn(),
-  buildScript: jest.fn((template: string, params: Record<string, string>) => {
-    let s = template;
-    for (const [k, v] of Object.entries(params)) {
-      s = s.split(`{{${k}}}`).join(v);
-    }
-    return s;
-  }),
-  sanitizeForJxa: jest.fn((s: string) => s),
-  JxaError: jest.requireActual('../utils/jxaExecutor.js').JxaError,
-}));
+// Mock jxaExecutor - only mock OS calls, use real sanitizeForJxa/buildScript
+jest.mock('../utils/jxaExecutor.js', () => {
+  const actual = jest.requireActual('../utils/jxaExecutor.js');
+  return {
+    ...actual,
+    executeJxa: jest.fn(),
+    executeJxaWithRetry: jest.fn(),
+    executeAppleScript: jest.fn(),
+  };
+});
 
 jest.mock('../utils/sqliteMessageReader.js', () => ({
   SqliteAccessError: class SqliteAccessError extends Error {
@@ -185,6 +180,25 @@ describe('Notes Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Notes matching "match"');
     });
+
+    it('sanitizes apostrophes in search (prevents double-escape)', async () => {
+      mockExecuteJxaWithRetry.mockResolvedValue([]);
+
+      await handleReadNotes({ action: 'read', search: "O'Brien" });
+
+      const script = mockExecuteJxaWithRetry.mock.calls[0][0];
+      expect(script).toContain("O\\'Brien");
+      expect(script).not.toContain("O\\\\'Brien");
+    });
+
+    it('sanitizes backslashes in search', async () => {
+      mockExecuteJxaWithRetry.mockResolvedValue([]);
+
+      await handleReadNotes({ action: 'read', search: 'path\\to\\file' });
+
+      const script = mockExecuteJxaWithRetry.mock.calls[0][0];
+      expect(script).toContain('path\\\\to\\\\file');
+    });
   });
 
   describe('handleReadNotesFolders', () => {
@@ -351,6 +365,34 @@ describe('Mail Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Re: Original');
     });
+
+    it('sanitizes newlines in body', async () => {
+      mockExecuteJxa.mockResolvedValue({ sent: true });
+
+      await handleCreateMail({
+        action: 'create',
+        subject: 'Test',
+        body: 'Line1\nLine2',
+        to: ['test@example.com'],
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('Line1\\nLine2');
+    });
+
+    it('sanitizes quotes in subject', async () => {
+      mockExecuteJxa.mockResolvedValue({ sent: true });
+
+      await handleCreateMail({
+        action: 'create',
+        subject: 'He said "hello"',
+        body: 'Body',
+        to: ['test@example.com'],
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('He said \\"hello\\"');
+    });
   });
 
   describe('handleUpdateMail', () => {
@@ -445,7 +487,6 @@ describe('Messages Handlers', () => {
         action: 'read',
         chatId: 'bad',
       });
-      // When JXA returns error object and SQLite is unavailable, handler reports error
       expect(result.isError).toBe(true);
       expect(getTextContent(result)).toContain('Messages database');
     });
@@ -493,9 +534,7 @@ describe('Messages Handlers', () => {
     });
 
     it('falls back to SQLite when JXA fails to list chats', async () => {
-      // JXA fails
       mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
-      // SQLite succeeds
       mockListChats.mockResolvedValue([
         {
           id: 'iMessage;-;+1234567890',
@@ -515,9 +554,7 @@ describe('Messages Handlers', () => {
     });
 
     it('falls back to SQLite when JXA returns empty chat list', async () => {
-      // JXA returns empty
       mockExecuteJxaWithRetry.mockResolvedValue([]);
-      // SQLite succeeds
       mockListChats.mockResolvedValue([
         {
           id: 'chat123',
@@ -534,59 +571,39 @@ describe('Messages Handlers', () => {
     });
 
     it('reports error when both JXA and SQLite fail for chat listing', async () => {
-      // JXA fails
       mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
-      // SQLite also fails with permission error - use the mocked class for instanceof check
       mockListChats.mockRejectedValue(
         new MockSqliteAccessError('DB access denied', true),
       );
 
       const result = await handleReadMessages({ action: 'read' });
       expect(result.isError).toBe(true);
-      // The handler wraps SQLite permission errors with a helpful message
       expect(getTextContent(result)).toContain('Full Disk Access');
     });
   });
 });
 
 describe('Retry Logic (executeJxaWithRetry)', () => {
-  let executeJxaWithRetry: typeof import('../utils/jxaExecutor.js').executeJxaWithRetry;
-
-  beforeAll(async () => {
-    // Get the real implementation
-    jest.resetModules();
-    jest.unmock('../utils/jxaExecutor.js');
-    const mod = await import('../utils/jxaExecutor.js');
-    executeJxaWithRetry = mod.executeJxaWithRetry;
-  });
-
-  afterAll(() => {
-    // Re-mock for other tests
-    jest.mock('../utils/jxaExecutor.js');
-  });
-
-  it('is exported and callable', () => {
-    expect(typeof executeJxaWithRetry).toBe('function');
+  it('is exported and callable', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const { executeJxaWithRetry } = await import('../utils/jxaExecutor.js');
+      expect(typeof executeJxaWithRetry).toBe('function');
+    });
   });
 });
 
 describe('Error Handling - JXA hints', () => {
   it('provides timeout hint for JxaError', async () => {
-    // Re-import with real errorHandling
-    jest.resetModules();
-    jest.unmock('../utils/errorHandling.js');
-    const { handleAsyncOperation: realHandleAsync } = await import(
-      '../utils/errorHandling.js'
-    );
-    const { JxaError: RealJxaError } = await import('../utils/jxaExecutor.js');
+    // Use requireActual to bypass module-level mocks
+    const { handleAsyncOperation } = jest.requireActual(
+      '../utils/errorHandling.js',
+    ) as typeof import('../utils/errorHandling.js');
+    const { JxaError } = jest.requireActual(
+      '../utils/jxaExecutor.js',
+    ) as typeof import('../utils/jxaExecutor.js');
 
-    const result = await realHandleAsync(async () => {
-      throw new RealJxaError(
-        'timed out',
-        'Notes',
-        false,
-        'osascript timed out',
-      );
+    const result = await handleAsyncOperation(async () => {
+      throw new JxaError('timed out', 'Notes', false, 'osascript timed out');
     }, 'read notes');
 
     expect(result.isError).toBe(true);
