@@ -205,8 +205,7 @@ const SEND_MAIL_SCRIPT = `
   });
   Mail.outgoingMessages.push(msg);
   {{recipients}}
-  Mail.send(msg);
-  return JSON.stringify({sent: true, subject: "{{subject}}"});
+  return JSON.stringify({drafted: true, subject: "{{subject}}"});
 })()
 `;
 
@@ -439,8 +438,8 @@ export async function handleCreateMail(
       recipients: recipientLines.join('\n  '),
     });
     await executeJxa(script, 15000, 'Mail');
-    return `Successfully sent mail "${subject}" to ${validated.to.join(', ')}.`;
-  }, 'send mail');
+    return `Successfully drafted mail "${subject}" to ${validated.to.join(', ')}.`;
+  }, 'create mail draft');
 }
 
 export async function handleUpdateMail(

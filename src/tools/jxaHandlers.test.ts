@@ -306,7 +306,7 @@ describe('Mail Handlers', () => {
         bcc: ['e@f.com'],
       });
       expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('Successfully sent mail');
+      expect(getTextContent(result)).toContain('Successfully drafted mail');
     });
 
     it('sends a reply', async () => {
