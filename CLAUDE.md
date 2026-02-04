@@ -119,3 +119,12 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 - Coverage threshold: 96% statements, 90% branches
 - Mock CLI: `src/utils/__mocks__/cliExecutor.ts`
 - Mock JXA: `src/tools/jxaHandlers.test.ts`
+
+## Commits
+
+See `~/.claude/CLAUDE.md` for commit guidelines. Use `/commit` skill.
+
+Key project patterns:
+- Conventional commits: `feat(tool):`, `fix(handler):`, `refactor(utils):`
+- Link issues: `Closes #XX`, `Fixes #XX`, `(#XX)`
+- Reference ADRs when implementing architectural decisions
