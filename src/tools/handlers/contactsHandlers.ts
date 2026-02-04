@@ -180,9 +180,9 @@ const CREATE_CONTACT_SCRIPT = `
     note: "{{note}}"
   });
   Contacts.people.push(person);
-  {{addEmail}}
-  {{addPhone}}
-  {{addAddress}}
+  %%addEmail%%
+  %%addPhone%%
+  %%addAddress%%
   Contacts.save();
   return JSON.stringify({
     id: person.id(),
@@ -366,13 +366,13 @@ export async function handleCreateContact(
     let addEmail = '';
     if (validated.email) {
       const label = validated.emailLabel || 'work';
-      addEmail = `Contacts.Email({value: "${sanitizeForJxa(validated.email)}", label: "${sanitizeForJxa(label)}"}).pushOnto(person.emails);`;
+      addEmail = `person.emails.push(Contacts.Email({value: "${sanitizeForJxa(validated.email)}", label: "${sanitizeForJxa(label)}"}));`;
     }
 
     let addPhone = '';
     if (validated.phone) {
       const label = validated.phoneLabel || 'mobile';
-      addPhone = `Contacts.Phone({value: "${sanitizeForJxa(validated.phone)}", label: "${sanitizeForJxa(label)}"}).pushOnto(person.phones);`;
+      addPhone = `person.phones.push(Contacts.Phone({value: "${sanitizeForJxa(validated.phone)}", label: "${sanitizeForJxa(label)}"}));`;
     }
 
     let addAddress = '';
@@ -384,26 +384,30 @@ export async function handleCreateContact(
       validated.country
     ) {
       const label = validated.addressLabel || 'home';
-      addAddress = `Contacts.Address({
+      addAddress = `person.addresses.push(Contacts.Address({
         street: "${sanitizeForJxa(validated.street || '')}",
         city: "${sanitizeForJxa(validated.city || '')}",
         state: "${sanitizeForJxa(validated.state || '')}",
         zip: "${sanitizeForJxa(validated.zip || '')}",
         country: "${sanitizeForJxa(validated.country || '')}",
         label: "${sanitizeForJxa(label)}"
-      }).pushOnto(person.addresses);`;
+      }));`;
     }
 
-    const script = buildScript(CREATE_CONTACT_SCRIPT, {
-      firstName: sanitizeForJxa(validated.firstName || ''),
-      lastName: sanitizeForJxa(validated.lastName || ''),
-      organization: sanitizeForJxa(validated.organization || ''),
-      jobTitle: sanitizeForJxa(validated.jobTitle || ''),
-      note: sanitizeForJxa(validated.note || ''),
-      addEmail,
-      addPhone,
-      addAddress,
+    // Build script with data fields (sanitized by buildScript)
+    // Code blocks use %% placeholders to avoid double-sanitization
+    let script = buildScript(CREATE_CONTACT_SCRIPT, {
+      firstName: validated.firstName || '',
+      lastName: validated.lastName || '',
+      organization: validated.organization || '',
+      jobTitle: validated.jobTitle || '',
+      note: validated.note || '',
     });
+    // Replace code block placeholders (not re-sanitized - they contain pre-sanitized values)
+    script = script
+      .replace('%%addEmail%%', addEmail)
+      .replace('%%addPhone%%', addPhone)
+      .replace('%%addAddress%%', addAddress);
 
     const result = await executeJxa<{ id: string; fullName: string }>(
       script,
