@@ -4,8 +4,13 @@
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { CalendarsToolArgs, CalendarToolArgs } from '../../types/index.js';
+import type {
+  CalendarEvent,
+  CalendarsToolArgs,
+  CalendarToolArgs,
+} from '../../types/index.js';
 import { calendarRepository } from '../../utils/calendarRepository.js';
+import { contactResolver } from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import { formatMultilineNotes } from '../../utils/helpers.js';
 import {
@@ -23,6 +28,26 @@ import {
 } from './shared.js';
 
 /**
+ * Enriches event attendees by resolving email addresses to contact names.
+ * Unknown attendees gracefully fall back to their raw email addresses.
+ *
+ * @param events - Array of calendar events to enrich
+ * @returns Events with attendee emails replaced by contact names where available
+ */
+async function enrichEventAttendees(
+  events: CalendarEvent[],
+): Promise<CalendarEvent[]> {
+  const emails = [...new Set(events.flatMap((e) => e.attendees || []))];
+  if (emails.length === 0) return events;
+
+  const resolved = await contactResolver.resolveBatch(emails);
+  return events.map((e) => ({
+    ...e,
+    attendees: e.attendees?.map((a) => resolved.get(a)?.fullName || a),
+  }));
+}
+
+/**
  * Formats a calendar event as a markdown list item
  */
 const formatEventMarkdown = (event: {
@@ -35,6 +60,7 @@ const formatEventMarkdown = (event: {
   location?: string;
   url?: string;
   isAllDay?: boolean;
+  attendees?: string[];
 }): string[] => {
   const lines: string[] = [];
   lines.push(`- ${event.title}`);
@@ -47,6 +73,9 @@ const formatEventMarkdown = (event: {
   if (event.notes)
     lines.push(`  - Notes: ${formatMultilineNotes(event.notes)}`);
   if (event.url) lines.push(`  - URL: ${event.url}`);
+  if (event.attendees && event.attendees.length > 0) {
+    lines.push(`  - Attendees: ${event.attendees.join(', ')}`);
+  }
   return lines;
 };
 
@@ -141,16 +170,26 @@ export const handleReadCalendarEvents = async (
     );
 
     if (validatedArgs.id) {
-      const event = await calendarRepository.findEventById(validatedArgs.id);
+      let event = await calendarRepository.findEventById(validatedArgs.id);
+      // Enrich single event attendees if enabled (default: true)
+      if (validatedArgs.enrichContacts !== false) {
+        const enriched = await enrichEventAttendees([event]);
+        event = enriched[0];
+      }
       return formatEventMarkdown(event).join('\n');
     }
 
-    const events = await calendarRepository.findEvents({
+    let events = await calendarRepository.findEvents({
       startDate: validatedArgs.startDate,
       endDate: validatedArgs.endDate,
       calendarName: validatedArgs.filterCalendar,
       search: validatedArgs.search,
     });
+
+    // Enrich attendees with contact names if enabled (default: true)
+    if (validatedArgs.enrichContacts !== false) {
+      events = await enrichEventAttendees(events);
+    }
 
     return formatListMarkdown(
       'Calendar Events',

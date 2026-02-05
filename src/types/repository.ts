@@ -40,6 +40,7 @@ export interface EventJSON {
   url: string | null;
   isAllDay: boolean;
   recurrence: RecurrenceJSON | null;
+  attendees: string[] | null;
 }
 
 export interface CalendarJSON {

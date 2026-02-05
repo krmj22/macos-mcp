@@ -19,6 +19,7 @@ import {
   handleUpdateReminderList,
 } from '../tools/handlers/index.js';
 import { calendarRepository } from '../utils/calendarRepository.js';
+import { contactResolver } from '../utils/contactResolver.js';
 import { handleAsyncOperation } from '../utils/errorHandling.js';
 import { reminderRepository } from '../utils/reminderRepository.js';
 
@@ -30,6 +31,7 @@ jest.mock('../utils/cliExecutor.js', () => ({
 // Mock the repository and error handling
 jest.mock('../utils/reminderRepository.js');
 jest.mock('../utils/calendarRepository.js');
+jest.mock('../utils/contactResolver.js');
 jest.mock('../utils/errorHandling.js');
 
 const mockReminderRepository = reminderRepository as jest.Mocked<
@@ -37,6 +39,9 @@ const mockReminderRepository = reminderRepository as jest.Mocked<
 >;
 const mockCalendarRepository = calendarRepository as jest.Mocked<
   typeof calendarRepository
+>;
+const mockContactResolver = contactResolver as jest.Mocked<
+  typeof contactResolver
 >;
 const mockHandleAsyncOperation = handleAsyncOperation as jest.Mock;
 
@@ -69,6 +74,8 @@ mockHandleAsyncOperation.mockImplementation(async (operation) => {
 describe('Tool Handlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default mock for contactResolver - returns empty map (no matches)
+    mockContactResolver.resolveBatch.mockResolvedValue(new Map());
   });
 
   // --- Reminder Handlers ---
@@ -282,6 +289,7 @@ describe('Tool Handlers', () => {
         url: null,
         isAllDay: false,
         recurrence: null,
+        attendees: [],
       };
       mockCalendarRepository.createEvent.mockResolvedValue(mockEvent);
       const result = await handleCreateCalendarEvent({
@@ -310,6 +318,7 @@ describe('Tool Handlers', () => {
         url: null,
         isAllDay: false,
         recurrence: null,
+        attendees: [],
       };
       mockCalendarRepository.updateEvent.mockResolvedValue(mockEvent);
       const result = await handleUpdateCalendarEvent({
@@ -472,6 +481,117 @@ describe('Tool Handlers', () => {
       expect(content).toContain('### Calendar Events (Total: 0)');
       expect(content).toContain('No calendar events found.');
       expect(mockCalendarRepository.findAllCalendars).not.toHaveBeenCalled();
+    });
+
+    it('should enrich attendees with contact names by default', async () => {
+      const mockEvents = [
+        {
+          id: 'evt-1',
+          title: 'Team Meeting',
+          calendar: 'Work',
+          startDate: '2025-11-15T09:00:00Z',
+          endDate: '2025-11-15T10:00:00Z',
+          isAllDay: false,
+          attendees: ['john@example.com', 'jane@example.com'],
+        },
+      ];
+      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
+
+      // Mock contact resolver to return a contact name for one attendee
+      mockContactResolver.resolveBatch.mockResolvedValue(
+        new Map([
+          [
+            'john@example.com',
+            { id: 'c1', fullName: 'John Smith', firstName: 'John' },
+          ],
+        ]),
+      );
+
+      const result = await handleReadCalendarEvents({ action: 'read' });
+      const content = _getTextContent(result.content);
+
+      expect(content).toContain('- Attendees: John Smith, jane@example.com');
+      expect(mockContactResolver.resolveBatch).toHaveBeenCalledWith([
+        'john@example.com',
+        'jane@example.com',
+      ]);
+    });
+
+    it('should show raw emails when enrichContacts is false', async () => {
+      const mockEvents = [
+        {
+          id: 'evt-1',
+          title: 'Team Meeting',
+          calendar: 'Work',
+          startDate: '2025-11-15T09:00:00Z',
+          endDate: '2025-11-15T10:00:00Z',
+          isAllDay: false,
+          attendees: ['john@example.com', 'jane@example.com'],
+        },
+      ];
+      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
+
+      const result = await handleReadCalendarEvents({
+        action: 'read',
+        enrichContacts: false,
+      });
+      const content = _getTextContent(result.content);
+
+      expect(content).toContain(
+        '- Attendees: john@example.com, jane@example.com',
+      );
+      expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
+    });
+
+    it('should enrich single event attendees when id is provided', async () => {
+      const mockEvent = {
+        id: 'event-123',
+        title: 'One-on-One',
+        calendar: 'Work',
+        startDate: '2025-11-15T09:00:00Z',
+        endDate: '2025-11-15T10:00:00Z',
+        isAllDay: false,
+        attendees: ['boss@company.com'],
+      };
+      mockCalendarRepository.findEventById.mockResolvedValue(mockEvent);
+
+      mockContactResolver.resolveBatch.mockResolvedValue(
+        new Map([
+          [
+            'boss@company.com',
+            { id: 'c2', fullName: 'The Boss', firstName: 'The' },
+          ],
+        ]),
+      );
+
+      const result = await handleReadCalendarEvents({
+        action: 'read',
+        id: 'event-123',
+      });
+      const content = _getTextContent(result.content);
+
+      expect(content).toContain('- Attendees: The Boss');
+    });
+
+    it('should handle events without attendees gracefully', async () => {
+      const mockEvents = [
+        {
+          id: 'evt-1',
+          title: 'Solo Event',
+          calendar: 'Personal',
+          startDate: '2025-11-15T09:00:00Z',
+          endDate: '2025-11-15T10:00:00Z',
+          isAllDay: false,
+        },
+      ];
+      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
+
+      const result = await handleReadCalendarEvents({ action: 'read' });
+      const content = _getTextContent(result.content);
+
+      expect(content).not.toContain('Attendees');
+      // Should not call resolveBatch when no attendees exist
+      expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
     });
   });
 

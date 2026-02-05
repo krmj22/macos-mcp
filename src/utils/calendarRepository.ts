@@ -45,6 +45,7 @@ class CalendarRepository {
       'notes',
       'location',
       'url',
+      'attendees',
     ]) as CalendarEvent;
   }
 
@@ -63,7 +64,7 @@ class CalendarRepository {
       filters.search,
     );
     return events.map((e) =>
-      nullToUndefined(e, ['notes', 'location', 'url']),
+      nullToUndefined(e, ['notes', 'location', 'url', 'attendees']),
     ) as CalendarEvent[];
   }
 

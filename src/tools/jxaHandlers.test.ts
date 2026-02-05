@@ -68,6 +68,14 @@ jest.mock('../utils/errorHandling.js', () => ({
   ),
 }));
 
+// Mock contactResolver for mail sender enrichment tests
+jest.mock('../utils/contactResolver.js', () => ({
+  contactResolver: {
+    resolveHandle: jest.fn().mockResolvedValue(null),
+    resolveBatch: jest.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 const mockExecuteJxa = jest.requireMock('../utils/jxaExecutor.js')
   .executeJxa as jest.Mock;
 const mockExecuteJxaWithRetry = jest.requireMock('../utils/jxaExecutor.js')
@@ -746,6 +754,16 @@ describe('Schema Validation', () => {
       });
       expect(result.mailbox).toBe('Sent');
       expect(result.account).toBe('Gmail');
+    });
+
+    it('ReadMailSchema defaults enrichContacts to true', () => {
+      const result = ReadMailSchema.parse({});
+      expect(result.enrichContacts).toBe(true);
+    });
+
+    it('ReadMailSchema accepts enrichContacts: false', () => {
+      const result = ReadMailSchema.parse({ enrichContacts: false });
+      expect(result.enrichContacts).toBe(false);
     });
   });
 

@@ -198,6 +198,7 @@ export const ReadCalendarEventsSchema = z.object({
   search: SafeSearchSchema,
   startDate: SafeDateSchema,
   endDate: SafeDateSchema,
+  enrichContacts: z.boolean().optional().default(true),
 });
 
 export const UpdateCalendarEventSchema = z.object({
@@ -288,6 +289,7 @@ export const ReadMailSchema = z.object({
     VALIDATION.MAX_LIST_NAME_LENGTH,
     'Account',
   ),
+  enrichContacts: z.boolean().optional().default(true),
   ...PaginationFields,
 });
 
@@ -315,6 +317,7 @@ export const ReadMessagesSchema = z.object({
   chatId: z.string().optional(),
   search: SafeSearchSchema,
   searchMessages: z.boolean().optional(),
+  enrichContacts: z.boolean().optional().default(true),
   ...PaginationFields,
 });
 

@@ -48,6 +48,7 @@ export interface CalendarEvent {
   url?: string;
   isAllDay: boolean;
   recurrence?: Recurrence;
+  attendees?: string[];
 }
 
 /**
@@ -170,6 +171,8 @@ export interface CalendarToolArgs extends BaseToolArgs {
   recurrenceInterval?: number;
   recurrenceEnd?: string;
   recurrenceCount?: number;
+  // Contact enrichment for attendees (default: true)
+  enrichContacts?: boolean;
 }
 
 export interface CalendarsToolArgs extends BaseToolArgs {
