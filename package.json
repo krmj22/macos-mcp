@@ -7,6 +7,16 @@
     "Frad Lee <https://frad.me>"
   ],
   "license": "MIT",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.*",
+    "!dist/test-setup.*",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "homepage": "https://github.com/krmj22/macos-mcp",
   "repository": {
     "type": "git",
@@ -49,6 +59,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.5",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release": "^24.2.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.10.1",
     "babel-jest": "^30.2.0",
