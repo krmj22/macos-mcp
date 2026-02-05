@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(git -C /Users/kylejensen/Projects/macos-mcp status)",
+      "Skill(commit-commands:commit)"
+    ]
+  }
+}
