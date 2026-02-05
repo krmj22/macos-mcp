@@ -222,7 +222,7 @@ export class ContactResolverService {
 
     try {
       const contacts = await executeJxaWithRetry<ContactCacheEntry[]>(
-        BULK_FETCH_CONTACTS_SCRIPT,
+        BULK_FETCH_CONTACTS_SCRIPT.trim(),
         60000, // 60s timeout for large contact lists
         'Contacts',
         2,
