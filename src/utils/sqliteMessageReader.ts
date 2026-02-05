@@ -65,6 +65,103 @@ interface SqliteMessage {
   is_from_me: number;
   handle_id: string | null;
   date: number;
+  attributedBody_hex: string | null;
+  attachment_count: number;
+}
+
+/**
+ * Extracts plain text from a hex-encoded NSKeyedArchiver attributedBody blob.
+ * Apple stores rich text messages in this format instead of the plain text column.
+ *
+ * The blob format after NSString marker is typically:
+ * - Control bytes (class info)
+ * - '+' byte (0x2B) indicating string type
+ * - Length byte
+ * - UTF-8 text content
+ */
+function extractTextFromAttributedBody(
+  hexString: string | null,
+): string | null {
+  if (!hexString) return null;
+
+  try {
+    const buffer = Buffer.from(hexString, 'hex');
+
+    // Find "NSString" marker
+    const nsStringMarker = Buffer.from('NSString');
+    const markerIndex = buffer.indexOf(nsStringMarker);
+    if (markerIndex === -1) return null;
+
+    // Search for the '+' marker followed by length byte, then text
+    const searchStart = markerIndex + nsStringMarker.length;
+    let pos = searchStart;
+
+    // Skip control bytes until we find '+' (0x2B) which indicates string data
+    while (pos < buffer.length && buffer[pos] !== 0x2b) {
+      pos++;
+    }
+
+    if (pos >= buffer.length - 2) return null;
+
+    // Skip '+' marker and length byte
+    pos += 2;
+
+    // Now we're at the start of the actual text
+    const textStart = pos;
+
+    // Find where the text ends (control char 0x86 or 0x84 typically marks end)
+    let textEnd = textStart;
+    while (textEnd < buffer.length) {
+      const byte = buffer[textEnd];
+      // Stop at blob markers that indicate end of string content
+      if (byte === 0x86 || byte === 0x84) break;
+      textEnd++;
+    }
+
+    if (textEnd > textStart) {
+      const text = buffer.subarray(textStart, textEnd).toString('utf8');
+      // Clean up any trailing non-printable control chars
+      let end = text.length;
+      while (end > 0) {
+        const code = text.charCodeAt(end - 1);
+        if ((code >= 0x20 && code < 0x7f) || code > 0x9f) break;
+        end--;
+      }
+      return text.slice(0, end).trim();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Gets the display text for a message, falling back to attributedBody extraction.
+ * Returns '[Attachment]' for attachment-only messages.
+ */
+function getMessageText(
+  text: string | null,
+  attributedBodyHex: string | null,
+  attachmentCount: number,
+): string {
+  // Try plain text first
+  if (text?.trim()) {
+    return text;
+  }
+
+  // Try extracting from attributedBody
+  const extracted = extractTextFromAttributedBody(attributedBodyHex);
+  if (extracted?.trim()) {
+    return extracted;
+  }
+
+  // If there's an attachment but no text, indicate that
+  if (attachmentCount > 0) {
+    return '[Attachment]';
+  }
+
+  return '';
 }
 
 /**
@@ -105,7 +202,9 @@ export async function readChatMessages(
   const escapedId = chatId.replace(/'/g, "''");
   const query = `
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
-           COALESCE(h.id, '') as handle_id
+           COALESCE(h.id, '') as handle_id,
+           hex(m.attributedBody) as attributedBody_hex,
+           (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) as attachment_count
     FROM message m
     LEFT JOIN handle h ON m.handle_id = h.ROWID
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
@@ -118,7 +217,11 @@ export async function readChatMessages(
   const rows = parseSqliteJson<SqliteMessage & { handle_id: string }>(output);
   return rows.reverse().map((row) => ({
     id: String(row.ROWID),
-    text: row.text || '',
+    text: getMessageText(
+      row.text,
+      row.attributedBody_hex,
+      row.attachment_count,
+    ),
     sender: row.is_from_me ? 'me' : row.handle_id || 'unknown',
     date: appleTimestampToISO(row.date),
     isFromMe: row.is_from_me === 1,
@@ -127,6 +230,7 @@ export async function readChatMessages(
 
 /**
  * Search messages across all chats by text content.
+ * Searches both the text column and attributedBody for matches.
  */
 export async function searchMessages(
   searchTerm: string,
@@ -144,12 +248,15 @@ export async function searchMessages(
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
            COALESCE(h.id, '') as handle_id,
            c.guid as chat_guid,
-           COALESCE(c.display_name, '') as chat_name
+           COALESCE(c.display_name, '') as chat_name,
+           hex(m.attributedBody) as attributedBody_hex,
+           (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) as attachment_count
     FROM message m
     LEFT JOIN handle h ON m.handle_id = h.ROWID
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
     WHERE m.text LIKE '%${escapedTerm}%'
+       OR CAST(m.attributedBody AS TEXT) LIKE '%${escapedTerm}%'
     ORDER BY m.date DESC
     LIMIT ${limit}
   `;
@@ -159,7 +266,11 @@ export async function searchMessages(
   >(output);
   return rows.map((row) => ({
     id: String(row.ROWID),
-    text: row.text || '',
+    text: getMessageText(
+      row.text,
+      row.attributedBody_hex,
+      row.attachment_count,
+    ),
     sender: row.is_from_me ? 'me' : row.handle_id || 'unknown',
     date: appleTimestampToISO(row.date),
     isFromMe: row.is_from_me === 1,
@@ -176,7 +287,9 @@ export async function getLastMessage(
 ): Promise<{ text: string; date: string } | null> {
   const escapedId = chatGuid.replace(/'/g, "''");
   const query = `
-    SELECT m.text, m.date
+    SELECT m.text, m.date,
+           hex(m.attributedBody) as attributedBody_hex,
+           (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) as attachment_count
     FROM message m
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
@@ -185,10 +298,20 @@ export async function getLastMessage(
     LIMIT 1
   `;
   const output = await runSqlite(query, 5000);
-  const rows = parseSqliteJson<{ text: string | null; date: number }>(output);
+  const rows = parseSqliteJson<{
+    text: string | null;
+    date: number;
+    attributedBody_hex: string | null;
+    attachment_count: number;
+  }>(output);
   if (rows.length === 0) return null;
+  const text = getMessageText(
+    rows[0].text,
+    rows[0].attributedBody_hex,
+    rows[0].attachment_count,
+  );
   return {
-    text: (rows[0].text || '').substring(0, 100),
+    text: text.substring(0, 100),
     date: appleTimestampToISO(rows[0].date),
   };
 }
@@ -221,6 +344,22 @@ export async function listChats(
         LIMIT 1
       ) as last_message,
       (
+        SELECT hex(m.attributedBody)
+        FROM message m
+        JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+        WHERE cmj.chat_id = c.ROWID
+        ORDER BY m.date DESC
+        LIMIT 1
+      ) as last_message_attr_hex,
+      (
+        SELECT (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID)
+        FROM message m
+        JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+        WHERE cmj.chat_id = c.ROWID
+        ORDER BY m.date DESC
+        LIMIT 1
+      ) as last_message_attach_count,
+      (
         SELECT m.date
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
@@ -240,6 +379,8 @@ export async function listChats(
     display_name: string;
     participants: string | null;
     last_message: string | null;
+    last_message_attr_hex: string | null;
+    last_message_attach_count: number | null;
     last_date: number | null;
   }>(output);
 
@@ -249,11 +390,16 @@ export async function listChats(
       : [];
     const name =
       row.display_name || participants.join(', ') || row.chat_guid || 'Unknown';
+    const lastMessage = getMessageText(
+      row.last_message,
+      row.last_message_attr_hex,
+      row.last_message_attach_count ?? 0,
+    );
     return {
       id: row.chat_guid,
       name,
       participants,
-      lastMessage: (row.last_message || '').substring(0, 100),
+      lastMessage: lastMessage.substring(0, 100),
       lastDate: row.last_date ? appleTimestampToISO(row.last_date) : '',
     };
   });
