@@ -404,3 +404,75 @@ export async function listChats(
     };
   });
 }
+
+/**
+ * Read messages from handles (phone numbers or emails).
+ * Used for reverse lookup by contact name.
+ */
+export async function readMessagesByHandles(
+  handles: string[],
+  limit: number,
+): Promise<
+  Array<
+    ReadMessageResult & {
+      chatId: string;
+      chatName: string;
+    }
+  >
+> {
+  if (handles.length === 0) {
+    return [];
+  }
+
+  // Build OR conditions for each handle
+  // We need to normalize handles to match Messages DB format
+  const handleConditions = handles
+    .map((h) => {
+      const escaped = h.replace(/'/g, "''");
+      // Messages DB stores handles like "+15551234567" or "email@example.com"
+      // We'll match by suffix for phone numbers (to handle country code variations)
+      // and exact match for emails
+      if (h.includes('@')) {
+        return `h.id = '${escaped}'`;
+      }
+      // For phone numbers, match last 10 digits using LIKE
+      const last10 = h.slice(-10);
+      return `h.id LIKE '%${last10}'`;
+    })
+    .join(' OR ');
+
+  const query = `
+    SELECT m.ROWID, m.text, m.is_from_me, m.date,
+           COALESCE(h.id, '') as handle_id,
+           c.guid as chat_guid,
+           COALESCE(c.display_name, '') as chat_name,
+           hex(m.attributedBody) as attributedBody_hex,
+           (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) as attachment_count
+    FROM message m
+    LEFT JOIN handle h ON m.handle_id = h.ROWID
+    JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+    JOIN chat c ON c.ROWID = cmj.chat_id
+    WHERE (${handleConditions})
+    ORDER BY m.date DESC
+    LIMIT ${limit}
+  `;
+
+  const output = await runSqlite(query, 30000);
+  const rows = parseSqliteJson<
+    SqliteMessage & { handle_id: string; chat_guid: string; chat_name: string }
+  >(output);
+
+  return rows.map((row) => ({
+    id: String(row.ROWID),
+    text: getMessageText(
+      row.text,
+      row.attributedBody_hex,
+      row.attachment_count,
+    ),
+    sender: row.is_from_me ? 'me' : row.handle_id || 'unknown',
+    date: appleTimestampToISO(row.date),
+    isFromMe: row.is_from_me === 1,
+    chatId: row.chat_guid,
+    chatName: row.chat_name || row.chat_guid,
+  }));
+}

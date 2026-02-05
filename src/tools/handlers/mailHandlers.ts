@@ -183,6 +183,63 @@ const SEARCH_MAIL_SCRIPT = `
 })()
 `;
 
+/**
+ * JXA script to search mail by sender email addresses (for contact reverse lookup).
+ * The %%emailConditions%% placeholder is replaced with the actual condition code.
+ */
+const SEARCH_MAIL_BY_SENDERS_SCRIPT = `
+(() => {
+  const Mail = Application("Mail");
+  const accounts = Mail.accounts();
+  const result = [];
+  const limit = {{limit}};
+  const emails = [%%emailsList%%];
+  const emailsLower = emails.map(e => e.toLowerCase());
+
+  // Helper to check if sender matches any email
+  function senderMatches(sender) {
+    if (!sender) return false;
+    const senderLower = sender.toLowerCase();
+    // Extract email from "Name <email@example.com>" format
+    const match = senderLower.match(/<([^>]+)>/);
+    const senderEmail = match ? match[1] : senderLower;
+    return emailsLower.some(e => senderEmail.includes(e) || e.includes(senderEmail));
+  }
+
+  // Search all mailboxes across all accounts
+  for (let a = 0; a < accounts.length && result.length < limit; a++) {
+    const mailboxes = accounts[a].mailboxes();
+    for (let b = 0; b < mailboxes.length && result.length < limit; b++) {
+      const msgs = mailboxes[b].messages();
+      const searchLimit = Math.min(msgs.length, 500); // Limit per mailbox for performance
+      for (let i = 0; i < searchLimit && result.length < limit; i++) {
+        try {
+          const m = msgs[i];
+          const sender = m.sender() || "";
+          if (senderMatches(sender)) {
+            result.push({
+              id: m.id().toString(),
+              subject: m.subject() || "(no subject)",
+              sender: sender,
+              dateReceived: m.dateReceived().toISOString(),
+              read: m.readStatus(),
+              mailbox: mailboxes[b].name(),
+              account: accounts[a].name(),
+              preview: (m.content() || "").substring(0, 200)
+            });
+          }
+        } catch(e) { /* skip problematic message */ }
+      }
+    }
+  }
+
+  // Sort by date (most recent first)
+  result.sort((a, b) => new Date(b.dateReceived) - new Date(a.dateReceived));
+
+  return JSON.stringify(result.slice(0, limit));
+})()
+`;
+
 const GET_MAIL_SCRIPT = `
 (() => {
   const Mail = Application("Mail");
@@ -321,6 +378,42 @@ export async function handleReadMail(
       offset: String(validated.offset),
     };
     const paginationMeta = { limit: validated.limit, offset: validated.offset };
+
+    // Find emails from a contact by name (reverse lookup)
+    if (validated.contact) {
+      const handles = await contactResolver.resolveNameToHandles(
+        validated.contact,
+      );
+      if (!handles || handles.emails.length === 0) {
+        return `No contact found matching "${validated.contact}", or the contact has no email addresses associated.`;
+      }
+
+      // Build the emails list for the JXA script
+      const emailsList = handles.emails
+        .map((e) => `"${sanitizeForJxa(e)}"`)
+        .join(', ');
+
+      const script = SEARCH_MAIL_BY_SENDERS_SCRIPT.replace(
+        '%%emailsList%%',
+        emailsList,
+      ).replace('{{limit}}', String(validated.limit));
+
+      let messages = await executeJxaWithRetry<MailMessage[]>(
+        script,
+        60000, // Longer timeout since we search all mailboxes
+        'Mail',
+      );
+      if (validated.enrichContacts !== false) {
+        messages = await enrichMailSenders(messages);
+      }
+      return formatListMarkdown(
+        `Mail from contact "${validated.contact}"`,
+        messages,
+        formatMailMarkdown,
+        `No messages found from contact "${validated.contact}".`,
+        { pagination: paginationMeta, includeTimezone: true },
+      );
+    }
 
     // List mailboxes
     if (validated.mailbox === '_list') {

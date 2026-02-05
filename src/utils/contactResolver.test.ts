@@ -495,4 +495,173 @@ describe('ContactResolverService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('resolveNameToHandles', () => {
+    it('should resolve a full name to phone numbers and emails', async () => {
+      const result = await service.resolveNameToHandles('John Doe');
+
+      expect(result).not.toBeNull();
+      expect(result?.phones).toContain('15551234567');
+      expect(result?.emails).toContain('john.doe@example.com');
+      expect(result?.emails).toContain('john@work.com');
+    });
+
+    it('should support partial name matching (case-insensitive)', async () => {
+      const result = await service.resolveNameToHandles('john');
+
+      expect(result).not.toBeNull();
+      // Should match John Doe
+      expect(result?.phones).toContain('15551234567');
+    });
+
+    it('should match by last name', async () => {
+      const result = await service.resolveNameToHandles('Smith');
+
+      expect(result).not.toBeNull();
+      expect(result?.emails).toContain('jane.smith@example.com');
+    });
+
+    it('should return null for unknown name', async () => {
+      const result = await service.resolveNameToHandles('Unknown Person');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty name', async () => {
+      const result = await service.resolveNameToHandles('');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for whitespace-only name', async () => {
+      const result = await service.resolveNameToHandles('   ');
+
+      expect(result).toBeNull();
+    });
+
+    it('should combine handles from multiple contacts with similar names', async () => {
+      mockExecuteJxa.mockResolvedValue([
+        {
+          id: 'john-1',
+          fullName: 'John Smith',
+          firstName: 'John',
+          lastName: 'Smith',
+          phones: ['5551111111'],
+          emails: ['john.smith@example.com'],
+        },
+        {
+          id: 'john-2',
+          fullName: 'John Doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          phones: ['5552222222'],
+          emails: ['john.doe@example.com'],
+        },
+      ]);
+
+      const result = await service.resolveNameToHandles('John');
+
+      expect(result).not.toBeNull();
+      expect(result?.phones).toContain('5551111111');
+      expect(result?.phones).toContain('5552222222');
+      expect(result?.emails).toContain('john.smith@example.com');
+      expect(result?.emails).toContain('john.doe@example.com');
+    });
+
+    it('should deduplicate handles', async () => {
+      mockExecuteJxa.mockResolvedValue([
+        {
+          id: 'contact-1',
+          fullName: 'John Doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          phones: ['5551234567', '5551234567'], // Duplicate
+          emails: ['john@example.com'],
+        },
+      ]);
+
+      const result = await service.resolveNameToHandles('John');
+
+      expect(result).not.toBeNull();
+      expect(result?.phones.length).toBe(1);
+    });
+
+    it('should return null on permission error', async () => {
+      const { JxaError: MockJxaError } = jest.requireMock('./jxaExecutor.js');
+      mockExecuteJxa.mockRejectedValue(
+        new MockJxaError(
+          'Permission denied for Contacts',
+          'Contacts',
+          true,
+          'not authorized',
+        ),
+      );
+
+      const result = await service.resolveNameToHandles('John');
+
+      expect(result).toBeNull();
+    });
+
+    it('should only call JXA once for resolve then resolveNameToHandles (shared cache)', async () => {
+      await service.resolveHandle('john@example.com');
+      await service.resolveNameToHandles('John');
+
+      // JXA should only be called once - cache is shared
+      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle contacts with only phones (no emails)', async () => {
+      mockExecuteJxa.mockResolvedValue([
+        {
+          id: 'phone-only',
+          fullName: 'Phone Only',
+          firstName: 'Phone',
+          lastName: 'Only',
+          phones: ['5551234567'],
+          emails: [],
+        },
+      ]);
+
+      const result = await service.resolveNameToHandles('Phone Only');
+
+      expect(result).not.toBeNull();
+      expect(result?.phones.length).toBe(1);
+      expect(result?.emails.length).toBe(0);
+    });
+
+    it('should handle contacts with only emails (no phones)', async () => {
+      mockExecuteJxa.mockResolvedValue([
+        {
+          id: 'email-only',
+          fullName: 'Email Only',
+          firstName: 'Email',
+          lastName: 'Only',
+          phones: [],
+          emails: ['email@example.com'],
+        },
+      ]);
+
+      const result = await service.resolveNameToHandles('Email Only');
+
+      expect(result).not.toBeNull();
+      expect(result?.phones.length).toBe(0);
+      expect(result?.emails.length).toBe(1);
+    });
+  });
+
+  describe('getNameIndexSize', () => {
+    it('should return the size of the name index', async () => {
+      await service.resolveHandle('john@example.com'); // Build cache
+
+      // Name index should have entries for unique names
+      expect(service.getNameIndexSize()).toBeGreaterThan(0);
+    });
+
+    it('should be 0 after invalidation', async () => {
+      await service.resolveHandle('john@example.com');
+      service.invalidateCache();
+
+      expect(service.getNameIndexSize()).toBe(0);
+    });
+  });
 });

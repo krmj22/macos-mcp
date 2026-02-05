@@ -17,6 +17,14 @@ export interface ResolvedContact {
 }
 
 /**
+ * Contact handles (phones and emails) for reverse lookup
+ */
+export interface ContactHandles {
+  phones: string[];
+  emails: string[];
+}
+
+/**
  * Contact cache entry with phone/email mappings
  */
 interface ContactCacheEntry {
@@ -35,6 +43,14 @@ interface CacheState {
   entries: Map<string, ResolvedContact>; // normalized handle -> contact
   timestamp: number;
   building: Promise<void> | null; // Lock to prevent duplicate fetches
+}
+
+/**
+ * Name-to-handles index cache for reverse lookup
+ */
+interface NameIndexCache {
+  entries: Map<string, ContactHandles>; // lowercase name -> handles
+  timestamp: number;
 }
 
 /**
@@ -99,6 +115,11 @@ export class ContactResolverService {
     building: null,
   };
 
+  private nameIndex: NameIndexCache = {
+    entries: new Map(),
+    timestamp: 0,
+  };
+
   private cacheTtlMs: number;
 
   constructor(cacheTtlMs = CACHE_TTL_MS) {
@@ -144,6 +165,10 @@ export class ContactResolverService {
       entries: new Map(),
       timestamp: 0,
       building: null,
+    };
+    this.nameIndex = {
+      entries: new Map(),
+      timestamp: 0,
     };
   }
 
@@ -193,6 +218,7 @@ export class ContactResolverService {
    */
   private async doBuildCache(): Promise<void> {
     const entries = new Map<string, ResolvedContact>();
+    const nameEntries = new Map<string, ContactHandles>();
 
     try {
       const contacts = await executeJxaWithRetry<ContactCacheEntry[]>(
@@ -230,12 +256,44 @@ export class ContactResolverService {
             entries.set(normalized, resolved);
           }
         }
+
+        // Build name index for reverse lookup
+        // Index by full name, first name, last name (all lowercase for case-insensitive matching)
+        const handles: ContactHandles = {
+          phones: contact.phones
+            .map((p) => this.normalizePhone(p))
+            .filter(Boolean),
+          emails: contact.emails
+            .map((e) => this.normalizeEmail(e))
+            .filter(Boolean),
+        };
+
+        // Only index contacts that have at least one handle
+        if (handles.phones.length > 0 || handles.emails.length > 0) {
+          // Index by full name
+          if (contact.fullName) {
+            const key = contact.fullName.toLowerCase();
+            const existing = nameEntries.get(key);
+            if (existing) {
+              // Merge handles for same name
+              existing.phones.push(...handles.phones);
+              existing.emails.push(...handles.emails);
+            } else {
+              nameEntries.set(key, { ...handles });
+            }
+          }
+        }
       }
 
+      const timestamp = Date.now();
       this.cache = {
         entries,
-        timestamp: Date.now(),
+        timestamp,
         building: null,
+      };
+      this.nameIndex = {
+        entries: nameEntries,
+        timestamp,
       };
     } catch (error) {
       // Graceful degradation: permission errors result in empty cache with valid timestamp
@@ -246,10 +304,15 @@ export class ContactResolverService {
         (error as { isPermissionError: boolean }).isPermissionError === true;
 
       if (isPermissionErr) {
+        const timestamp = Date.now();
         this.cache = {
           entries: new Map(),
-          timestamp: Date.now(),
+          timestamp,
           building: null,
+        };
+        this.nameIndex = {
+          entries: new Map(),
+          timestamp,
         };
         return;
       }
@@ -326,6 +389,63 @@ export class ContactResolverService {
   }
 
   /**
+   * Resolves a contact name to their phone numbers and email addresses.
+   * Supports partial matching (case-insensitive).
+   *
+   * @param name - Contact name to search for (partial match, case-insensitive)
+   * @returns ContactHandles with phones and emails, or null if no contact found
+   *
+   * @example
+   * // Find by full name
+   * await service.resolveNameToHandles("John Doe")
+   * // Returns { phones: ["+15551234567"], emails: ["john@example.com"] }
+   *
+   * // Find by partial name
+   * await service.resolveNameToHandles("John")
+   * // Returns combined handles for all contacts matching "John"
+   */
+  async resolveNameToHandles(name: string): Promise<ContactHandles | null> {
+    try {
+      await this.buildCache();
+    } catch {
+      // Graceful degradation: return null on any error
+      return null;
+    }
+
+    const searchTerm = name.toLowerCase().trim();
+    if (!searchTerm) {
+      return null;
+    }
+
+    const matchedHandles: ContactHandles = {
+      phones: [],
+      emails: [],
+    };
+
+    // Search through name index for partial matches
+    for (const [indexedName, handles] of this.nameIndex.entries) {
+      if (indexedName.includes(searchTerm)) {
+        matchedHandles.phones.push(...handles.phones);
+        matchedHandles.emails.push(...handles.emails);
+      }
+    }
+
+    // Deduplicate results
+    matchedHandles.phones = [...new Set(matchedHandles.phones)];
+    matchedHandles.emails = [...new Set(matchedHandles.emails)];
+
+    // Return null if no handles found
+    if (
+      matchedHandles.phones.length === 0 &&
+      matchedHandles.emails.length === 0
+    ) {
+      return null;
+    }
+
+    return matchedHandles;
+  }
+
+  /**
    * Gets the current cache size (for testing/debugging).
    */
   getCacheSize(): number {
@@ -337,6 +457,13 @@ export class ContactResolverService {
    */
   getCacheTimestamp(): number {
     return this.cache.timestamp;
+  }
+
+  /**
+   * Gets the name index size (for testing/debugging).
+   */
+  getNameIndexSize(): number {
+    return this.nameIndex.entries.size;
   }
 }
 

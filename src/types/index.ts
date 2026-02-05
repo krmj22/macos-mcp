@@ -242,6 +242,8 @@ export interface MailToolArgs extends BaseToolArgs {
   read?: boolean;
   limit?: number;
   offset?: number;
+  /** Find emails from a contact by name (partial match, case-insensitive) */
+  contact?: string;
 }
 
 // --- Messages ---
@@ -264,6 +266,8 @@ export interface MessagesToolArgs extends BaseToolArgs {
   offset?: number;
   /** Resolve sender phone/email to contact name (default: true) */
   enrichContacts?: boolean;
+  /** Find messages from a contact by name (partial match, case-insensitive) */
+  contact?: string;
 }
 
 // --- Contacts ---

@@ -290,6 +290,10 @@ export const ReadMailSchema = z.object({
     'Account',
   ),
   enrichContacts: z.boolean().optional().default(true),
+  contact: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'Contact name',
+  ),
   ...PaginationFields,
 });
 
@@ -318,6 +322,10 @@ export const ReadMessagesSchema = z.object({
   search: SafeSearchSchema,
   searchMessages: z.boolean().optional(),
   enrichContacts: z.boolean().optional().default(true),
+  contact: createOptionalSafeTextSchema(
+    VALIDATION.MAX_TITLE_LENGTH,
+    'Contact name',
+  ),
   ...PaginationFields,
 });
 

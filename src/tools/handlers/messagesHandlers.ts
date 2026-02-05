@@ -17,6 +17,7 @@ import {
   getLastMessage,
   listChats,
   readChatMessages,
+  readMessagesByHandles,
   SqliteAccessError,
   searchMessages,
 } from '../../utils/sqliteMessageReader.js';
@@ -228,9 +229,7 @@ async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
   const resolved = await contactResolver.resolveBatch(handles);
   return chats.map((c) => ({
     ...c,
-    participants: c.participants?.map(
-      (p) => resolved.get(p)?.fullName || p,
-    ),
+    participants: c.participants?.map((p) => resolved.get(p)?.fullName || p),
   }));
 }
 
@@ -444,12 +443,58 @@ async function listChatsWithFallback(
   }
 }
 
+/**
+ * Reads messages by phone handles (for contact reverse lookup).
+ * Uses SQLite directly since JXA does not support handle-based queries.
+ */
+async function readMessagesByHandlesWithFallback(
+  handles: string[],
+  limit: number,
+): Promise<SearchMessageResult[]> {
+  try {
+    return await readMessagesByHandles(handles, limit);
+  } catch (error) {
+    if (error instanceof SqliteAccessError && error.isPermissionError) {
+      throw new Error(
+        'Cannot read messages by contact: SQLite access requires Full Disk Access. ' +
+          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
+    }
+    throw error;
+  }
+}
+
 export async function handleReadMessages(
   args: MessagesToolArgs,
 ): Promise<CallToolResult> {
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, ReadMessagesSchema);
     const paginationMeta = { limit: validated.limit, offset: validated.offset };
+
+    // Find messages from a contact by name (reverse lookup)
+    if (validated.contact) {
+      const handles = await contactResolver.resolveNameToHandles(
+        validated.contact,
+      );
+      if (!handles || handles.phones.length === 0) {
+        return `No contact found matching "${validated.contact}", or the contact has no phone numbers associated.`;
+      }
+
+      let results = await readMessagesByHandlesWithFallback(
+        handles.phones,
+        validated.limit ?? 50,
+      );
+      if (validated.enrichContacts !== false) {
+        results = await enrichSearchMessagesWithContacts(results);
+      }
+      return formatListMarkdown(
+        `Messages from contact "${validated.contact}"`,
+        results,
+        formatSearchMessageMarkdown,
+        `No messages found from contact "${validated.contact}".`,
+        { includeTimezone: true },
+      );
+    }
 
     // Search chats by participant/name or search messages by content
     if (validated.search) {

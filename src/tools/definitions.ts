@@ -388,7 +388,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'mail_messages',
     description:
-      'Manages Apple Mail. Supports reading inbox/mailboxes, searching messages (subject, sender, body), reading individual messages, sending mail with CC/BCC, replying, marking read/unread, and deleting.',
+      'Manages Apple Mail. Supports reading inbox/mailboxes, searching messages (subject, sender, body), finding emails from a contact by name, reading individual messages, sending mail with CC/BCC, replying, marking read/unread, and deleting.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -406,6 +406,11 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'string',
           description:
             'A search term to filter messages by subject, sender, or body content.',
+        },
+        contact: {
+          type: 'string',
+          description:
+            'Find emails from a contact by name (partial match, case-insensitive). Looks up all email addresses for the contact and returns matching messages.',
         },
         mailbox: {
           type: 'string',
@@ -483,7 +488,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage). Supports reading chats and messages, searching chats by participant/name, searching messages by content, and sending new iMessages.',
+      'Manages Apple Messages (iMessage). Supports reading chats and messages, searching chats by participant/name, searching messages by content, finding messages from a contact by name, and sending new iMessages.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -505,6 +510,11 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'boolean',
           description:
             'When true with search, searches message content instead of chat names/participants.',
+        },
+        contact: {
+          type: 'string',
+          description:
+            'Find messages from a contact by name (partial match, case-insensitive). Looks up all phone numbers for the contact and returns matching messages.',
         },
         limit: {
           type: 'number',
