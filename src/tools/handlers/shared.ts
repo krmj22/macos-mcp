@@ -15,6 +15,7 @@ import type {
   NotesToolArgs,
   RemindersToolArgs,
 } from '../../types/index.js';
+import { formatTimezoneInfo, getSystemTimezone } from '../../utils/timezone.js';
 import { validateInput } from '../../validation/schemas.js';
 
 /**
@@ -39,6 +40,15 @@ export const extractAndValidateArgs = <T>(
 };
 
 /**
+ * Options for formatListMarkdown
+ */
+export interface FormatListOptions {
+  pagination?: { offset?: number; limit?: number };
+  /** Include user's timezone in the response for time-sensitive data */
+  includeTimezone?: boolean;
+}
+
+/**
  * Formats a list of items as markdown with header and empty state message
  */
 export const formatListMarkdown = <T>(
@@ -46,8 +56,15 @@ export const formatListMarkdown = <T>(
   items: T[],
   formatItem: (item: T) => string[],
   emptyMessage: string,
-  pagination?: { offset?: number; limit?: number },
+  options?: FormatListOptions | { offset?: number; limit?: number },
 ): string => {
+  // Support both old pagination-only signature and new options object
+  const opts: FormatListOptions =
+    options && ('includeTimezone' in options || 'pagination' in options)
+      ? (options as FormatListOptions)
+      : { pagination: options as { offset?: number; limit?: number } };
+
+  const pagination = opts.pagination;
   let header: string;
   const offset = pagination?.offset ?? 0;
   const limit = pagination?.limit ?? 0;
@@ -66,6 +83,13 @@ export const formatListMarkdown = <T>(
     items.forEach((item) => {
       lines.push(...formatItem(item));
     });
+  }
+
+  // Add timezone context for time-sensitive data
+  if (opts.includeTimezone) {
+    const tz = getSystemTimezone();
+    lines.push('');
+    lines.push(`*User timezone: ${formatTimezoneInfo(tz)}*`);
   }
 
   return lines.join('\n');

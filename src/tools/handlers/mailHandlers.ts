@@ -12,6 +12,7 @@ import {
   executeJxaWithRetry,
   sanitizeForJxa,
 } from '../../utils/jxaExecutor.js';
+import { formatTimezoneInfo, getSystemTimezone } from '../../utils/timezone.js';
 import {
   CreateMailSchema,
   DeleteMailSchema,
@@ -267,6 +268,7 @@ export async function handleReadMail(
         'Mail',
       );
       if (!msg) return 'Mail message not found.';
+      const tz = getSystemTimezone();
       return [
         `### Mail: ${msg.subject}`,
         '',
@@ -282,6 +284,8 @@ export async function handleReadMail(
         '',
         '**Content:**',
         msg.content,
+        '',
+        `*User timezone: ${formatTimezoneInfo(tz)}*`,
       ]
         .filter(Boolean)
         .join('\n');
@@ -325,7 +329,7 @@ export async function handleReadMail(
         messages,
         formatMailMarkdown,
         'No messages in this mailbox.',
-        paginationMeta,
+        { pagination: paginationMeta, includeTimezone: true },
       );
     }
 
@@ -344,7 +348,7 @@ export async function handleReadMail(
         messages,
         formatMailMarkdown,
         'No messages found matching search.',
-        paginationMeta,
+        { pagination: paginationMeta, includeTimezone: true },
       );
     }
 
@@ -359,7 +363,7 @@ export async function handleReadMail(
       messages,
       formatMailMarkdown,
       'No messages in inbox.',
-      paginationMeta,
+      { pagination: paginationMeta, includeTimezone: true },
     );
   }, 'read mail');
 }

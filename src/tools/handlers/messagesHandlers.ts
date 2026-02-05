@@ -393,6 +393,7 @@ export async function handleReadMessages(
           results,
           formatSearchMessageMarkdown,
           'No messages found matching search.',
+          { includeTimezone: true },
         );
       }
       const script = buildScript(SEARCH_CHATS_SCRIPT, {
@@ -409,6 +410,7 @@ export async function handleReadMessages(
         chats,
         formatChatMarkdown,
         'No chats found matching search.',
+        { includeTimezone: true },
       );
     }
 
@@ -423,7 +425,7 @@ export async function handleReadMessages(
         messages,
         formatMessageMarkdown,
         'No messages in this chat.',
-        paginationMeta,
+        { pagination: paginationMeta, includeTimezone: true },
       );
     }
 
@@ -438,7 +440,7 @@ export async function handleReadMessages(
       chats,
       formatChatMarkdown,
       'No chats found.',
-      paginationMeta,
+      { pagination: paginationMeta, includeTimezone: true },
     );
   }, 'read messages');
 }

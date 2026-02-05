@@ -157,6 +157,7 @@ export const handleReadCalendarEvents = async (
       events,
       formatEventMarkdown,
       'No calendar events found.',
+      { includeTimezone: true },
     );
   }, 'read calendar events');
 };

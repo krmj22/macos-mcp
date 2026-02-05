@@ -8,6 +8,7 @@ import type { RemindersToolArgs } from '../../types/index.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import { formatMultilineNotes } from '../../utils/helpers.js';
 import { reminderRepository } from '../../utils/reminderRepository.js';
+import { formatTimezoneInfo, getSystemTimezone } from '../../utils/timezone.js';
 import {
   CreateReminderSchema,
   DeleteReminderSchema,
@@ -113,10 +114,13 @@ export const handleReadReminders = async (
     // because id might be filtered out by schema validation if it's optional
     if (args.id) {
       const reminder = await reminderRepository.findReminderById(args.id);
+      const tz = getSystemTimezone();
       const markdownLines: string[] = [
         '### Reminder',
         '',
         ...formatReminderMarkdown(reminder),
+        '',
+        `*User timezone: ${formatTimezoneInfo(tz)}*`,
       ];
       return markdownLines.join('\n');
     }
@@ -134,6 +138,7 @@ export const handleReadReminders = async (
       reminders,
       formatReminderMarkdown,
       'No reminders found matching the criteria.',
+      { includeTimezone: true },
     );
   }, 'read reminders');
 };
