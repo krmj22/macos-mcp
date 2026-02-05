@@ -23,6 +23,48 @@ import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
 
 // --- JXA Script Templates ---
 
+/**
+ * Bulk fetch script for contact resolver - fetches all contacts with phones/emails.
+ * Limited to 10,000 contacts for safety.
+ * @internal Exported for use by contactResolver.ts
+ */
+export const BULK_FETCH_CONTACTS_SCRIPT = `
+(() => {
+  const Contacts = Application("Contacts");
+  const people = Contacts.people();
+  const result = [];
+  const limit = Math.min(people.length, 10000);
+  for (let i = 0; i < limit; i++) {
+    const p = people[i];
+    const phones = [];
+    try {
+      const ph = p.phones();
+      for (let j = 0; j < ph.length; j++) {
+        phones.push(ph[j].value());
+      }
+    } catch(e) {}
+    const emails = [];
+    try {
+      const em = p.emails();
+      for (let j = 0; j < em.length; j++) {
+        emails.push(em[j].value());
+      }
+    } catch(e) {}
+    if (phones.length > 0 || emails.length > 0) {
+      result.push({
+        id: p.id(),
+        fullName: p.name() || "",
+        firstName: p.firstName() || "",
+        lastName: p.lastName() || "",
+        phones: phones,
+        emails: emails
+      });
+    }
+  }
+  return JSON.stringify(result);
+})()
+`;
+
 const LIST_CONTACTS_SCRIPT = `
 (() => {
   const Contacts = Application("Contacts");
