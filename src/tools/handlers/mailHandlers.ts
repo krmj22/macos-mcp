@@ -5,6 +5,7 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { MailToolArgs } from '../../types/index.js';
+import { contactResolver } from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
   buildScript,
@@ -42,6 +43,24 @@ interface MailboxItem {
   name: string;
   account: string;
   unreadCount: number;
+}
+
+// --- Contact Enrichment ---
+
+/**
+ * Enriches mail senders with contact names instead of email addresses.
+ */
+async function enrichMailSenders(
+  messages: MailMessage[],
+): Promise<MailMessage[]> {
+  const addresses = [...new Set(messages.map((m) => m.sender))];
+  if (addresses.length === 0) return messages;
+
+  const resolved = await contactResolver.resolveBatch(addresses);
+  return messages.map((m) => ({
+    ...m,
+    sender: resolved.get(m.sender)?.fullName || m.sender,
+  }));
 }
 
 // --- JXA Script Templates ---
@@ -268,12 +287,18 @@ export async function handleReadMail(
         'Mail',
       );
       if (!msg) return 'Mail message not found.';
+      // Enrich sender with contact name
+      let senderDisplay = msg.sender;
+      if (validated.enrichContacts !== false) {
+        const resolved = await contactResolver.resolveHandle(msg.sender);
+        senderDisplay = resolved?.fullName || msg.sender;
+      }
       const tz = getSystemTimezone();
       return [
         `### Mail: ${msg.subject}`,
         '',
         `- ID: ${msg.id}`,
-        `- From: ${msg.sender}`,
+        `- From: ${senderDisplay}`,
         `- To: ${msg.toRecipients.join(', ')}`,
         msg.ccRecipients.length > 0
           ? `- CC: ${msg.ccRecipients.join(', ')}`
@@ -319,11 +344,14 @@ export async function handleReadMail(
         account: validated.account ?? '',
         ...paginationParams,
       });
-      const messages = await executeJxaWithRetry<MailMessage[]>(
+      let messages = await executeJxaWithRetry<MailMessage[]>(
         script,
         30000,
         'Mail',
       );
+      if (validated.enrichContacts !== false) {
+        messages = await enrichMailSenders(messages);
+      }
       return formatListMarkdown(
         `Mailbox: ${validated.mailbox}`,
         messages,
@@ -338,11 +366,14 @@ export async function handleReadMail(
         search: validated.search,
         ...paginationParams,
       });
-      const messages = await executeJxaWithRetry<MailMessage[]>(
+      let messages = await executeJxaWithRetry<MailMessage[]>(
         script,
         30000,
         'Mail',
       );
+      if (validated.enrichContacts !== false) {
+        messages = await enrichMailSenders(messages);
+      }
       return formatListMarkdown(
         `Mail matching "${validated.search}"`,
         messages,
@@ -353,11 +384,14 @@ export async function handleReadMail(
     }
 
     const script = buildScript(LIST_MAIL_SCRIPT, paginationParams);
-    const messages = await executeJxaWithRetry<MailMessage[]>(
+    let messages = await executeJxaWithRetry<MailMessage[]>(
       script,
       30000,
       'Mail',
     );
+    if (validated.enrichContacts !== false) {
+      messages = await enrichMailSenders(messages);
+    }
     return formatListMarkdown(
       'Inbox',
       messages,

@@ -5,6 +5,7 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { MessagesToolArgs } from '../../types/index.js';
+import { contactResolver } from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
   buildScript,
@@ -162,6 +163,59 @@ interface SearchMessageResult {
   sender: string;
   date: string;
   isFromMe: boolean;
+}
+
+// --- Contact Enrichment ---
+
+/**
+ * Enriches messages with contact names instead of phone numbers.
+ * Only enriches incoming messages (not isFromMe) with known senders.
+ */
+async function enrichMessagesWithContacts(
+  messages: MessageItem[],
+): Promise<MessageItem[]> {
+  const handles = [
+    ...new Set(
+      messages
+        .filter((m) => !m.isFromMe && m.sender !== 'unknown')
+        .map((m) => m.sender),
+    ),
+  ];
+  if (handles.length === 0) return messages;
+
+  const resolved = await contactResolver.resolveBatch(handles);
+  return messages.map((m) => ({
+    ...m,
+    sender:
+      !m.isFromMe && m.sender !== 'unknown'
+        ? resolved.get(m.sender)?.fullName || m.sender
+        : m.sender,
+  }));
+}
+
+/**
+ * Enriches search results with contact names.
+ */
+async function enrichSearchMessagesWithContacts(
+  messages: SearchMessageResult[],
+): Promise<SearchMessageResult[]> {
+  const handles = [
+    ...new Set(
+      messages
+        .filter((m) => !m.isFromMe && m.sender !== 'unknown')
+        .map((m) => m.sender),
+    ),
+  ];
+  if (handles.length === 0) return messages;
+
+  const resolved = await contactResolver.resolveBatch(handles);
+  return messages.map((m) => ({
+    ...m,
+    sender:
+      !m.isFromMe && m.sender !== 'unknown'
+        ? resolved.get(m.sender)?.fullName || m.sender
+        : m.sender,
+  }));
 }
 
 const SEARCH_MESSAGES_SCRIPT = `
@@ -384,10 +438,13 @@ export async function handleReadMessages(
     // Search chats by participant/name or search messages by content
     if (validated.search) {
       if (validated.searchMessages) {
-        const results = await searchMessagesWithFallback(
+        let results = await searchMessagesWithFallback(
           validated.search,
           validated.limit ?? 50,
         );
+        if (validated.enrichContacts !== false) {
+          results = await enrichSearchMessagesWithContacts(results);
+        }
         return formatListMarkdown(
           `Messages matching "${validated.search}"`,
           results,
@@ -415,11 +472,14 @@ export async function handleReadMessages(
     }
 
     if (validated.chatId) {
-      const messages = await readMessagesWithFallback(
+      let messages = await readMessagesWithFallback(
         validated.chatId,
         validated.limit ?? 50,
         validated.offset ?? 0,
       );
+      if (validated.enrichContacts !== false) {
+        messages = await enrichMessagesWithContacts(messages);
+      }
       return formatListMarkdown(
         'Messages',
         messages,

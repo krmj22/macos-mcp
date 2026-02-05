@@ -236,6 +236,8 @@ export interface MailToolArgs extends BaseToolArgs {
   bcc?: string[];
   replyToId?: string;
   mailbox?: string;
+  /** Resolve sender email to contact name (default: true) */
+  enrichContacts?: boolean;
   account?: string;
   read?: boolean;
   limit?: number;
@@ -260,6 +262,8 @@ export interface MessagesToolArgs extends BaseToolArgs {
   text?: string;
   limit?: number;
   offset?: number;
+  /** Resolve sender phone/email to contact name (default: true) */
+  enrichContacts?: boolean;
 }
 
 // --- Contacts ---
