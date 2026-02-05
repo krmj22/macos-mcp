@@ -10,11 +10,20 @@ import type { ServerConfig } from '../types/index.js';
 import { registerHandlers } from './handlers.js';
 
 /**
+ * Server configuration interface for createServer
+ * Accepts either basic ServerConfig or FullServerConfig (which extends it)
+ */
+interface CreateServerConfig {
+  name: string;
+  version: string;
+}
+
+/**
  * Creates and configures an MCP server instance
- * @param config - Server configuration
+ * @param config - Server configuration (basic or full)
  * @returns Configured server instance
  */
-export function createServer(config: ServerConfig): Server {
+export function createServer(config: CreateServerConfig): Server {
   const server = new Server(
     {
       name: config.name,
@@ -36,7 +45,8 @@ export function createServer(config: ServerConfig): Server {
 }
 
 /**
- * Starts the MCP server
+ * Starts the MCP server with stdio transport
+ * @deprecated Use index.ts entry point with loadConfig() for multi-transport support
  * @param config - Server configuration
  * @returns A promise that resolves when the server starts
  */

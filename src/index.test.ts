@@ -1,107 +1,231 @@
 /**
  * index.test.ts
- * Tests for the entry point
+ * Tests for the entry point with multi-transport support
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { startServer } from './server/server.js';
-import { findProjectRoot } from './utils/projectUtils.js';
-
-jest.mock('node:fs');
-jest.mock('node:path');
-jest.mock('./server/server.js');
+// Mock projectUtils first to avoid import.meta.url issues
 jest.mock('./utils/projectUtils.js', () => ({
   findProjectRoot: jest.fn(),
 }));
 
-const mockReadFileSync = readFileSync as jest.MockedFunction<
-  typeof readFileSync
+// Mock core dependencies
+jest.mock('@modelcontextprotocol/sdk/server/stdio.js');
+jest.mock('./config/index.js');
+jest.mock('./server/server.js');
+
+// Mock the HTTP transport module at the top level
+jest.mock('./server/transports/http/index.js', () => ({
+  createHttpTransport: jest.fn(),
+}));
+
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { FullServerConfig } from './config/index.js';
+import { loadConfig } from './config/index.js';
+import { createServer } from './server/server.js';
+import { createHttpTransport } from './server/transports/http/index.js';
+
+const mockLoadConfig = loadConfig as jest.MockedFunction<typeof loadConfig>;
+const mockCreateServer = createServer as jest.MockedFunction<
+  typeof createServer
 >;
-const mockJoin = join as jest.MockedFunction<typeof join>;
-const mockFindProjectRoot = findProjectRoot as jest.MockedFunction<
-  typeof findProjectRoot
+const mockStdioServerTransport = StdioServerTransport as jest.MockedClass<
+  typeof StdioServerTransport
 >;
-const mockStartServer = startServer as jest.MockedFunction<typeof startServer>;
+const mockCreateHttpTransport = createHttpTransport as jest.MockedFunction<
+  typeof createHttpTransport
+>;
+
+// Default config for stdio mode
+const defaultConfig: FullServerConfig = {
+  name: 'mcp-server-apple-apps',
+  version: '0.11.0',
+  transport: 'stdio',
+};
 
 describe('index', () => {
+  let mockServerInstance: jest.Mocked<Server>;
+  let mockTransportInstance: jest.Mocked<StdioServerTransport>;
+  let mockExit: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFindProjectRoot.mockReturnValue('/test/project');
-    mockJoin.mockImplementation((...args) => args.join('/'));
-    mockReadFileSync.mockReturnValue(
-      JSON.stringify({ name: 'mcp-server-apple-apps', version: '0.11.0' }),
-    );
-    mockStartServer.mockResolvedValue(undefined);
+
+    // Mock server instance
+    mockServerInstance = {
+      connect: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<Server>;
+
+    // Mock transport instance
+    mockTransportInstance = {} as jest.Mocked<StdioServerTransport>;
+
+    mockLoadConfig.mockReturnValue(defaultConfig);
+    mockCreateServer.mockReturnValue(mockServerInstance);
+    mockStdioServerTransport.mockImplementation(() => mockTransportInstance);
+
+    // Mock process.exit by default
+    mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
+      // Prevent actual exit
+    }) as () => never);
   });
 
-  it('should load package.json and start server with correct config', async () => {
-    // Import the module to execute it
-    await import('./index.js');
+  afterEach(() => {
+    mockExit.mockRestore();
+  });
 
-    expect(mockFindProjectRoot).toHaveBeenCalled();
-    expect(mockJoin).toHaveBeenCalledWith('/test/project', 'package.json');
-    expect(mockReadFileSync).toHaveBeenCalledWith(
-      '/test/project/package.json',
-      'utf-8',
-    );
-    expect(mockStartServer).toHaveBeenCalledWith({
-      name: 'mcp-server-apple-apps',
-      version: '0.11.0',
+  describe('stdio transport (default)', () => {
+    it('should load config and start server with stdio transport', async () => {
+      // Use isolateModules to get a fresh import without clearing mocks
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
+
+      // Wait for async main() to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockLoadConfig).toHaveBeenCalled();
+      expect(mockCreateServer).toHaveBeenCalledWith(defaultConfig);
+      expect(mockStdioServerTransport).toHaveBeenCalled();
+      expect(mockServerInstance.connect).toHaveBeenCalledWith(
+        mockTransportInstance,
+      );
+    });
+
+    it('should handle server startup errors and exit with code 1', async () => {
+      const serverError = new Error('Server startup failed');
+      mockServerInstance.connect.mockRejectedValue(serverError);
+
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
+
+      // Wait for async error handling
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockExit).toHaveBeenCalledWith(1);
     });
   });
 
-  it('should handle server startup errors and exit with code 1', async () => {
-    // Setup mocks for error scenario before first import
-    mockFindProjectRoot.mockReturnValue('/test/project');
-    mockJoin.mockImplementation((...args) => args.join('/'));
-    mockReadFileSync.mockReturnValue(
-      JSON.stringify({ name: 'mcp-server-apple-apps', version: '0.11.0' }),
-    );
-
-    const serverError = new Error('Server startup failed');
-    mockStartServer.mockRejectedValue(serverError);
-
-    // Mock process.exit to capture calls without actually exiting
-    const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
-      // Prevent actual exit, but track the call
-    }) as () => never);
-
-    // Clear module cache
-    jest.resetModules();
-
-    // Re-mock all modules after resetModules
-    const { readFileSync: readFileSyncMock } = jest.requireMock('node:fs') as {
-      readFileSync: jest.MockedFunction<typeof readFileSync>;
+  describe('http transport', () => {
+    const httpConfig: FullServerConfig = {
+      name: 'mcp-server-apple-apps',
+      version: '0.11.0',
+      transport: 'http',
+      http: {
+        enabled: true,
+        host: '127.0.0.1',
+        port: 3847,
+      },
     };
-    const { join: joinMock } = jest.requireMock('node:path') as {
-      join: jest.MockedFunction<typeof join>;
+
+    it('should throw error when http transport requested but not enabled', async () => {
+      const invalidConfig: FullServerConfig = {
+        name: 'mcp-server-apple-apps',
+        version: '0.11.0',
+        transport: 'http',
+        // http.enabled is false by default or missing
+      };
+
+      mockLoadConfig.mockReturnValue(invalidConfig);
+
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+    });
+
+    it('should start http transport when configured', async () => {
+      const mockHttpTransportInstance = {
+        app: {},
+        transport: {},
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+      };
+
+      mockLoadConfig.mockReturnValue(httpConfig);
+      mockCreateHttpTransport.mockReturnValue(
+        mockHttpTransportInstance as unknown as ReturnType<
+          typeof createHttpTransport
+        >,
+      );
+
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockCreateHttpTransport).toHaveBeenCalledWith(
+        mockServerInstance,
+        httpConfig,
+        httpConfig.http,
+      );
+      expect(mockHttpTransportInstance.start).toHaveBeenCalled();
+    });
+  });
+
+  describe('both transports', () => {
+    const bothConfig: FullServerConfig = {
+      name: 'mcp-server-apple-apps',
+      version: '0.11.0',
+      transport: 'both',
+      http: {
+        enabled: true,
+        host: '127.0.0.1',
+        port: 3847,
+      },
     };
-    const { findProjectRoot: findProjectRootMock } = jest.requireMock(
-      './utils/projectUtils.js',
-    ) as { findProjectRoot: jest.MockedFunction<typeof findProjectRoot> };
-    const { startServer: startServerMock } = jest.requireMock(
-      './server/server.js',
-    ) as { startServer: jest.MockedFunction<typeof startServer> };
 
-    // Setup all mocks
-    findProjectRootMock.mockReturnValue('/test/project');
-    joinMock.mockImplementation((...args) => args.join('/'));
-    readFileSyncMock.mockReturnValue(
-      JSON.stringify({ name: 'mcp-server-apple-apps', version: '0.11.0' }),
-    );
-    startServerMock.mockRejectedValue(serverError);
+    it('should start both stdio and http transports', async () => {
+      const mockHttpTransportInstance = {
+        app: {},
+        transport: {},
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+      };
 
-    // Re-import index to trigger error path
-    await import('./index.js');
+      mockLoadConfig.mockReturnValue(bothConfig);
+      mockCreateHttpTransport.mockReturnValue(
+        mockHttpTransportInstance as unknown as ReturnType<
+          typeof createHttpTransport
+        >,
+      );
 
-    // Wait for async error handling to complete
-    await new Promise((resolve) => setTimeout(resolve, 200));
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
 
-    // Verify process.exit was called with code 1
-    expect(mockExit).toHaveBeenCalledWith(1);
-    expect(startServerMock).toHaveBeenCalled();
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    mockExit.mockRestore();
+      // Verify stdio was started
+      expect(mockStdioServerTransport).toHaveBeenCalled();
+      expect(mockServerInstance.connect).toHaveBeenCalledWith(
+        mockTransportInstance,
+      );
+
+      // Verify http was started
+      expect(mockCreateHttpTransport).toHaveBeenCalled();
+      expect(mockHttpTransportInstance.start).toHaveBeenCalled();
+    });
+  });
+
+  describe('graceful shutdown', () => {
+    it('should register SIGINT and SIGTERM handlers', async () => {
+      const onSpy = jest.spyOn(process, 'on');
+
+      await jest.isolateModulesAsync(async () => {
+        await import('./index.js');
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      onSpy.mockRestore();
+    });
   });
 });
