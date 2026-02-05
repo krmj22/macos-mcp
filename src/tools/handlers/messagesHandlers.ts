@@ -218,6 +218,22 @@ async function enrichSearchMessagesWithContacts(
   }));
 }
 
+/**
+ * Enriches chat participants with contact names instead of phone numbers.
+ */
+async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
+  const handles = [...new Set(chats.flatMap((c) => c.participants || []))];
+  if (handles.length === 0) return chats;
+
+  const resolved = await contactResolver.resolveBatch(handles);
+  return chats.map((c) => ({
+    ...c,
+    participants: c.participants?.map(
+      (p) => resolved.get(p)?.fullName || p,
+    ),
+  }));
+}
+
 const SEARCH_MESSAGES_SCRIPT = `
 (() => {
   const Messages = Application("Messages");
@@ -457,11 +473,14 @@ export async function handleReadMessages(
         search: validated.search,
         limit: String(validated.limit),
       });
-      const chats = await executeJxaWithRetry<ChatItem[]>(
+      let chats = await executeJxaWithRetry<ChatItem[]>(
         script,
         15000,
         'Messages',
       );
+      if (validated.enrichContacts !== false) {
+        chats = await enrichChatParticipants(chats);
+      }
       return formatListMarkdown(
         `Chats matching "${validated.search}"`,
         chats,
@@ -490,10 +509,13 @@ export async function handleReadMessages(
     }
 
     // List chats — try JXA first, fall back to SQLite
-    const chats = await listChatsWithFallback(
+    let chats = await listChatsWithFallback(
       validated.limit ?? 50,
       validated.offset ?? 0,
     );
+    if (validated.enrichContacts !== false) {
+      chats = await enrichChatParticipants(chats);
+    }
 
     return formatListMarkdown(
       'Chats',
