@@ -23,7 +23,7 @@ pnpm lint             # Lint and format with Biome
 | `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
 | `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
 | `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
-| `contacts_people` | read, create, update, delete, search | `search`, `id` | ✅ Working |
+| `contacts_people` | read, create, delete | `id` | ⚠️ Update/search deferred |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
