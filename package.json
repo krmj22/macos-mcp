@@ -61,16 +61,19 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.29.0",
     "@biomejs/biome": "2.3.5",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.10.1",
+    "@types/supertest": "^6.0.3",
     "babel-jest": "^30.2.0",
     "babel-plugin-transform-import-meta": "^2.3.3",
     "jest": "^30.2.0",
     "semantic-release": "^24.2.3",
+    "supertest": "^7.2.2",
     "ts-jest": "^29.4.5",
     "typescript": "^5.9.3"
   },

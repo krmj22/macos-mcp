@@ -22,12 +22,16 @@ export default {
         },
       },
     ],
+    '^.+\\.m?js$': 'babel-jest',
   },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^import-meta$': '<rootDir>/src/__mocks__/importMeta.js',
+    '^jose$': '<rootDir>/src/__mocks__/jose.ts',
   },
-  transformIgnorePatterns: ['node_modules/'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(jose|supertest)/)',
+  ],
   testMatch: ['<rootDir>/src/**/*.test.ts', '<rootDir>/src/**/*.spec.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '<rootDir>/dist/'],
   collectCoverageFrom: [
@@ -38,6 +42,7 @@ export default {
     '!src/**/__mocks__/**',
     '!src/**/__fixtures__/**',
     '!src/utils/projectUtils.ts', // Excluded: import.meta.url line cannot be tested in Jest
+    '!src/server/transports/http/index.ts', // Excluded: HTTP transport integration tested via E2E
   ],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
   // Ignore import.meta.url line in projectUtils.ts

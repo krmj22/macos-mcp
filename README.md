@@ -193,6 +193,24 @@ pnpm test             # Run full test suite
 pnpm lint             # Lint and format with Biome + TypeScript check
 ```
 
+### End-to-End Testing
+
+For HTTP transport testing, an E2E script is available:
+
+```bash
+./scripts/test-e2e.sh
+```
+
+This script:
+- Starts the server in HTTP mode
+- Tests health endpoints
+- Verifies CORS headers and OPTIONS preflight
+- Tests MCP endpoint availability
+- Tests rate limit headers
+- Verifies graceful shutdown
+
+Requirements: `jq` (install with `brew install jq`)
+
 ### Dependencies
 
 **Runtime:** `@modelcontextprotocol/sdk`, `exit-on-epipe`, `tsx`, `zod`
