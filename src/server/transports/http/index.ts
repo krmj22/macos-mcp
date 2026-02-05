@@ -4,7 +4,6 @@
  * @description Express server providing HTTP transport for MCP protocol messages
  */
 
-import { randomUUID } from 'node:crypto';
 import type { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, {
@@ -39,18 +38,6 @@ export interface HttpTransportInstance {
 }
 
 /**
- * Active session tracking
- */
-interface SessionInfo {
-  sessionId: string;
-  createdAt: Date;
-  lastActivity: Date;
-}
-
-/** Map of active sessions */
-const activeSessions = new Map<string, SessionInfo>();
-
-/**
  * Creates an HTTP transport for the MCP server
  *
  * @param mcpServer - MCP server instance to connect
@@ -76,26 +63,12 @@ export function createHttpTransport(
   // Trust proxy for rate limiting behind Cloudflare Tunnel
   app.set('trust proxy', true);
 
-  // Create MCP transport with session management
+  // Create MCP transport in STATELESS mode for multi-client support
+  // Each request is independent - no session tracking
+  // This is required for Claude.ai which serves multiple users
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID(),
-    enableJsonResponse: false, // Use SSE for streaming
-    onsessioninitialized: (sessionId: string) => {
-      activeSessions.set(sessionId, {
-        sessionId,
-        createdAt: new Date(),
-        lastActivity: new Date(),
-      });
-      process.stderr.write(
-        `${JSON.stringify({ timestamp: new Date().toISOString(), event: 'session_created', sessionId })}\n`,
-      );
-    },
-    onsessionclosed: (sessionId: string) => {
-      activeSessions.delete(sessionId);
-      process.stderr.write(
-        `${JSON.stringify({ timestamp: new Date().toISOString(), event: 'session_closed', sessionId })}\n`,
-      );
-    },
+    sessionIdGenerator: undefined, // Stateless mode - no session tracking
+    enableJsonResponse: true, // Allow JSON responses for clients that don't support SSE
   });
 
   // Apply global middleware
@@ -118,15 +91,6 @@ export function createHttpTransport(
   // MCP endpoint handler
   const mcpHandler = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Update session activity
-      const sessionId = req.headers['mcp-session-id'];
-      if (typeof sessionId === 'string') {
-        const session = activeSessions.get(sessionId);
-        if (session) {
-          session.lastActivity = new Date();
-        }
-      }
-
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       const errorMessage =
@@ -145,7 +109,9 @@ export function createHttpTransport(
   };
 
   // Register MCP routes - handle all methods for session management
+  // Support both /mcp (explicit) and root / (Claude.ai expects this)
   app.all('/mcp', mcpHandler);
+  app.all('/', mcpHandler);
 
   // Error handler must be last
   app.use(errorHandler());
