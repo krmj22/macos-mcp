@@ -1,0 +1,13 @@
+{
+  "transport": "http",
+  "http": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 3847,
+    "cloudflareAccess": {
+      "teamDomain": "your-team.cloudflareaccess.com",
+      "policyAUD": "your-application-audience-tag",
+      "allowedEmails": ["user@example.com"]
+    }
+  }
+}

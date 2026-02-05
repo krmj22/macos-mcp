@@ -181,3 +181,6 @@ dist
 # Swift compiled binaries
 *.swiftmodule
 .claude/
+
+# Local server config (user-specific)
+macos-mcp.config.json

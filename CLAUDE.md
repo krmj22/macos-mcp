@@ -54,6 +54,31 @@ JXA `c.messages()` throws "Can't convert types". Server auto-falls back to SQLit
 
 Swift binary permission dialogs may not appear in non-interactive contexts. The server proactively triggers an AppleScript prompt before the first EventKit call.
 
+## HTTP Transport (Remote Access)
+
+Supports Claude iOS/web via Cloudflare Tunnel. See `docs/CLOUDFLARE_SETUP.md` for full setup guide.
+
+**Quick Start:**
+```bash
+# Copy example config
+cp macos-mcp.config.example.json macos-mcp.config.json
+
+# Start in HTTP mode
+MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
+```
+
+**Key Design Decisions:**
+- **Stateless mode**: Required for multi-client support (Claude.ai serves multiple users)
+- **Root endpoint**: MCP handler at `/` (Claude expects this, not `/mcp`)
+- **JSON fallback**: `enableJsonResponse: true` for clients without SSE support
+
+**Config Options** (env vars or `macos-mcp.config.json`):
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, or `both` |
+| `MCP_HTTP_ENABLED` | `false` | Enable HTTP transport |
+| `MCP_HTTP_PORT` | `3847` | HTTP server port |
+
 ## Architecture
 
 MCP server providing native macOS integration via two bridges:
@@ -65,16 +90,26 @@ MCP server providing native macOS integration via two bridges:
 
 ```
 src/
+├── config/              # Configuration system
+│   ├── schema.ts        # Zod schemas for config validation
+│   └── index.ts         # loadConfig() - file + env var loading
+├── server/
+│   ├── server.ts        # MCP server factory
+│   └── transports/http/ # HTTP transport layer
+│       ├── index.ts     # Express + StreamableHTTPServerTransport
+│       ├── auth.ts      # Cloudflare Access JWT verification
+│       ├── middleware.ts # Rate limiting, logging, CORS
+│       └── health.ts    # /health endpoints
 ├── tools/
-│   ├── definitions.ts    # MCP tool schemas (dependentSchemas for validation)
-│   ├── index.ts          # Tool routing
-│   └── handlers/         # Domain handlers (reminderHandlers.ts, notesHandlers.ts, etc.)
+│   ├── definitions.ts   # MCP tool schemas (dependentSchemas for validation)
+│   ├── index.ts         # Tool routing
+│   └── handlers/        # Domain handlers (reminderHandlers.ts, notesHandlers.ts, etc.)
 ├── utils/
-│   ├── cliExecutor.ts    # Swift binary execution + permission retry
-│   ├── jxaExecutor.ts    # JXA/AppleScript execution + retry logic
+│   ├── cliExecutor.ts   # Swift binary execution + permission retry
+│   ├── jxaExecutor.ts   # JXA/AppleScript execution + retry logic
 │   └── sqliteMessageReader.ts  # Messages SQLite fallback
 └── validation/
-    └── schemas.ts        # Zod schemas
+    └── schemas.ts       # Zod schemas
 ```
 
 ### Data Flow
