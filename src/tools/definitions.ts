@@ -553,7 +553,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'contacts_people',
     description:
-      'Manages Apple Contacts. Supports reading all contacts, searching by name/email/phone, creating, updating, and deleting contacts.',
+      'Manages Apple Contacts. When looking for a specific person, ALWAYS use the search action with a name, email, or phone query — do not use read to browse for them. The read action returns paginated results (default 50, max 200) which may not include all contacts. If a search returns many results, ask the user follow-up questions to narrow down (e.g., last name, company, phone number) rather than listing all matches. Supports search, read, create, update, and delete actions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -570,7 +570,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         search: {
           type: 'string',
           description:
-            'Search term to find contacts by name, email, or phone number (REQUIRED for search action).',
+            'Search term to find contacts by name, email, or phone number (REQUIRED for search action). This is the preferred way to find specific contacts — always use search instead of read when looking for a person.',
         },
         firstName: {
           type: 'string',
@@ -638,7 +638,8 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of items to return (1-200, default 50).',
+          description:
+            'Maximum number of items to return (1-200, default 50). Results are paginated — a full page does not mean these are all contacts. Use search to find specific people instead of paginating through read results.',
           default: 50,
         },
         offset: {
