@@ -9,6 +9,17 @@ import type {
 } from '../types/index.js';
 import { handleToolCall } from './index.js';
 
+// Mock logging module
+jest.mock('../utils/logging.js', () => ({
+  logToolError: jest.fn(),
+}));
+
+import { logToolError } from '../utils/logging.js';
+
+const mockLogToolError = logToolError as jest.MockedFunction<
+  typeof logToolError
+>;
+
 // Mock all handler functions
 jest.mock('./handlers/index.js', () => ({
   handleCreateReminder: jest.fn(),
@@ -232,6 +243,57 @@ describe('Tools Index', () => {
         await expect(
           handleToolCall('reminders_tasks', { action: 'create' as const }),
         ).rejects.toThrow('Handler failed');
+      });
+
+      it('should log thrown errors to stderr with tool name and args', async () => {
+        const error = new Error('JXA timeout');
+        mockHandleCreateReminder.mockRejectedValue(error);
+        const args = { action: 'create' as const, title: 'Test' };
+
+        await expect(handleToolCall('reminders_tasks', args)).rejects.toThrow(
+          'JXA timeout',
+        );
+
+        expect(mockLogToolError).toHaveBeenCalledWith(
+          'reminders_tasks',
+          args,
+          error,
+        );
+      });
+
+      it('should log isError results to stderr with tool name and error text', async () => {
+        const errorResult: CallToolResult = {
+          content: [
+            {
+              type: 'text',
+              text: 'Failed to read reminders: System error occurred',
+            },
+          ],
+          isError: true,
+        };
+        mockHandleReadReminders.mockResolvedValue(errorResult);
+
+        const args = { action: 'read' as const, id: '123' };
+        const result = await handleToolCall('reminders_tasks', args);
+
+        expect(result).toEqual(errorResult);
+        expect(mockLogToolError).toHaveBeenCalledWith(
+          'reminders_tasks',
+          args,
+          'Failed to read reminders: System error occurred',
+        );
+      });
+
+      it('should not log successful tool results', async () => {
+        const successResult: CallToolResult = {
+          content: [{ type: 'text', text: 'Success' }],
+          isError: false,
+        };
+        mockHandleReadReminders.mockResolvedValue(successResult);
+
+        await handleToolCall('reminders_tasks', { action: 'read' as const });
+
+        expect(mockLogToolError).not.toHaveBeenCalled();
       });
 
       it('should handle complex arguments', async () => {

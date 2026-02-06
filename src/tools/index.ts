@@ -16,6 +16,7 @@ import type {
   RemindersToolArgs,
 } from '../types/index.js';
 import { MESSAGES, TOOLS as TOOL_NAMES } from '../utils/constants.js';
+import { logToolError } from '../utils/logging.js';
 import { TOOLS } from './definitions.js';
 import {
   handleCreateCalendarEvent,
@@ -209,7 +210,24 @@ export async function handleToolCall(
   }
 
   const router = TOOL_ROUTER_MAP[normalizedName];
-  return router(args);
+
+  let result: CallToolResult;
+  try {
+    result = await router(args);
+  } catch (error) {
+    logToolError(normalizedName, args, error);
+    throw error;
+  }
+
+  if (result.isError) {
+    const errorText =
+      result.content[0]?.type === 'text'
+        ? (result.content[0] as { type: 'text'; text: string }).text
+        : 'Unknown error';
+    logToolError(normalizedName, args, errorText);
+  }
+
+  return result;
 }
 
 export { TOOLS };
