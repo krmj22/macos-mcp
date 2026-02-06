@@ -45,6 +45,9 @@ export function createRateLimiter(
   return rateLimit({
     windowMs,
     max: maxRequests,
+    // Suppress ERR_ERL_KEY_GEN_IPV6 ValidationError — we're behind Cloudflare
+    // Tunnel which always provides X-Forwarded-For, so IPv6 validation is irrelevant
+    validate: { keyGeneratorIpFallback: false },
     message: {
       error: 'Too Many Requests',
       message: `Rate limit exceeded. Maximum ${maxRequests} requests per ${windowMs / 1000} seconds.`,
