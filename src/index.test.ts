@@ -140,7 +140,6 @@ describe('index', () => {
     it('should start http transport when configured', async () => {
       const mockHttpTransportInstance = {
         app: {},
-        transport: {},
         start: jest.fn().mockResolvedValue(undefined),
         stop: jest.fn().mockResolvedValue(undefined),
       };
@@ -182,7 +181,6 @@ describe('index', () => {
     it('should start both stdio and http transports', async () => {
       const mockHttpTransportInstance = {
         app: {},
-        transport: {},
         start: jest.fn().mockResolvedValue(undefined),
         stop: jest.fn().mockResolvedValue(undefined),
       };

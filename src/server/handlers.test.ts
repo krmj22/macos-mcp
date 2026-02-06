@@ -210,18 +210,13 @@ describe('Server Handlers', () => {
       it.each([
         ['unknown-prompt', 'Unknown prompt: unknown-prompt'],
         [123 as unknown, 'Prompt name must be a string.'],
-      ])(
-        'should throw error for invalid prompt: %s',
-        async (name, expectedError) => {
-          const request = {
-            params: { name, arguments: {} },
-          };
+      ])('should throw error for invalid prompt: %s', async (name, expectedError) => {
+        const request = {
+          params: { name, arguments: {} },
+        };
 
-          await expect(getPromptHandler(request)).rejects.toThrow(
-            expectedError,
-          );
-        },
-      );
+        await expect(getPromptHandler(request)).rejects.toThrow(expectedError);
+      });
     });
   });
 

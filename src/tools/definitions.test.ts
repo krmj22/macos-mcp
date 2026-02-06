@@ -27,23 +27,24 @@ describe('Tools Definitions', () => {
         description: 'Reads calendar collections',
         actions: ['read'],
       },
-    ])(
-      'should define $name tool with correct schema and actions',
-      ({ name, description, actions }) => {
-        const tool = TOOLS.find((t) => t.name === name);
-        expect(tool).toBeDefined();
-        expect(tool?.description).toContain(description);
-        expect(tool?.inputSchema).toBeDefined();
-        expect(tool?.inputSchema.type).toBe('object');
+    ])('should define $name tool with correct schema and actions', ({
+      name,
+      description,
+      actions,
+    }) => {
+      const tool = TOOLS.find((t) => t.name === name);
+      expect(tool).toBeDefined();
+      expect(tool?.description).toContain(description);
+      expect(tool?.inputSchema).toBeDefined();
+      expect(tool?.inputSchema.type).toBe('object');
 
-        const actionEnum = (
-          tool?.inputSchema.properties?.action as
-            | { enum?: readonly string[] }
-            | undefined
-        )?.enum;
-        expect(actionEnum).toEqual(actions);
-      },
-    );
+      const actionEnum = (
+        tool?.inputSchema.properties?.action as
+          | { enum?: readonly string[] }
+          | undefined
+      )?.enum;
+      expect(actionEnum).toEqual(actions);
+    });
 
     it('should have correct dueWithin options enum', () => {
       const remindersTool = TOOLS.find(

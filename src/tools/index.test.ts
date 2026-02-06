@@ -142,22 +142,19 @@ describe('Tools Index', () => {
           mockHandleDeleteReminder,
           { action: 'delete' as const, title: 'Delete me' },
         ],
-      ])(
-        'should route reminders_tasks action=%s correctly',
-        async (_action, mockHandler, args) => {
-          const expectedResult: CallToolResult = {
-            content: [{ type: 'text', text: 'Success' }],
-            isError: false,
-          };
+      ])('should route reminders_tasks action=%s correctly', async (_action, mockHandler, args) => {
+        const expectedResult: CallToolResult = {
+          content: [{ type: 'text', text: 'Success' }],
+          isError: false,
+        };
 
-          mockHandler.mockResolvedValue(expectedResult);
+        mockHandler.mockResolvedValue(expectedResult);
 
-          const result = await handleToolCall('reminders_tasks', args);
+        const result = await handleToolCall('reminders_tasks', args);
 
-          expect(mockHandler).toHaveBeenCalledWith(args);
-          expect(result).toEqual(expectedResult);
-        },
-      );
+        expect(mockHandler).toHaveBeenCalledWith(args);
+        expect(result).toEqual(expectedResult);
+      });
     });
 
     describe('legacy tool alias routing', () => {
@@ -325,20 +322,17 @@ describe('Tools Index', () => {
         [undefined, 'No arguments provided'],
         [{ action: undefined }, 'Unknown reminders_tasks action: undefined'],
         [{ action: 'unknown' }, 'Unknown reminders_tasks action: unknown'],
-      ])(
-        'should return error for invalid reminders_tasks args',
-        async (args, expectedText) => {
-          const result = await handleToolCall(
-            'reminders_tasks',
-            args as unknown as RemindersToolArgs,
-          );
+      ])('should return error for invalid reminders_tasks args', async (args, expectedText) => {
+        const result = await handleToolCall(
+          'reminders_tasks',
+          args as unknown as RemindersToolArgs,
+        );
 
-          expect(result).toEqual({
-            content: [{ type: 'text', text: expectedText }],
-            isError: true,
-          });
-        },
-      );
+        expect(result).toEqual({
+          content: [{ type: 'text', text: expectedText }],
+          isError: true,
+        });
+      });
     });
 
     describe('reminders_lists tool routing', () => {
@@ -367,29 +361,26 @@ describe('Tools Index', () => {
           { action: 'delete' as const, name: 'List Name' },
           { action: 'delete', name: 'List Name' },
         ],
-      ])(
-        'should route reminders_lists action=%s correctly',
-        async (_action, mockHandler, args, expectedCallArgs) => {
-          const expectedResult: CallToolResult = {
-            content: [{ type: 'text', text: 'Success' }],
-            isError: false,
-          };
+      ])('should route reminders_lists action=%s correctly', async (_action, mockHandler, args, expectedCallArgs) => {
+        const expectedResult: CallToolResult = {
+          content: [{ type: 'text', text: 'Success' }],
+          isError: false,
+        };
 
-          mockHandler.mockResolvedValue(expectedResult);
+        mockHandler.mockResolvedValue(expectedResult);
 
-          const result = await handleToolCall(
-            'reminders_lists',
-            args as ListsToolArgs,
-          );
+        const result = await handleToolCall(
+          'reminders_lists',
+          args as ListsToolArgs,
+        );
 
-          if (expectedCallArgs) {
-            expect(mockHandler).toHaveBeenCalledWith(expectedCallArgs);
-          } else {
-            expect(mockHandler).toHaveBeenCalled();
-          }
-          expect(result).toEqual(expectedResult);
-        },
-      );
+        if (expectedCallArgs) {
+          expect(mockHandler).toHaveBeenCalledWith(expectedCallArgs);
+        } else {
+          expect(mockHandler).toHaveBeenCalled();
+        }
+        expect(result).toEqual(expectedResult);
+      });
     });
 
     describe('reminders_lists tool validation errors', () => {
@@ -418,33 +409,30 @@ describe('Tools Index', () => {
           { action: 'delete' as const },
           'name',
         ],
-      ])(
-        'should return validation error when reminders_lists %s field is missing',
-        async (_action, mockHandler, args, missingField) => {
-          mockHandler.mockResolvedValue({
-            content: [
-              {
-                type: 'text',
-                text: `Input validation failed: ${missingField}: List name cannot be empty`,
-              },
-            ],
-            isError: true,
-          });
+      ])('should return validation error when reminders_lists %s field is missing', async (_action, mockHandler, args, missingField) => {
+        mockHandler.mockResolvedValue({
+          content: [
+            {
+              type: 'text',
+              text: `Input validation failed: ${missingField}: List name cannot be empty`,
+            },
+          ],
+          isError: true,
+        });
 
-          const result = await handleToolCall(
-            'reminders_lists',
-            args as ListsToolArgs,
-          );
+        const result = await handleToolCall(
+          'reminders_lists',
+          args as ListsToolArgs,
+        );
 
-          expect(result.isError).toBe(true);
-          expect(result.content[0]?.type).toBe('text');
-          const textContent = result.content[0] as
-            | { type: 'text'; text: string }
-            | undefined;
-          expect(textContent?.text).toContain('Input validation failed');
-          expect(textContent?.text).toContain(missingField);
-        },
-      );
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.type).toBe('text');
+        const textContent = result.content[0] as
+          | { type: 'text'; text: string }
+          | undefined;
+        expect(textContent?.text).toContain('Input validation failed');
+        expect(textContent?.text).toContain(missingField);
+      });
     });
   });
 
@@ -475,25 +463,22 @@ describe('Tools Index', () => {
         mockHandleDeleteCalendarEvent,
         { action: 'delete' as const, id: 'event-123' },
       ],
-    ])(
-      'should route calendar_events action=%s correctly',
-      async (_action, mockHandler, args) => {
-        const expectedResult: CallToolResult = {
-          content: [{ type: 'text', text: 'Success' }],
-          isError: false,
-        };
+    ])('should route calendar_events action=%s correctly', async (_action, mockHandler, args) => {
+      const expectedResult: CallToolResult = {
+        content: [{ type: 'text', text: 'Success' }],
+        isError: false,
+      };
 
-        mockHandler.mockResolvedValue(expectedResult);
+      mockHandler.mockResolvedValue(expectedResult);
 
-        const result = await handleToolCall(
-          'calendar_events',
-          args as CalendarToolArgs,
-        );
+      const result = await handleToolCall(
+        'calendar_events',
+        args as CalendarToolArgs,
+      );
 
-        expect(mockHandler).toHaveBeenCalledWith(args);
-        expect(result).toEqual(expectedResult);
-      },
-    );
+      expect(mockHandler).toHaveBeenCalledWith(args);
+      expect(result).toEqual(expectedResult);
+    });
 
     it('should return error for unknown calendar_events action', async () => {
       const result = await handleToolCall('calendar_events', {

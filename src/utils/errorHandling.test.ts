@@ -67,19 +67,16 @@ describe('ErrorHandling', () => {
       ['create reminder', 'Failed to create reminder'],
       ['update reminder', 'Failed to update reminder'],
       ['delete reminder', 'Failed to delete reminder'],
-    ])(
-      'should format error message for "%s"',
-      async (operationName, expectedText) => {
-        const mockOperation = jest.fn().mockRejectedValue(new Error('Failed'));
+    ])('should format error message for "%s"', async (operationName, expectedText) => {
+      const mockOperation = jest.fn().mockRejectedValue(new Error('Failed'));
 
-        const result = await handleAsyncOperation(mockOperation, operationName);
+      const result = await handleAsyncOperation(mockOperation, operationName);
 
-        expect(result.content[0]).toHaveProperty('type', 'text');
-        expect(
-          (result.content[0] as { type: 'text'; text: string }).text,
-        ).toContain(expectedText);
-      },
-    );
+      expect(result.content[0]).toHaveProperty('type', 'text');
+      expect(
+        (result.content[0] as { type: 'text'; text: string }).text,
+      ).toContain(expectedText);
+    });
 
     it('should show detailed error in development mode', async () => {
       process.env.NODE_ENV = 'development';
@@ -128,23 +125,20 @@ describe('ErrorHandling', () => {
     it.each([
       ['String error', 'string error'],
       [{ code: 'ERROR' }, { code: 'ERROR' }],
-    ])(
-      'should handle non-Error exceptions: %s',
-      async (errorValue, _description) => {
-        const mockOperation = jest.fn().mockRejectedValue(errorValue);
+    ])('should handle non-Error exceptions: %s', async (errorValue, _description) => {
+      const mockOperation = jest.fn().mockRejectedValue(errorValue);
 
-        const result = await handleAsyncOperation(
-          mockOperation,
-          'test operation',
-        );
+      const result = await handleAsyncOperation(
+        mockOperation,
+        'test operation',
+      );
 
-        expect(result.isError).toBe(true);
-        expect(result.content[0]).toHaveProperty('type', 'text');
-        expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
-          'Failed to test operation: System error occurred',
-        );
-      },
-    );
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toHaveProperty('type', 'text');
+      expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
+        'Failed to test operation: System error occurred',
+      );
+    });
 
     it('should show detailed error when DEBUG is set', async () => {
       process.env.DEBUG = '1';

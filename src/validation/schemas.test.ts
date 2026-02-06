@@ -196,23 +196,25 @@ describe('ValidationSchemas', () => {
           minimalInput: { name: 'New List' },
           requiredFields: ['name'],
         },
-      ])(
-        '$name validates correctly',
-        ({ schema, validInput, minimalInput, requiredFields }) => {
-          // Should validate full input
-          expect(() => schema.parse(validInput)).not.toThrow();
+      ])('$name validates correctly', ({
+        schema,
+        validInput,
+        minimalInput,
+        requiredFields,
+      }) => {
+        // Should validate full input
+        expect(() => schema.parse(validInput)).not.toThrow();
 
-          // Should validate minimal input with only required fields
-          expect(() => schema.parse(minimalInput)).not.toThrow();
+        // Should validate minimal input with only required fields
+        expect(() => schema.parse(minimalInput)).not.toThrow();
 
-          // Should reject input missing required fields
-          for (const field of requiredFields) {
-            const invalidInput = { ...minimalInput } as Record<string, unknown>;
-            delete invalidInput[field];
-            expect(() => schema.parse(invalidInput)).toThrow();
-          }
-        },
-      );
+        // Should reject input missing required fields
+        for (const field of requiredFields) {
+          const invalidInput = { ...minimalInput } as Record<string, unknown>;
+          delete invalidInput[field];
+          expect(() => schema.parse(invalidInput)).toThrow();
+        }
+      });
     });
 
     describe('ReadRemindersSchema', () => {

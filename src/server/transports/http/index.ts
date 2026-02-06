@@ -13,6 +13,7 @@ import express, {
   Router,
 } from 'express';
 import type { FullServerConfig, HttpConfig } from '../../../config/index.js';
+import { createServer } from '../../server.js';
 import { createAuthMiddleware } from './auth.js';
 import { markServerStarted, registerHealthRoutes } from './health.js';
 import {
@@ -29,8 +30,6 @@ import {
 export interface HttpTransportInstance {
   /** Express application */
   app: Express;
-  /** StreamableHTTPServerTransport for MCP protocol */
-  transport: StreamableHTTPServerTransport;
   /** Start listening on configured host:port */
   start: () => Promise<void>;
   /** Stop the HTTP server */
@@ -40,7 +39,11 @@ export interface HttpTransportInstance {
 /**
  * Creates an HTTP transport for the MCP server
  *
- * @param mcpServer - MCP server instance to connect
+ * SDK 1.26.0 requires stateless transports to be created fresh per request.
+ * Each POST creates a new MCP Server + StreamableHTTPServerTransport pair,
+ * handles the request, then cleans up on response close.
+ *
+ * @param _mcpServer - Unused (kept for API compatibility). Per-request servers are created internally.
  * @param config - Full server configuration
  * @param httpConfig - HTTP-specific configuration
  * @returns HTTP transport instance
@@ -54,7 +57,7 @@ export interface HttpTransportInstance {
  * ```
  */
 export function createHttpTransport(
-  mcpServer: McpServer,
+  _mcpServer: McpServer,
   config: FullServerConfig,
   httpConfig: HttpConfig,
 ): HttpTransportInstance {
@@ -63,15 +66,9 @@ export function createHttpTransport(
   // Trust proxy for rate limiting behind Cloudflare Tunnel
   app.set('trust proxy', true);
 
-  // Create MCP transport in STATELESS mode for multi-client support
-  // Each request is independent - no session tracking
-  // This is required for Claude.ai which serves multiple users
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // Stateless mode - no session tracking
-    enableJsonResponse: true, // Allow JSON responses for clients that don't support SSE
-  });
-
   // Apply global middleware
+  // express.json() is required to pre-parse the body for the SDK's parsedBody parameter.
+  // SDK 1.26.0 explicitly supports this pattern: transport.handleRequest(req, res, req.body)
   app.use(express.json());
   app.use(corsMiddleware());
   app.use(requestTiming());
@@ -88,10 +85,33 @@ export function createHttpTransport(
     app.use('/mcp', createAuthMiddleware(httpConfig.cloudflareAccess));
   }
 
-  // MCP endpoint handler
+  // MCP endpoint handler — creates a fresh server + transport per request
+  // SDK 1.26.0 stateless mode throws "Stateless transport cannot be reused across requests"
+  // if a transport with sessionIdGenerator=undefined handles more than one request.
+  // The official SDK pattern (simpleStatelessStreamableHttp.ts) creates new instances per request.
   const mcpHandler = async (req: Request, res: Response): Promise<void> => {
+    const perRequestServer = createServer(config);
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+
+    // Log transport-level errors to stderr for visibility
+    transport.onerror = (error: Error) => {
+      process.stderr.write(
+        `${JSON.stringify({ timestamp: new Date().toISOString(), error: 'MCP transport error', message: error.message, stack: error.stack })}\n`,
+      );
+    };
+
     try {
+      await perRequestServer.connect(transport);
       await transport.handleRequest(req, res, req.body);
+
+      // Clean up when the response closes
+      res.on('close', () => {
+        transport.close().catch(() => {});
+        perRequestServer.close().catch(() => {});
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -121,12 +141,8 @@ export function createHttpTransport(
 
   return {
     app,
-    transport,
 
     async start(): Promise<void> {
-      // Connect MCP server to transport
-      await mcpServer.connect(transport);
-
       return new Promise((resolve, reject) => {
         try {
           server = app.listen(httpConfig.port, httpConfig.host, () => {
