@@ -5,7 +5,10 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { MessagesToolArgs } from '../../types/index.js';
-import { contactResolver } from '../../utils/contactResolver.js';
+import {
+  contactResolver,
+  type ResolvedContact,
+} from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
   buildScript,
@@ -220,7 +223,28 @@ async function enrichSearchMessagesWithContacts(
 }
 
 /**
+ * Rebuilds chat name from resolved contacts when the original name
+ * was just comma-separated phone numbers (no iMessage display_name).
+ */
+function rebuildChatName(
+  chat: ChatItem,
+  resolved: Map<string, ResolvedContact>,
+): string {
+  // If chat name doesn't look like it was built from phone numbers, keep it
+  const looksLikePhoneList = chat.participants?.some((p) =>
+    chat.name.includes(p),
+  );
+  if (!looksLikePhoneList) return chat.name;
+
+  // Rebuild from resolved names
+  const names =
+    chat.participants?.map((p) => resolved.get(p)?.fullName || p) || [];
+  return names.join(', ') || chat.name;
+}
+
+/**
  * Enriches chat participants with contact names instead of phone numbers.
+ * Participants show "Name (+number)" format; chat name is rebuilt from names only.
  */
 async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
   const handles = [...new Set(chats.flatMap((c) => c.participants || []))];
@@ -229,7 +253,11 @@ async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
   const resolved = await contactResolver.resolveBatch(handles);
   return chats.map((c) => ({
     ...c,
-    participants: c.participants?.map((p) => resolved.get(p)?.fullName || p),
+    participants: c.participants?.map((p) => {
+      const name = resolved.get(p)?.fullName;
+      return name ? `${name} (${p})` : p;
+    }),
+    name: rebuildChatName(c, resolved),
   }));
 }
 
