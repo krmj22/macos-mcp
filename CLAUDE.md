@@ -44,7 +44,21 @@ Currently no critical bugs. Deferred work tracked in separate issues.
 
 JXA `c.messages()` throws "Can't convert types". Server auto-falls back to SQLite at `~/Library/Messages/chat.db`. Requires **Full Disk Access** for the process reading the database:
 - **stdio transport**: Grant Full Disk Access to your terminal app (Terminal, iTerm2, etc.)
-- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **node binary** itself (e.g., `~/.volta/bin/node` or `/opt/homebrew/bin/node`). See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions.
+- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **actual node binary** (not a version manager shim). See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions including troubleshooting.
+
+**Quick FDA setup commands:**
+```bash
+# Find the actual node binary (not the shim)
+node -e "console.log(process.execPath)"
+
+# Reveal it in Finder for drag-and-drop into FDA settings
+open -R "$(node -e "console.log(process.execPath)")"
+
+# Open the Full Disk Access settings pane
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+```
+
+> **Volta users:** `~/.volta/bin/node` is a shim that points to `volta-shim`. You need the resolved path under `~/.volta/tools/image/node/<VERSION>/bin/node`. Use `volta which node` or `node -e "console.log(process.execPath)"` to get it.
 
 ### Permission Requirements
 
@@ -84,7 +98,7 @@ MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
 | `MCP_HTTP_ENABLED` | `false` | Enable HTTP transport |
 | `MCP_HTTP_PORT` | `3847` | HTTP server port |
 
-**Important:** When running via HTTP transport as a LaunchAgent, the Messages tool requires Full Disk Access granted to the node binary. See `docs/CLOUDFLARE_SETUP.md` Step 10 for setup instructions.
+**Important:** When running via HTTP transport as a LaunchAgent, the Messages tool requires Full Disk Access granted to the actual node binary (not a shim). See `docs/CLOUDFLARE_SETUP.md` Step 10 for setup and troubleshooting.
 
 ## Architecture
 

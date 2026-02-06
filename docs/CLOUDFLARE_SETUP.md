@@ -328,34 +328,63 @@ tail -f /tmp/cloudflared.log
 
 The Messages tool relies on direct SQLite access to `~/Library/Messages/chat.db` because JXA message reading is broken on macOS Sonoma and later (throws "Can't convert types"). macOS restricts access to this database behind **Full Disk Access**.
 
-When running via a terminal, your terminal app needs Full Disk Access. When running as a LaunchAgent (HTTP transport), the **node binary itself** needs Full Disk Access since there is no terminal app in the process chain.
+- **stdio transport**: Grant Full Disk Access to your **terminal app** (Terminal, iTerm2, etc.)
+- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **node binary itself** since there is no terminal app in the process chain
 
-### 10.1: Find Your Node Binary Path
+### 10.1: Find Your Actual Node Binary Path
+
+Version managers (Volta, nvm, fnm) use shims or symlinks that point to a launcher, not the real node binary. You must add the **actual binary**, not the shim.
 
 ```bash
-# If using Volta
-which node
-# Typical output: /Users/<user>/.volta/bin/node
-
-# If using Homebrew
-which node
-# Typical output: /opt/homebrew/bin/node
-
-# If using system Node
-which node
-# Typical output: /usr/local/bin/node
+# Recommended: this resolves through all symlinks to the real binary
+node -e "console.log(process.execPath)"
 ```
+
+Expected output by version manager:
+
+| Manager | `which node` (shim -- do NOT use) | Actual binary (use this) |
+|---------|----------------------------------|--------------------------|
+| **Volta** | `~/.volta/bin/node` | `~/.volta/tools/image/node/<VERSION>/bin/node` |
+| **nvm** | `~/.nvm/versions/node/<VERSION>/bin/node` | Same (nvm uses real paths) |
+| **fnm** | `~/.local/share/fnm/aliases/default/bin/node` | `~/.local/share/fnm/node-versions/<VERSION>/installation/bin/node` |
+| **Homebrew** | `/opt/homebrew/bin/node` | `/opt/homebrew/Cellar/node/<VERSION>/bin/node` |
+| **System** | `/usr/local/bin/node` | `/usr/local/bin/node` |
+
+**Volta users:** `~/.volta/bin/node` is a symlink to `volta-shim`, a launcher that delegates to the real binary. macOS grants FDA to the actual executable, so you must add the resolved path (e.g., `~/.volta/tools/image/node/22.12.0/bin/node`). You can also use `volta which node` to get this path.
 
 The path must match the `ProgramArguments` in your LaunchAgent plist from Step 9.
 
 ### 10.2: Grant Full Disk Access
 
+There are two methods. **Method A (drag-and-drop)** is more reliable because the Finder file picker in System Settings sometimes fails to show binaries in hidden directories (paths starting with `.`).
+
+#### Method A: Reveal in Finder and Drag-and-Drop (Recommended)
+
+This method bypasses the file picker entirely:
+
+```bash
+# 1. Open the Full Disk Access settings pane
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+
+# 2. Reveal the actual node binary in Finder
+open -R "$(node -e "console.log(process.execPath)")"
+```
+
+Then:
+1. In System Settings, click the **+** button (unlock with your password if needed)
+2. **Instead of using the file picker**, drag the `node` binary directly from the Finder window into the Full Disk Access list
+3. Ensure the toggle next to the node entry is **enabled**
+
+#### Method B: Use the File Picker with Go to Folder
+
 1. Open **System Settings** > **Privacy & Security** > **Full Disk Access**
 2. Click the **+** button (you may need to unlock with your password)
 3. Press **Cmd+Shift+G** to open the "Go to Folder" dialog
-4. Paste the full path to your node binary (e.g., `/Users/<user>/.volta/bin/node`)
+4. Paste the full path to your node binary (from Step 10.1)
 5. Click **Open** to add it
 6. Ensure the toggle next to the node entry is **enabled**
+
+> **Tip:** If the Go to Folder dialog doesn't show the binary or the list appears empty after adding, use Method A instead.
 
 ### 10.3: Restart the LaunchAgent
 
@@ -369,16 +398,52 @@ launchctl load ~/Library/LaunchAgents/com.macos-mcp.server.plist
 ### 10.4: Verify Messages Access
 
 ```bash
-# Test that the node process can read the Messages database
-node -e "const db = require('better-sqlite3')('$HOME/Library/Messages/chat.db'); console.log('Messages DB accessible');" 2>&1 || echo "Access denied - check Full Disk Access"
+# Quick test: can the current node binary read the Messages database?
+node -e "
+const fs = require('fs');
+const path = require('os').homedir() + '/Library/Messages/chat.db';
+try {
+  fs.accessSync(path, fs.constants.R_OK);
+  console.log('Full Disk Access is working — Messages DB is readable');
+} catch {
+  console.error('Access denied — Full Disk Access not granted for this node binary');
+  process.exit(1);
+}
+"
 ```
 
-If you see "Access denied", double-check that:
-- The correct node binary path is listed in Full Disk Access
-- The toggle is enabled
-- You restarted the LaunchAgent after granting access
+If you see "Access denied", see the troubleshooting section below.
 
-> **Note:** If you use a version manager (Volta, nvm, fnm), the node path may change when you install a new Node.js version. After upgrading Node.js, verify that Full Disk Access still points to the correct binary.
+### 10.5: Troubleshooting Full Disk Access
+
+**Binary doesn't appear in the list after adding:**
+- The Finder file picker in System Settings can fail to display binaries in hidden directories. Use the drag-and-drop method (Method A in Step 10.2) instead.
+- Verify the file exists: `ls -la "$(node -e "console.log(process.execPath)")"` -- it should show a real file, not a broken symlink.
+
+**Added the binary but Messages still don't work:**
+- You may have added the shim instead of the actual binary. Run `node -e "console.log(process.execPath)"` and compare with what's in the FDA list. Volta's `~/.volta/bin/node` is a shim -- you need the resolved path under `~/.volta/tools/image/node/`.
+- Restart the LaunchAgent after granting access (Step 10.3). FDA changes only apply to newly started processes.
+
+**Node version changed after upgrading:**
+- Version managers install new binaries when you upgrade Node.js. The old binary path in the FDA list becomes stale.
+- After upgrading, re-run Step 10.1 to get the new path, then repeat Steps 10.2-10.4.
+- Also update the `ProgramArguments` in your LaunchAgent plist if it uses the full versioned path.
+
+**Helper commands for diagnosing FDA issues:**
+
+```bash
+# Show the actual binary that needs FDA
+node -e "console.log(process.execPath)"
+
+# Reveal it in Finder for drag-and-drop
+open -R "$(node -e "console.log(process.execPath)")"
+
+# Open the FDA settings pane directly
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+
+# Test read access to Messages database
+node -e "require('fs').accessSync(require('os').homedir()+'/Library/Messages/chat.db'); console.log('OK')"
+```
 
 ## Step 11: Register in Claude iOS/Desktop
 
@@ -465,7 +530,7 @@ launchctl start com.macos-mcp.server
 
 ### Messages Tool Not Working
 
-The Messages tool is the most common source of issues when running via HTTP transport. This is because JXA message reading is broken on macOS Sonoma+, so the server falls back to reading `~/Library/Messages/chat.db` directly via SQLite. This database is protected by Full Disk Access.
+The Messages tool is the most common source of issues when running via HTTP transport. JXA message reading is broken on macOS Sonoma+, so the server falls back to reading `~/Library/Messages/chat.db` directly via SQLite. This database is protected by Full Disk Access.
 
 **Symptoms:**
 - Messages tool returns empty results or errors via Claude iOS/web
@@ -473,25 +538,24 @@ The Messages tool is the most common source of issues when running via HTTP tran
 - Error logs show `SQLITE_CANTOPEN` or permission denied for `chat.db`
 
 **Fix:**
-1. Grant Full Disk Access to your node binary (see Step 10 above)
-2. Restart the LaunchAgent after granting access
-3. Verify with the test command in Step 10.4
+1. Ensure you added the **actual node binary**, not a shim (see Step 10.1)
+2. Use the drag-and-drop method if the file picker didn't work (see Step 10.2, Method A)
+3. Restart the LaunchAgent after granting access (Step 10.3)
+4. Verify with the test command in Step 10.4
 
 **Checking logs for Messages errors:**
 ```bash
 grep -i "messages\|chat.db\|sqlite" /tmp/macos-mcp.error.log
 ```
 
+See Step 10.5 for additional troubleshooting.
+
 ### Permission Issues
 
 Several tools require specific macOS permissions. When running as a LaunchAgent (HTTP transport), permissions must be granted to the **node binary** rather than a terminal app since there is no terminal in the process chain.
 
 **For Messages (Full Disk Access):**
-1. Go to **System Settings** > **Privacy & Security** > **Full Disk Access**
-2. Add the **node binary** used in your LaunchAgent (run `which node` to find the path)
-3. Restart the LaunchAgent after granting access
-
-See Step 10 for detailed instructions.
+See Step 10 for detailed instructions including troubleshooting.
 
 **For other tools (Automation permissions):**
 1. Go to **System Settings** > **Privacy & Security** > **Automation**

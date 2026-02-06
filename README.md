@@ -92,6 +92,28 @@ JXA-based tools require macOS Automation permissions. On first use, macOS will p
 pnpm test -- src/swift/Info.plist.test.ts
 ```
 
+### Full Disk Access (Messages)
+
+The Messages tool reads `~/Library/Messages/chat.db` via SQLite (JXA message reading is broken on macOS Sonoma+). This database is protected by **Full Disk Access (FDA)**.
+
+- **stdio transport**: Grant FDA to your terminal app (Terminal, iTerm2, etc.)
+- **HTTP transport / LaunchAgent**: Grant FDA to the **actual node binary**, not a version manager shim
+
+To find and grant access to the correct binary:
+
+```bash
+# Find the actual node binary path
+node -e "console.log(process.execPath)"
+
+# Reveal it in Finder (drag-and-drop into FDA settings)
+open -R "$(node -e "console.log(process.execPath)")"
+
+# Open Full Disk Access settings
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+```
+
+> **Note:** Version managers (Volta, nvm, fnm) use shims that point to a launcher, not the real binary. The System Settings file picker may not show binaries in hidden directories -- use the drag-and-drop method above instead. See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions and troubleshooting.
+
 ## Quick Start
 
 ```bash
