@@ -188,12 +188,12 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         startDate: {
           type: 'string',
           description:
-            "Start date and time. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time without timezone, e.g., '2025-11-04 09:00:00'). Also supports: 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss', or ISO 8601 with timezone. When no timezone is specified, the time is interpreted as local time.",
+            "Start date and time. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time without timezone, e.g., '2025-11-04 09:00:00'). Also supports: 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss', or ISO 8601 with timezone (e.g., '2025-11-04T09:00:00-05:00'). When no timezone offset is specified, the time is interpreted in the macOS system timezone. Use explicit timezone offsets (e.g., '-05:00', '+09:00', 'Z') for cross-timezone clarity.",
         },
         endDate: {
           type: 'string',
           description:
-            "End date and time. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time without timezone, e.g., '2025-11-04 10:00:00'). Also supports: 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss', or ISO 8601 with timezone. When no timezone is specified, the time is interpreted as local time.",
+            "End date and time. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time without timezone, e.g., '2025-11-04 10:00:00'). Also supports: 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss', or ISO 8601 with timezone (e.g., '2025-11-04T10:00:00-05:00'). When no timezone offset is specified, the time is interpreted in the macOS system timezone. Use explicit timezone offsets (e.g., '-05:00', '+09:00', 'Z') for cross-timezone clarity.",
         },
         note: {
           type: 'string',
@@ -356,7 +356,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_folders',
     description:
-      'Manages Apple Notes folders. Supports listing all folders and creating new ones.',
+      'Manages Apple Notes folders. Only read and create are supported. Folder renaming and deletion are not available through the Apple Notes API.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -458,7 +458,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         replyToId: {
           type: 'string',
           description:
-            'ID of the message to reply to. Prefills Re: subject and quotes body.',
+            'ID of the message to reply to. Creates a draft reply with auto-populated "Re:" subject prefix, quoted original body, and pre-filled recipients (to/cc from the original message). When replyToId is provided, subject, body, and to become optional — they will be auto-populated from the original message if omitted.',
         },
         read: {
           type: 'boolean',
@@ -488,7 +488,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage). Supports reading chats and messages, searching chats by participant/name, searching messages by content, finding messages from a contact by name, and sending new iMessages.',
+      'Manages Apple Messages (iMessage). Supports reading chats and messages, searching chats by participant/name, searching messages by content, finding messages from a contact by name, and sending new iMessages. Only read and create are supported. Message deletion and editing are not available through the Apple Messages API.',
     inputSchema: {
       type: 'object',
       properties: {
