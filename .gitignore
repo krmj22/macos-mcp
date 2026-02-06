@@ -184,3 +184,6 @@ dist
 
 # Local server config (user-specific)
 macos-mcp.config.json
+
+# AI tool configs
+.gemini/
