@@ -324,7 +324,63 @@ tail -f /tmp/macos-mcp.log
 tail -f /tmp/cloudflared.log
 ```
 
-## Step 10: Register in Claude iOS/Desktop
+## Step 10: Grant Full Disk Access for Messages
+
+The Messages tool relies on direct SQLite access to `~/Library/Messages/chat.db` because JXA message reading is broken on macOS Sonoma and later (throws "Can't convert types"). macOS restricts access to this database behind **Full Disk Access**.
+
+When running via a terminal, your terminal app needs Full Disk Access. When running as a LaunchAgent (HTTP transport), the **node binary itself** needs Full Disk Access since there is no terminal app in the process chain.
+
+### 10.1: Find Your Node Binary Path
+
+```bash
+# If using Volta
+which node
+# Typical output: /Users/<user>/.volta/bin/node
+
+# If using Homebrew
+which node
+# Typical output: /opt/homebrew/bin/node
+
+# If using system Node
+which node
+# Typical output: /usr/local/bin/node
+```
+
+The path must match the `ProgramArguments` in your LaunchAgent plist from Step 9.
+
+### 10.2: Grant Full Disk Access
+
+1. Open **System Settings** > **Privacy & Security** > **Full Disk Access**
+2. Click the **+** button (you may need to unlock with your password)
+3. Press **Cmd+Shift+G** to open the "Go to Folder" dialog
+4. Paste the full path to your node binary (e.g., `/Users/<user>/.volta/bin/node`)
+5. Click **Open** to add it
+6. Ensure the toggle next to the node entry is **enabled**
+
+### 10.3: Restart the LaunchAgent
+
+Full Disk Access changes require a process restart to take effect:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.macos-mcp.server.plist
+launchctl load ~/Library/LaunchAgents/com.macos-mcp.server.plist
+```
+
+### 10.4: Verify Messages Access
+
+```bash
+# Test that the node process can read the Messages database
+node -e "const db = require('better-sqlite3')('$HOME/Library/Messages/chat.db'); console.log('Messages DB accessible');" 2>&1 || echo "Access denied - check Full Disk Access"
+```
+
+If you see "Access denied", double-check that:
+- The correct node binary path is listed in Full Disk Access
+- The toggle is enabled
+- You restarted the LaunchAgent after granting access
+
+> **Note:** If you use a version manager (Volta, nvm, fnm), the node path may change when you install a new Node.js version. After upgrading Node.js, verify that Full Disk Access still points to the correct binary.
+
+## Step 11: Register in Claude iOS/Desktop
 
 ### Claude iOS
 
@@ -407,13 +463,40 @@ log show --predicate 'subsystem == "com.apple.launchd"' --last 5m
 launchctl start com.macos-mcp.server
 ```
 
+### Messages Tool Not Working
+
+The Messages tool is the most common source of issues when running via HTTP transport. This is because JXA message reading is broken on macOS Sonoma+, so the server falls back to reading `~/Library/Messages/chat.db` directly via SQLite. This database is protected by Full Disk Access.
+
+**Symptoms:**
+- Messages tool returns empty results or errors via Claude iOS/web
+- Other tools (Reminders, Calendar, Notes) work fine
+- Error logs show `SQLITE_CANTOPEN` or permission denied for `chat.db`
+
+**Fix:**
+1. Grant Full Disk Access to your node binary (see Step 10 above)
+2. Restart the LaunchAgent after granting access
+3. Verify with the test command in Step 10.4
+
+**Checking logs for Messages errors:**
+```bash
+grep -i "messages\|chat.db\|sqlite" /tmp/macos-mcp.error.log
+```
+
 ### Permission Issues
 
-Messages and some other features require Full Disk Access:
+Several tools require specific macOS permissions. When running as a LaunchAgent (HTTP transport), permissions must be granted to the **node binary** rather than a terminal app since there is no terminal in the process chain.
 
+**For Messages (Full Disk Access):**
 1. Go to **System Settings** > **Privacy & Security** > **Full Disk Access**
-2. Add **Terminal** (or your terminal app)
-3. Add the **node** binary if running via LaunchAgent
+2. Add the **node binary** used in your LaunchAgent (run `which node` to find the path)
+3. Restart the LaunchAgent after granting access
+
+See Step 10 for detailed instructions.
+
+**For other tools (Automation permissions):**
+1. Go to **System Settings** > **Privacy & Security** > **Automation**
+2. Ensure the node binary has permission for Notes, Mail, and Contacts
+3. Note: Automation permission dialogs may not appear in non-interactive contexts (LaunchAgent). You may need to run the server interactively once to trigger the permission prompts.
 
 ## Security Considerations
 

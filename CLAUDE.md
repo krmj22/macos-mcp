@@ -39,7 +39,9 @@ Currently no critical bugs. Deferred work tracked in separate issues.
 
 ### Messages JXA Broken (Sonoma+)
 
-JXA `c.messages()` throws "Can't convert types". Server auto-falls back to SQLite at `~/Library/Messages/chat.db`. Requires **Full Disk Access** for terminal app.
+JXA `c.messages()` throws "Can't convert types". Server auto-falls back to SQLite at `~/Library/Messages/chat.db`. Requires **Full Disk Access** for the process reading the database:
+- **stdio transport**: Grant Full Disk Access to your terminal app (Terminal, iTerm2, etc.)
+- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **node binary** itself (e.g., `~/.volta/bin/node` or `/opt/homebrew/bin/node`). See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions.
 
 ### Permission Requirements
 
@@ -78,6 +80,8 @@ MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
 | `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, or `both` |
 | `MCP_HTTP_ENABLED` | `false` | Enable HTTP transport |
 | `MCP_HTTP_PORT` | `3847` | HTTP server port |
+
+**Important:** When running via HTTP transport as a LaunchAgent, the Messages tool requires Full Disk Access granted to the node binary. See `docs/CLOUDFLARE_SETUP.md` Step 10 for setup instructions.
 
 ## Architecture
 
