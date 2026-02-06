@@ -6,14 +6,14 @@
 // Mock jose before importing anything that uses it
 jest.mock('jose');
 
-import * as jose from 'jose';
 import type { NextFunction, Request, Response } from 'express';
+import * as jose from 'jose';
+import type { CloudflareAccessConfig } from '../../../config/index.js';
 import {
   clearJwksCache,
   createAuthMiddleware,
   verifyCloudflareAccessJwt,
 } from './auth.js';
-import type { CloudflareAccessConfig } from '../../../config/index.js';
 
 // Test key pair for signing JWTs
 let testKeyPair: Awaited<ReturnType<typeof jose.generateKeyPair>>;
@@ -238,7 +238,9 @@ describe('verifyCloudflareAccessJwt', () => {
       const result = await verifyCloudflareAccessJwt(token, config);
 
       expect(result.valid).toBe(false);
-      expect(result.error).toBe('Email notallowed@example.com not in allowed list');
+      expect(result.error).toBe(
+        'Email notallowed@example.com not in allowed list',
+      );
     });
 
     it('allows any email when allowed list is empty array', async () => {
@@ -390,15 +392,17 @@ describe('createAuthMiddleware', () => {
     await middleware(mockReq as Request, mockRes as Response, mockNext);
 
     expect(mockNext).toHaveBeenCalled();
-    expect((mockReq as Request & { cfAccessEmail?: string }).cfAccessEmail).toBe(
-      'user@example.com',
-    );
+    expect(
+      (mockReq as Request & { cfAccessEmail?: string }).cfAccessEmail,
+    ).toBe('user@example.com');
     expect(mockRes.status).not.toHaveBeenCalled();
   });
 
   it('handles array header value (takes first)', async () => {
     // Express can sometimes provide headers as arrays
-    mockReq.headers = { 'cf-access-jwt-assertion': ['first', 'second'] as unknown as string };
+    mockReq.headers = {
+      'cf-access-jwt-assertion': ['first', 'second'] as unknown as string,
+    };
     const middleware = createAuthMiddleware(baseConfig);
 
     await middleware(mockReq as Request, mockRes as Response, mockNext);

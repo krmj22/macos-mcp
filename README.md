@@ -191,7 +191,10 @@ pnpm install          # Install dependencies
 pnpm build            # Build TypeScript + Swift binary
 pnpm test             # Run full test suite
 pnpm lint             # Lint and format with Biome + TypeScript check
+pnpm dev              # Run from source via tsx (stdio only, no build needed)
 ```
+
+> **Note:** The production entry point (`bin/run.cjs`) requires `pnpm build` first. Use `pnpm dev` for quick local development with stdio transport.
 
 ### End-to-End Testing
 

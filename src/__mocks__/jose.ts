@@ -15,7 +15,10 @@ const mockKeyPair: MockKeyPair = {
 };
 
 // Store for signed tokens and their payloads (for verification)
-const tokenStore = new Map<string, { payload: Record<string, unknown>; exp: number }>();
+const tokenStore = new Map<
+  string,
+  { payload: Record<string, unknown>; exp: number }
+>();
 
 // Mock JWK for export
 const mockJwk = {
@@ -30,7 +33,9 @@ const mockJwk = {
 /**
  * Mock generateKeyPair function
  */
-export async function generateKeyPair(_algorithm: string): Promise<MockKeyPair> {
+export async function generateKeyPair(
+  _algorithm: string,
+): Promise<MockKeyPair> {
   return mockKeyPair;
 }
 
@@ -44,7 +49,9 @@ export async function exportJWK(_key: unknown): Promise<typeof mockJwk> {
 /**
  * Mock createRemoteJWKSet - returns a function that resolves to the mock key
  */
-export function createRemoteJWKSet(_url: URL): () => Promise<{ type: 'public' }> {
+export function createRemoteJWKSet(
+  _url: URL,
+): () => Promise<{ type: 'public' }> {
   return async () => mockKeyPair.publicKey;
 }
 
@@ -52,7 +59,6 @@ export function createRemoteJWKSet(_url: URL): () => Promise<{ type: 'public' }>
  * Mock SignJWT class
  */
 export class SignJWT {
-  private header: Record<string, unknown> = {};
   private payload: Record<string, unknown>;
   private expTime: string = '1h';
 
@@ -148,7 +154,9 @@ export async function jwtVerify(
 ): Promise<{ payload: Record<string, unknown> }> {
   // Check for tampering
   if (token.includes('invalidsignature')) {
-    throw new errors.JWSSignatureVerificationFailed('JWT signature verification failed');
+    throw new errors.JWSSignatureVerificationFailed(
+      'JWT signature verification failed',
+    );
   }
 
   // Check for malformed tokens

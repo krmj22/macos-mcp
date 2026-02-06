@@ -12,18 +12,18 @@ import request from 'supertest';
 import type { FullServerConfig } from '../../../config/index.js';
 import { clearJwksCache } from './auth.js';
 import {
+  createHealthHandler,
+  createReadinessHandler,
+  markServerStarted,
+  registerHealthRoutes,
+} from './health.js';
+import {
   corsMiddleware,
   createRateLimiter,
   errorHandler,
   requestLogging,
   requestTiming,
 } from './middleware.js';
-import {
-  createHealthHandler,
-  createReadinessHandler,
-  markServerStarted,
-  registerHealthRoutes,
-} from './health.js';
 
 // Test key pair for signing JWTs
 let testKeyPair: Awaited<ReturnType<typeof jose.generateKeyPair>>;
@@ -265,15 +265,9 @@ describe('Middleware', () => {
 
     it('uses X-Forwarded-For for rate limiting', async () => {
       // First IP
-      await request(app)
-        .get('/test')
-        .set('X-Forwarded-For', '1.2.3.4');
-      await request(app)
-        .get('/test')
-        .set('X-Forwarded-For', '1.2.3.4');
-      await request(app)
-        .get('/test')
-        .set('X-Forwarded-For', '1.2.3.4');
+      await request(app).get('/test').set('X-Forwarded-For', '1.2.3.4');
+      await request(app).get('/test').set('X-Forwarded-For', '1.2.3.4');
+      await request(app).get('/test').set('X-Forwarded-For', '1.2.3.4');
       const response1 = await request(app)
         .get('/test')
         .set('X-Forwarded-For', '1.2.3.4');
@@ -338,9 +332,7 @@ describe('Middleware', () => {
       finishHandlers.forEach((handler) => handler());
 
       expect(stderrSpy).toHaveBeenCalled();
-      const logEntry = JSON.parse(
-        stderrSpy.mock.calls[0][0] as string,
-      );
+      const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
       expect(logEntry.method).toBe('GET');
       expect(logEntry.path).toBe('/test');
       expect(logEntry.status).toBe(200);
@@ -438,10 +430,7 @@ describe('HTTP Transport Integration', () => {
       app.use(healthRouter);
 
       // MCP endpoint (with auth)
-      app.use(
-        '/mcp',
-        createAuthMiddleware(testConfig.http!.cloudflareAccess!),
-      );
+      app.use('/mcp', createAuthMiddleware(testConfig.http?.cloudflareAccess!));
       app.post('/mcp', (req, res) => {
         res.json({ result: 'ok', method: req.method });
       });

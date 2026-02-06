@@ -9,7 +9,10 @@ pnpm install          # Install dependencies
 pnpm build            # Build TypeScript + Swift binary (required before running)
 pnpm test             # Run all tests
 pnpm lint             # Lint and format with Biome
+pnpm dev              # Run from source via tsx (stdio only, no build needed)
 ```
+
+**Note:** `bin/run.cjs` (used by `.mcp.json`) runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
 
 ## Tools & Capabilities
 
@@ -111,6 +114,7 @@ src/
 ├── utils/
 │   ├── cliExecutor.ts   # Swift binary execution + permission retry
 │   ├── jxaExecutor.ts   # JXA/AppleScript execution + retry logic
+│   ├── logging.ts       # Structured error logging (tool failures → stderr)
 │   └── sqliteMessageReader.ts  # Messages SQLite fallback
 └── validation/
     └── schemas.ts       # Zod schemas
