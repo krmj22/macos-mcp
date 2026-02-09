@@ -327,6 +327,9 @@ export const ReadMessagesSchema = z.object({
     VALIDATION.MAX_TITLE_LENGTH,
     'Contact name',
   ),
+  dateRange: z
+    .enum(['today', 'yesterday', 'this_week', 'last_7_days', 'last_30_days'])
+    .optional(),
   startDate: SafeDateSchema,
   endDate: SafeDateSchema,
   ...PaginationFields,

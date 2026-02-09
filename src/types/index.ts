@@ -256,6 +256,21 @@ export const MESSAGES_ACTIONS: readonly MessagesAction[] = [
   'create',
 ] as const;
 
+export type DateRangeShortcut =
+  | 'today'
+  | 'yesterday'
+  | 'this_week'
+  | 'last_7_days'
+  | 'last_30_days';
+
+export const DATE_RANGE_SHORTCUTS: readonly DateRangeShortcut[] = [
+  'today',
+  'yesterday',
+  'this_week',
+  'last_7_days',
+  'last_30_days',
+] as const;
+
 export interface MessagesToolArgs extends BaseToolArgs {
   action: MessagesAction;
   chatId?: string;
@@ -273,6 +288,8 @@ export interface MessagesToolArgs extends BaseToolArgs {
   startDate?: string;
   /** Filter messages on or before this date (YYYY-MM-DD or ISO 8601) */
   endDate?: string;
+  /** Convenience shortcut for common date ranges (resolves to startDate/endDate) */
+  dateRange?: DateRangeShortcut;
 }
 
 // --- Contacts ---

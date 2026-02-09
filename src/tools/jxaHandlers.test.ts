@@ -813,6 +813,212 @@ describe('Messages Handlers', () => {
       // JXA should be tried first when no date filtering
       expect(mockExecuteJxaWithRetry).toHaveBeenCalled();
     });
+
+    it('resolves dateRange shortcut to date filter for chatId path', async () => {
+      mockReadChatMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Today msg',
+          sender: '+1234',
+          date: '2025-06-01T12:00:00.000Z',
+          isFromMe: false,
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+        dateRange: 'today',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Today msg');
+      // dateRange should skip JXA (uses date filtering)
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      // Verify SQLite was called with resolved date range
+      expect(mockReadChatMessages).toHaveBeenCalledWith(
+        'c1',
+        50,
+        0,
+        expect.objectContaining({
+          startDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+          endDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+        }),
+      );
+    });
+
+    it('explicit startDate/endDate take precedence over dateRange', async () => {
+      mockReadChatMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Explicit range msg',
+          sender: '+1234',
+          date: '2025-01-15T12:00:00.000Z',
+          isFromMe: false,
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+        dateRange: 'today',
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      expect(result.isError).toBe(false);
+      // Verify explicit dates were used, not the resolved dateRange
+      expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, {
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+    });
+
+    it('resolves dateRange for search path', async () => {
+      mockSearchMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'search result',
+          sender: '+1234',
+          date: '2025-06-01T12:00:00.000Z',
+          isFromMe: false,
+          chatId: 'c1',
+          chatName: 'Work',
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        search: 'meeting',
+        searchMessages: true,
+        dateRange: 'last_7_days',
+      });
+      expect(result.isError).toBe(false);
+      // Verify SQLite search was called with resolved date range
+      expect(mockSearchMessages).toHaveBeenCalledWith(
+        'meeting',
+        50,
+        expect.objectContaining({
+          startDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+          endDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+        }),
+      );
+    });
+  });
+});
+
+describe('resolveDateRange', () => {
+  let resolveDateRange: typeof import('./handlers/messagesHandlers.js').resolveDateRange;
+
+  beforeAll(async () => {
+    const mod = await import('./handlers/messagesHandlers.js');
+    resolveDateRange = mod.resolveDateRange;
+  });
+
+  it('returns startDate at midnight and endDate at now for "today"', () => {
+    const before = new Date();
+    const result = resolveDateRange('today');
+    const after = new Date();
+
+    // startDate should be midnight today (local time)
+    expect(result.startDate).toMatch(/^\d{4}-\d{2}-\d{2} 00:00:00$/);
+
+    // endDate should be close to "now"
+    const endParts = result.endDate.match(
+      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
+    );
+    expect(endParts).not.toBeNull();
+    const endDate = new Date(
+      Number(endParts?.[1]),
+      Number(endParts?.[2]) - 1,
+      Number(endParts?.[3]),
+      Number(endParts?.[4]),
+      Number(endParts?.[5]),
+      Number(endParts?.[6]),
+    );
+    expect(endDate.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+    expect(endDate.getTime()).toBeLessThanOrEqual(after.getTime() + 1000);
+  });
+
+  it('returns yesterday midnight to today midnight for "yesterday"', () => {
+    const result = resolveDateRange('yesterday');
+    const now = new Date();
+    const todayMidnight = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 00:00:00`;
+    expect(result.endDate).toBe(todayMidnight);
+
+    // startDate should be one day before todayMidnight
+    const yesterdayDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    );
+    const expectedStart = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')} 00:00:00`;
+    expect(result.startDate).toBe(expectedStart);
+  });
+
+  it('returns Monday midnight as start for "this_week"', () => {
+    const result = resolveDateRange('this_week');
+
+    // Parse startDate
+    const parts = result.startDate.match(/^(\d{4})-(\d{2})-(\d{2}) 00:00:00$/);
+    expect(parts).not.toBeNull();
+    const startDate = new Date(
+      Number(parts?.[1]),
+      Number(parts?.[2]) - 1,
+      Number(parts?.[3]),
+    );
+    // getDay() should be Monday (1)
+    expect(startDate.getDay()).toBe(1);
+  });
+
+  it('returns 7 days ago for "last_7_days"', () => {
+    const result = resolveDateRange('last_7_days');
+    const now = new Date();
+    const sevenDaysAgo = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 7,
+    );
+    const expectedStart = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')} 00:00:00`;
+    expect(result.startDate).toBe(expectedStart);
+  });
+
+  it('returns 30 days ago for "last_30_days"', () => {
+    const result = resolveDateRange('last_30_days');
+    const now = new Date();
+    const thirtyDaysAgo = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 30,
+    );
+    const expectedStart = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(thirtyDaysAgo.getDate()).padStart(2, '0')} 00:00:00`;
+    expect(result.startDate).toBe(expectedStart);
+  });
+
+  it('produces dates in YYYY-MM-DD HH:mm:ss format', () => {
+    for (const range of [
+      'today',
+      'yesterday',
+      'this_week',
+      'last_7_days',
+      'last_30_days',
+    ] as const) {
+      const result = resolveDateRange(range);
+      expect(result.startDate).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      expect(result.endDate).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    }
+  });
+
+  it('uses local timezone (startDate year matches current year)', () => {
+    const result = resolveDateRange('today');
+    const now = new Date();
+    expect(result.startDate).toContain(String(now.getFullYear()));
   });
 });
 
@@ -1095,6 +1301,41 @@ describe('Schema Validation', () => {
         endDate: '2025-06-30',
       });
       expect(result.startDate).toBeUndefined();
+      expect(result.endDate).toBe('2025-06-30');
+    });
+
+    it('ReadMessagesSchema accepts dateRange shortcut', () => {
+      const result = ReadMessagesSchema.parse({ dateRange: 'today' });
+      expect(result.dateRange).toBe('today');
+    });
+
+    it('ReadMessagesSchema accepts all dateRange values', () => {
+      for (const value of [
+        'today',
+        'yesterday',
+        'this_week',
+        'last_7_days',
+        'last_30_days',
+      ]) {
+        const result = ReadMessagesSchema.parse({ dateRange: value });
+        expect(result.dateRange).toBe(value);
+      }
+    });
+
+    it('ReadMessagesSchema rejects invalid dateRange value', () => {
+      expect(() =>
+        ReadMessagesSchema.parse({ dateRange: 'next_month' }),
+      ).toThrow();
+    });
+
+    it('ReadMessagesSchema allows dateRange with startDate/endDate', () => {
+      const result = ReadMessagesSchema.parse({
+        dateRange: 'today',
+        startDate: '2025-06-01',
+        endDate: '2025-06-30',
+      });
+      expect(result.dateRange).toBe('today');
+      expect(result.startDate).toBe('2025-06-01');
       expect(result.endDate).toBe('2025-06-30');
     });
 

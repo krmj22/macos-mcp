@@ -7,6 +7,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import {
   CALENDAR_ACTIONS,
   CONTACTS_ACTIONS,
+  DATE_RANGE_SHORTCUTS,
   DUE_WITHIN_OPTIONS,
   LIST_ACTIONS,
   MAIL_ACTIONS,
@@ -507,7 +508,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. (6) "Show messages from last week" → read with startDate/endDate to filter by date range. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset.',
+      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. (6) "Show today\'s messages" → read with dateRange="today" (shortcuts: today, yesterday, this_week, last_7_days, last_30_days). (7) "Show messages from a specific range" → read with startDate/endDate for custom date ranges. If both dateRange and startDate/endDate are provided, explicit startDate/endDate take precedence. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -560,15 +561,21 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'string',
           description: 'The message text to send (REQUIRED for create).',
         },
+        dateRange: {
+          type: 'string',
+          enum: DATE_RANGE_SHORTCUTS,
+          description:
+            "Convenience shortcut for common date ranges. Options: 'today' (since midnight), 'yesterday' (midnight to midnight), 'this_week' (since Monday midnight), 'last_7_days' (past 7 days), 'last_30_days' (past 30 days). Resolves to startDate/endDate using system local timezone. If explicit startDate/endDate are also provided, they take precedence over dateRange. Only applies to read action.",
+        },
         startDate: {
           type: 'string',
           description:
-            "Filter messages on or after this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T09:00:00Z'). Use with endDate for a date range, or alone for 'since date'. Only applies to read action.",
+            "Filter messages on or after this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T09:00:00Z'). Use with endDate for a date range, or alone for 'since date'. Takes precedence over dateRange if both provided. Only applies to read action.",
         },
         endDate: {
           type: 'string',
           description:
-            "Filter messages on or before this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T17:00:00Z'). Use with startDate for a date range, or alone for 'before date'. Only applies to read action.",
+            "Filter messages on or before this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T17:00:00Z'). Use with startDate for a date range, or alone for 'before date'. Takes precedence over dateRange if both provided. Only applies to read action.",
         },
       },
       required: ['action'],

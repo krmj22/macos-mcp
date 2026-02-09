@@ -4,7 +4,7 @@
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { MessagesToolArgs } from '../../types/index.js';
+import type { DateRangeShortcut, MessagesToolArgs } from '../../types/index.js';
 import {
   contactResolver,
   type ResolvedContact,
@@ -30,6 +30,94 @@ import {
   ReadMessagesSchema,
 } from '../../validation/schemas.js';
 import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
+
+/**
+ * Formats a local Date to 'YYYY-MM-DD HH:mm:ss' for consumption by the existing
+ * date filtering infrastructure (dateToAppleTimestamp).
+ */
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Resolves a dateRange shortcut to explicit start/end date strings.
+ * All dates use system local timezone via `new Date(year, month, date)`.
+ * Monday is used as start of week (ISO standard).
+ */
+export function resolveDateRange(range: DateRangeShortcut): {
+  startDate: string;
+  endDate: string;
+} {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  switch (range) {
+    case 'today':
+      return {
+        startDate: formatLocalDate(startOfToday),
+        endDate: formatLocalDate(now),
+      };
+    case 'yesterday': {
+      const startOfYesterday = new Date(
+        startOfToday.getFullYear(),
+        startOfToday.getMonth(),
+        startOfToday.getDate() - 1,
+      );
+      return {
+        startDate: formatLocalDate(startOfYesterday),
+        endDate: formatLocalDate(startOfToday),
+      };
+    }
+    case 'this_week': {
+      // Monday as start of week (ISO standard)
+      // getDay(): 0=Sunday, 1=Monday, ..., 6=Saturday
+      const dayOfWeek = now.getDay();
+      // Days since Monday: Sunday(0)→6, Monday(1)→0, Tuesday(2)→1, etc.
+      const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const startOfWeek = new Date(
+        startOfToday.getFullYear(),
+        startOfToday.getMonth(),
+        startOfToday.getDate() - daysSinceMonday,
+      );
+      return {
+        startDate: formatLocalDate(startOfWeek),
+        endDate: formatLocalDate(now),
+      };
+    }
+    case 'last_7_days': {
+      const sevenDaysAgo = new Date(
+        startOfToday.getFullYear(),
+        startOfToday.getMonth(),
+        startOfToday.getDate() - 7,
+      );
+      return {
+        startDate: formatLocalDate(sevenDaysAgo),
+        endDate: formatLocalDate(now),
+      };
+    }
+    case 'last_30_days': {
+      const thirtyDaysAgo = new Date(
+        startOfToday.getFullYear(),
+        startOfToday.getMonth(),
+        startOfToday.getDate() - 30,
+      );
+      return {
+        startDate: formatLocalDate(thirtyDaysAgo),
+        endDate: formatLocalDate(now),
+      };
+    }
+  }
+}
 
 interface ChatItem {
   id: string;
@@ -508,10 +596,21 @@ export async function handleReadMessages(
     const validated = extractAndValidateArgs(args, ReadMessagesSchema);
     const paginationMeta = { limit: validated.limit, offset: validated.offset };
 
+    // Resolve dateRange shortcut to start/end dates, then allow explicit dates to override
+    let effectiveStartDate = validated.startDate;
+    let effectiveEndDate = validated.endDate;
+
+    if (validated.dateRange && !validated.startDate && !validated.endDate) {
+      // dateRange shortcut only applies when explicit dates are NOT provided
+      const resolved = resolveDateRange(validated.dateRange);
+      effectiveStartDate = resolved.startDate;
+      effectiveEndDate = resolved.endDate;
+    }
+
     // Build date range filter if either date param is provided
     const dateRange: DateRange | undefined =
-      validated.startDate || validated.endDate
-        ? { startDate: validated.startDate, endDate: validated.endDate }
+      effectiveStartDate || effectiveEndDate
+        ? { startDate: effectiveStartDate, endDate: effectiveEndDate }
         : undefined;
 
     // Find messages from a contact by name (reverse lookup)
