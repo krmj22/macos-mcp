@@ -11,6 +11,7 @@ import { handleToolCall } from './index.js';
 
 // Mock logging module
 jest.mock('../utils/logging.js', () => ({
+  logToolCall: jest.fn(),
   logToolError: jest.fn(),
 }));
 

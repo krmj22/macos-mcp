@@ -16,7 +16,7 @@ import type {
   RemindersToolArgs,
 } from '../types/index.js';
 import { MESSAGES, TOOLS as TOOL_NAMES } from '../utils/constants.js';
-import { logToolError } from '../utils/logging.js';
+import { logToolCall, logToolError } from '../utils/logging.js';
 import { TOOLS } from './definitions.js';
 import {
   handleCreateCalendarEvent,
@@ -204,27 +204,40 @@ export async function handleToolCall(
   args?: ToolArgs,
 ): Promise<CallToolResult> {
   const normalizedName = normalizeToolName(name);
+  const action =
+    args && typeof args === 'object' && 'action' in args
+      ? String(args.action)
+      : undefined;
 
   if (!isManagedToolName(normalizedName)) {
+    logToolCall(name, normalizedName, false, action);
     return createErrorResponse(MESSAGES.ERROR.UNKNOWN_TOOL(name));
   }
 
   const router = TOOL_ROUTER_MAP[normalizedName];
+  const startTime = Date.now();
 
   let result: CallToolResult;
   try {
     result = await router(args);
   } catch (error) {
+    const durationMs = Date.now() - startTime;
+    logToolCall(name, normalizedName, true, action, durationMs, true);
     logToolError(normalizedName, args, error);
     throw error;
   }
+
+  const durationMs = Date.now() - startTime;
 
   if (result.isError) {
     const errorText =
       result.content[0]?.type === 'text'
         ? (result.content[0] as { type: 'text'; text: string }).text
         : 'Unknown error';
+    logToolCall(name, normalizedName, true, action, durationMs, true);
     logToolError(normalizedName, args, errorText);
+  } else {
+    logToolCall(name, normalizedName, true, action, durationMs, false);
   }
 
   return result;

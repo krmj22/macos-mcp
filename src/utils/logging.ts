@@ -25,6 +25,55 @@ function sanitizeArgs(args: unknown): unknown {
 }
 
 /**
+ * Logs a tool dispatch event to stderr in structured JSON format.
+ * Emits on every tool call -- enables diagnosing "tool not found" reports
+ * by confirming whether requests actually reached the server.
+ *
+ * @param toolName - The raw tool name from the request
+ * @param normalizedName - The name after alias resolution
+ * @param found - Whether the tool resolved to a known handler
+ * @param action - The action being performed (e.g. "read", "create")
+ * @param durationMs - Execution time in milliseconds (omitted if not yet complete)
+ * @param isError - Whether the result was an error
+ */
+export function logToolCall(
+  toolName: string,
+  normalizedName: string,
+  found: boolean,
+  action?: string,
+  durationMs?: number,
+  isError?: boolean,
+): void {
+  const entry: Record<string, unknown> = {
+    timestamp: new Date().toISOString(),
+    level: found ? 'info' : 'warn',
+    event: 'tool_dispatch',
+    tool: toolName,
+  };
+
+  // Only include normalized name if it differs from the raw name
+  if (normalizedName !== toolName) {
+    entry.normalizedTool = normalizedName;
+  }
+
+  entry.found = found;
+
+  if (action !== undefined) {
+    entry.action = action;
+  }
+
+  if (durationMs !== undefined) {
+    entry.durationMs = durationMs;
+  }
+
+  if (isError !== undefined) {
+    entry.isError = isError;
+  }
+
+  process.stderr.write(`${JSON.stringify(entry)}\n`);
+}
+
+/**
  * Logs a tool execution error to stderr in structured JSON format.
  *
  * Includes:

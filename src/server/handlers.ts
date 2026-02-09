@@ -28,9 +28,18 @@ import {
  */
 export function registerHandlers(server: Server): void {
   // Handler for listing available tools
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: TOOLS,
-  }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    process.stderr.write(
+      `${JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        event: 'tools_list_served',
+        toolCount: TOOLS.length,
+        tools: TOOLS.map((t) => t.name),
+      })}\n`,
+    );
+    return { tools: TOOLS };
+  });
 
   // Handler for calling a tool
   server.setRequestHandler(CallToolRequestSchema, async (request) =>
