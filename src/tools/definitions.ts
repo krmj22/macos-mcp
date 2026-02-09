@@ -44,7 +44,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'reminders_tasks',
     description:
-      'Manages reminder tasks. Supports reading, creating, updating, and deleting reminders.',
+      'Manages Apple Reminders tasks. Common actions: (1) "Show my reminders" → read action. (2) "Remind me to X" → create with title and optional dueDate. (3) "Mark X as done" → update with completed=true. Filter by list with filterList, by due date with dueWithin (today/tomorrow/this-week/overdue/no-date), or search by title/notes with search. Use targetList to assign a reminder to a specific list. Title max 200 chars, notes max 2000 chars.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -126,7 +126,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'reminders_lists',
     description:
-      'Manages reminder lists. Supports reading, creating, updating, and deleting reminder lists.',
+      'Manages Apple Reminders lists (categories/groups that contain tasks). Common actions: (1) "What lists do I have?" → read action. (2) "Create a Shopping list" → create with name. (3) "Rename list X to Y" → update with name (current) and newName. (4) "Delete list X" → delete with name. List name max 100 chars.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -164,7 +164,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'calendar_events',
     description:
-      'Manages calendar events (time blocks). Supports reading, creating, updating, and deleting calendar events, including recurring events.',
+      'Manages Apple Calendar events. Common actions: (1) "What\'s on my calendar?" → read with startDate/endDate range. (2) "Schedule a meeting" → create with title, startDate, endDate. (3) "Move my meeting" → update with id and new startDate/endDate. Supports recurring events via recurrence param (daily/weekly/monthly/yearly). Use filterCalendar to filter by calendar name, search to find events by title/notes/location. Use enrichContacts=true (default) to resolve attendee emails to contact names. Deleting a recurring event only removes the single occurrence. Use calendar_calendars tool first to see available calendar names.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -249,6 +249,12 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           description:
             'A search term to filter events by title, notes, or location.',
         },
+        enrichContacts: {
+          type: 'boolean',
+          description:
+            'Resolve attendee email addresses to contact names (default true). Set to false to show raw email addresses.',
+          default: true,
+        },
       },
       required: ['action'],
       dependentSchemas: {
@@ -269,7 +275,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'calendar_calendars',
     description:
-      'Reads calendar collections. Use to inspect available calendars before creating or updating events.',
+      'Lists all available Apple Calendar collections (e.g., "Work", "Personal", "Birthdays"). Read-only. Use this to discover calendar names before creating or filtering events with the calendar_events tool. Only supports the read action.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -290,7 +296,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_items',
     description:
-      'Manages Apple Notes. Supports reading, creating, updating (including moving between folders), and deleting notes.',
+      'Manages Apple Notes. IMPORTANT: Apple Notes uses plain text, NOT markdown — do not send markdown formatting (no **, ##, -, etc.). Title max 200 chars, body max 2000 chars. Common actions: (1) "Find my note about X" → read with search param (searches title and body). (2) "Create a note" → create with title and body (plain text only). (3) "Move note to folder X" → update with id and targetFolder param. (4) "Edit my note" → update with id, and new title/body. Delete moves notes to Recently Deleted. Use folder param on read to filter by folder, or on create to place in a specific folder (defaults to "Notes"). Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -306,11 +312,13 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         },
         title: {
           type: 'string',
-          description: 'The title of the note (REQUIRED for create).',
+          description:
+            'The title of the note (REQUIRED for create, max 200 chars).',
         },
         body: {
           type: 'string',
-          description: 'The body content of the note.',
+          description:
+            'The body content of the note (plain text only, max 2000 chars). Do NOT use markdown formatting — Apple Notes does not render it.',
         },
         folder: {
           type: 'string',
@@ -320,7 +328,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         targetFolder: {
           type: 'string',
           description:
-            'The destination folder name to move the note to (for update action).',
+            'Move the note to this folder (for update action). This is how you move notes between folders — use update with id and targetFolder. Can be combined with title/body changes in the same update call.',
         },
         search: {
           type: 'string',
@@ -356,7 +364,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_folders',
     description:
-      'Manages Apple Notes folders. Only read and create are supported. Folder renaming and deletion are not available through the Apple Notes API.',
+      'Manages Apple Notes folders. Only read and create are supported — folder renaming and deletion are NOT available through the Apple Notes API. Common actions: (1) "What folders do I have?" → read action (returns folder names and note counts). (2) "Create a folder called X" → create with name. To move a note between folders, use the notes_items tool with update action and targetFolder param. Folder name max 100 chars.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -388,7 +396,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'mail_messages',
     description:
-      'Manages Apple Mail. Supports reading inbox/mailboxes, searching messages (subject, sender, body), finding emails from a contact by name, reading individual messages, sending mail with CC/BCC, replying, marking read/unread, and deleting.',
+      'Manages Apple Mail. IMPORTANT: The create action creates a DRAFT in Mail, it does NOT send the email — the user must open Mail and click Send. Common actions: (1) "Show emails from John" → read with contact param (looks up contact by name, finds all their email addresses, and returns matching messages across all mailboxes — this is the easiest way to find emails from a person). (2) "Search for emails about X" → read with search param (searches subject, sender, and body). (3) "Read my inbox" → read action with no filters. (4) "Draft a reply" → create with replyToId (auto-populates subject, recipients, and quoted body). (5) "List mailboxes" → read with mailbox="_list". Use enrichContacts=true (default) to show sender names instead of raw email addresses. Paginated: use limit (default 50, max 200) and offset. Subject max 200 chars, body max 10000 chars.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -410,7 +418,13 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         contact: {
           type: 'string',
           description:
-            'Find emails from a contact by name (partial match, case-insensitive). Looks up all email addresses for the contact and returns matching messages.',
+            'Find emails from a contact by name (partial match, case-insensitive). Looks up all email addresses for the contact and returns matching messages across all mailboxes. This is the easiest way to find emails from a specific person.',
+        },
+        enrichContacts: {
+          type: 'boolean',
+          description:
+            'Resolve sender email addresses to contact names (default true). Set to false to show raw email addresses.',
+          default: true,
         },
         mailbox: {
           type: 'string',
@@ -488,7 +502,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage). Supports reading chats and messages, searching chats by participant/name, searching messages by content, finding messages from a contact by name, and sending new iMessages. Only read and create are supported. Message deletion and editing are not available through the Apple Messages API.',
+      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -509,12 +523,18 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         searchMessages: {
           type: 'boolean',
           description:
-            'When true with search, searches message content instead of chat names/participants.',
+            'IMPORTANT: Must be set to true when you want to search message content/text. Without this flag, search only matches chat names and participant handles. Set searchMessages=true together with search to find messages containing specific words or phrases.',
         },
         contact: {
           type: 'string',
           description:
-            'Find messages from a contact by name (partial match, case-insensitive). Looks up all phone numbers for the contact and returns matching messages.',
+            'Find messages from a contact by name (partial match, case-insensitive). Looks up all phone numbers for the contact and returns matching messages. This is the EASIEST way to find messages from a person — no need to look up phone numbers separately.',
+        },
+        enrichContacts: {
+          type: 'boolean',
+          description:
+            'Resolve phone numbers to contact names in results (default true). Set to false to show raw phone numbers.',
+          default: true,
         },
         limit: {
           type: 'number',

@@ -9,22 +9,22 @@ describe('Tools Definitions', () => {
     it.each([
       {
         name: 'reminders_tasks',
-        description: 'Manages reminder tasks',
+        description: 'Manages Apple Reminders tasks',
         actions: ['read', 'create', 'update', 'delete'],
       },
       {
         name: 'reminders_lists',
-        description: 'Manages reminder lists',
+        description: 'Manages Apple Reminders lists',
         actions: ['read', 'create', 'update', 'delete'],
       },
       {
         name: 'calendar_events',
-        description: 'Manages calendar events',
+        description: 'Manages Apple Calendar events',
         actions: ['read', 'create', 'update', 'delete'],
       },
       {
         name: 'calendar_calendars',
-        description: 'Reads calendar collections',
+        description: 'Lists all available Apple Calendar collections',
         actions: ['read'],
       },
     ])('should define $name tool with correct schema and actions', ({
