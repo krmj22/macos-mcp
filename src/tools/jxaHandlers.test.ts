@@ -50,6 +50,14 @@ jest.mock('../utils/sqliteMessageReader.js', () => ({
       return e;
     })(),
   ),
+  readMessagesByHandles: jest.fn().mockRejectedValue(
+    (() => {
+      const e = new Error('Cannot access Messages database.');
+      (e as any).name = 'SqliteAccessError';
+      (e as any).isPermissionError = true;
+      return e;
+    })(),
+  ),
 }));
 
 jest.mock('../utils/errorHandling.js', () => ({
@@ -82,6 +90,10 @@ const mockExecuteJxaWithRetry = jest.requireMock('../utils/jxaExecutor.js')
   .executeJxaWithRetry as jest.Mock;
 const mockListChats = jest.requireMock('../utils/sqliteMessageReader.js')
   .listChats as jest.Mock;
+const mockReadChatMessages = jest.requireMock('../utils/sqliteMessageReader.js')
+  .readChatMessages as jest.Mock;
+const mockSearchMessages = jest.requireMock('../utils/sqliteMessageReader.js')
+  .searchMessages as jest.Mock;
 const MockSqliteAccessError = jest.requireMock(
   '../utils/sqliteMessageReader.js',
 ).SqliteAccessError as new (
@@ -588,6 +600,84 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(true);
       expect(getTextContent(result)).toContain('Full Disk Access');
     });
+
+    it('passes date range to readChatMessages when filtering by chatId with dates', async () => {
+      // JXA should be skipped when date filtering is active
+      mockReadChatMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Hello',
+          sender: '+1234',
+          date: '2025-01-15T12:00:00.000Z',
+          isFromMe: false,
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Hello');
+      // Verify JXA was NOT called (date filtering skips JXA)
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      // Verify SQLite was called with date range
+      expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, {
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+    });
+
+    it('passes date range to searchMessages when searching with dates', async () => {
+      mockSearchMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'meeting notes',
+          sender: '+1234',
+          date: '2025-01-15T12:00:00.000Z',
+          isFromMe: false,
+          chatId: 'c1',
+          chatName: 'Work',
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        search: 'meeting',
+        searchMessages: true,
+        startDate: '2025-01-01',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('meeting notes');
+      // Verify JXA was NOT called (date filtering skips JXA)
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      // Verify SQLite was called with date range
+      expect(mockSearchMessages).toHaveBeenCalledWith('meeting', 50, {
+        startDate: '2025-01-01',
+        endDate: undefined,
+      });
+    });
+
+    it('does not pass date range when no dates specified (chatId path)', async () => {
+      mockExecuteJxaWithRetry.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Hello',
+          sender: '+1234',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+      ]);
+
+      await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+      });
+      // JXA should be tried first when no date filtering
+      expect(mockExecuteJxaWithRetry).toHaveBeenCalled();
+    });
   });
 });
 
@@ -782,6 +872,82 @@ describe('Schema Validation', () => {
     it('ReadNotesSchema accepts folder filter', () => {
       const result = ReadNotesSchema.parse({ folder: 'Work' });
       expect(result.folder).toBe('Work');
+    });
+  });
+
+  describe('Messages date filtering schemas', () => {
+    it('ReadMessagesSchema accepts startDate and endDate', () => {
+      const result = ReadMessagesSchema.parse({
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      expect(result.startDate).toBe('2025-01-01');
+      expect(result.endDate).toBe('2025-01-31');
+    });
+
+    it('ReadMessagesSchema accepts ISO 8601 dates', () => {
+      const result = ReadMessagesSchema.parse({
+        startDate: '2025-01-01T00:00:00Z',
+        endDate: '2025-01-31T23:59:59Z',
+      });
+      expect(result.startDate).toBe('2025-01-01T00:00:00Z');
+      expect(result.endDate).toBe('2025-01-31T23:59:59Z');
+    });
+
+    it('ReadMessagesSchema accepts local datetime format', () => {
+      const result = ReadMessagesSchema.parse({
+        startDate: '2025-01-01 09:00:00',
+      });
+      expect(result.startDate).toBe('2025-01-01 09:00:00');
+    });
+
+    it('ReadMessagesSchema allows omitting both dates', () => {
+      const result = ReadMessagesSchema.parse({});
+      expect(result.startDate).toBeUndefined();
+      expect(result.endDate).toBeUndefined();
+    });
+
+    it('ReadMessagesSchema allows only startDate', () => {
+      const result = ReadMessagesSchema.parse({
+        startDate: '2025-06-01',
+      });
+      expect(result.startDate).toBe('2025-06-01');
+      expect(result.endDate).toBeUndefined();
+    });
+
+    it('ReadMessagesSchema allows only endDate', () => {
+      const result = ReadMessagesSchema.parse({
+        endDate: '2025-06-30',
+      });
+      expect(result.startDate).toBeUndefined();
+      expect(result.endDate).toBe('2025-06-30');
+    });
+
+    it('ReadMessagesSchema rejects invalid date format', () => {
+      expect(() =>
+        ReadMessagesSchema.parse({ startDate: 'not-a-date' }),
+      ).toThrow();
+    });
+
+    it('ReadMessagesSchema accepts dates with chatId', () => {
+      const result = ReadMessagesSchema.parse({
+        chatId: 'iMessage;-;+1234',
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      expect(result.chatId).toBe('iMessage;-;+1234');
+      expect(result.startDate).toBe('2025-01-01');
+    });
+
+    it('ReadMessagesSchema accepts dates with search and searchMessages', () => {
+      const result = ReadMessagesSchema.parse({
+        search: 'hello',
+        searchMessages: true,
+        startDate: '2025-01-01',
+      });
+      expect(result.search).toBe('hello');
+      expect(result.searchMessages).toBe(true);
+      expect(result.startDate).toBe('2025-01-01');
     });
   });
 });

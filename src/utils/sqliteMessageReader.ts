@@ -175,6 +175,74 @@ function appleTimestampToISO(timestamp: number): string {
   return new Date(ms).toISOString();
 }
 
+/**
+ * Date range filter for SQLite message queries.
+ * Dates are converted to Apple Core Data timestamps (nanoseconds since 2001-01-01).
+ */
+export interface DateRange {
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * Apple epoch: 2001-01-01T00:00:00Z in Unix milliseconds.
+ */
+const APPLE_EPOCH_MS = new Date('2001-01-01T00:00:00Z').getTime();
+
+/**
+ * Parses a date string and converts it to Apple Core Data timestamp (nanoseconds since 2001-01-01).
+ * Supports: 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss', ISO 8601.
+ * Returns null if the date string is invalid.
+ */
+export function dateToAppleTimestamp(dateStr: string): number | null {
+  // Try parsing as-is (handles ISO 8601 and 'YYYY-MM-DDTHH:mm:ss')
+  let d = new Date(dateStr);
+
+  // If that didn't work, try 'YYYY-MM-DD HH:mm:ss' by replacing space with T
+  if (Number.isNaN(d.getTime())) {
+    d = new Date(dateStr.replace(' ', 'T'));
+  }
+
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+
+  // Convert Unix ms to Apple nanoseconds
+  const unixMs = d.getTime();
+  return (unixMs - APPLE_EPOCH_MS) * 1_000_000;
+}
+
+/**
+ * Builds SQL WHERE clause fragment for date range filtering.
+ * Uses pre-computed numeric Apple timestamps (safe from injection).
+ * Returns empty string if no date filtering is needed.
+ */
+export function buildDateFilter(
+  dateRange?: DateRange,
+  messageAlias = 'm',
+): string {
+  if (!dateRange) return '';
+
+  const clauses: string[] = [];
+
+  if (dateRange.startDate) {
+    const ts = dateToAppleTimestamp(dateRange.startDate);
+    if (ts !== null) {
+      clauses.push(`${messageAlias}.date >= ${ts}`);
+    }
+  }
+
+  if (dateRange.endDate) {
+    const ts = dateToAppleTimestamp(dateRange.endDate);
+    if (ts !== null) {
+      clauses.push(`${messageAlias}.date <= ${ts}`);
+    }
+  }
+
+  if (clauses.length === 0) return '';
+  return clauses.map((c) => `AND ${c}`).join(' ');
+}
+
 export interface ReadMessageResult {
   id: string;
   text: string;
@@ -198,8 +266,10 @@ export async function readChatMessages(
   chatId: string,
   limit: number,
   offset: number,
+  dateRange?: DateRange,
 ): Promise<ReadMessageResult[]> {
   const escapedId = chatId.replace(/'/g, "''");
+  const dateFilter = buildDateFilter(dateRange);
   const query = `
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
            COALESCE(h.id, '') as handle_id,
@@ -210,6 +280,7 @@ export async function readChatMessages(
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
     WHERE c.guid = '${escapedId}'
+    ${dateFilter}
     ORDER BY m.date DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -235,6 +306,7 @@ export async function readChatMessages(
 export async function searchMessages(
   searchTerm: string,
   limit: number,
+  dateRange?: DateRange,
 ): Promise<
   Array<
     ReadMessageResult & {
@@ -244,6 +316,7 @@ export async function searchMessages(
   >
 > {
   const escapedTerm = searchTerm.replace(/'/g, "''");
+  const dateFilter = buildDateFilter(dateRange);
   const query = `
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
            COALESCE(h.id, '') as handle_id,
@@ -255,8 +328,9 @@ export async function searchMessages(
     LEFT JOIN handle h ON m.handle_id = h.ROWID
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
-    WHERE m.text LIKE '%${escapedTerm}%'
-       OR CAST(m.attributedBody AS TEXT) LIKE '%${escapedTerm}%'
+    WHERE (m.text LIKE '%${escapedTerm}%'
+       OR CAST(m.attributedBody AS TEXT) LIKE '%${escapedTerm}%')
+    ${dateFilter}
     ORDER BY m.date DESC
     LIMIT ${limit}
   `;
@@ -412,6 +486,7 @@ export async function listChats(
 export async function readMessagesByHandles(
   handles: string[],
   limit: number,
+  dateRange?: DateRange,
 ): Promise<
   Array<
     ReadMessageResult & {
@@ -441,6 +516,7 @@ export async function readMessagesByHandles(
     })
     .join(' OR ');
 
+  const dateFilter = buildDateFilter(dateRange);
   const query = `
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
            COALESCE(h.id, '') as handle_id,
@@ -453,6 +529,7 @@ export async function readMessagesByHandles(
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
     WHERE (${handleConditions})
+    ${dateFilter}
     ORDER BY m.date DESC
     LIMIT ${limit}
   `;

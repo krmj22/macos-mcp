@@ -17,6 +17,7 @@ import {
   executeJxaWithRetry,
 } from '../../utils/jxaExecutor.js';
 import {
+  type DateRange,
   getLastMessage,
   listChats,
   readChatMessages,
@@ -337,34 +338,37 @@ function formatSearchMessageMarkdown(msg: SearchMessageResult): string[] {
  * Attempts to read messages via JXA first, falls back to SQLite.
  * JXA's c.messages() throws "Can't convert types" on modern macOS,
  * so SQLite (requires Full Disk Access) is the primary read path.
+ * When date filtering is requested, skips JXA (no date filter support) and goes directly to SQLite.
  */
 async function readMessagesWithFallback(
   chatId: string,
   limit: number,
   offset: number,
+  dateRange?: DateRange,
 ): Promise<MessageItem[]> {
-  // Try JXA first (works on some macOS versions)
-  try {
-    const script = buildScript(READ_CHAT_MESSAGES_SCRIPT, {
-      chatId,
-      limit: String(limit),
-      offset: String(offset),
-    });
-    const result = await executeJxaWithRetry<MessageItem[] | { error: string }>(
-      script,
-      15000,
-      'Messages',
-    );
-    if (Array.isArray(result) && result.length > 0) {
-      return result;
+  // Skip JXA when date filtering is requested (JXA does not support date filtering)
+  if (!dateRange?.startDate && !dateRange?.endDate) {
+    // Try JXA first (works on some macOS versions)
+    try {
+      const script = buildScript(READ_CHAT_MESSAGES_SCRIPT, {
+        chatId,
+        limit: String(limit),
+        offset: String(offset),
+      });
+      const result = await executeJxaWithRetry<
+        MessageItem[] | { error: string }
+      >(script, 15000, 'Messages');
+      if (Array.isArray(result) && result.length > 0) {
+        return result;
+      }
+    } catch {
+      // JXA failed, try SQLite
     }
-  } catch {
-    // JXA failed, try SQLite
   }
 
-  // SQLite fallback
+  // SQLite fallback (or primary path when date filtering)
   try {
-    return await readChatMessages(chatId, limit, offset);
+    return await readChatMessages(chatId, limit, offset, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
@@ -380,28 +384,32 @@ async function readMessagesWithFallback(
 async function searchMessagesWithFallback(
   search: string,
   limit: number,
+  dateRange?: DateRange,
 ): Promise<SearchMessageResult[]> {
-  // Try JXA first
-  try {
-    const script = buildScript(SEARCH_MESSAGES_SCRIPT, {
-      search,
-      limit: String(limit),
-    });
-    const results = await executeJxaWithRetry<SearchMessageResult[]>(
-      script,
-      30000,
-      'Messages',
-    );
-    if (results.length > 0) {
-      return results;
+  // Skip JXA when date filtering is requested (JXA does not support date filtering)
+  if (!dateRange?.startDate && !dateRange?.endDate) {
+    // Try JXA first
+    try {
+      const script = buildScript(SEARCH_MESSAGES_SCRIPT, {
+        search,
+        limit: String(limit),
+      });
+      const results = await executeJxaWithRetry<SearchMessageResult[]>(
+        script,
+        30000,
+        'Messages',
+      );
+      if (results.length > 0) {
+        return results;
+      }
+    } catch {
+      // JXA failed, try SQLite
     }
-  } catch {
-    // JXA failed, try SQLite
   }
 
-  // SQLite fallback
+  // SQLite fallback (or primary path when date filtering)
   try {
-    return await searchMessages(search, limit);
+    return await searchMessages(search, limit, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
@@ -478,9 +486,10 @@ async function listChatsWithFallback(
 async function readMessagesByHandlesWithFallback(
   handles: string[],
   limit: number,
+  dateRange?: DateRange,
 ): Promise<SearchMessageResult[]> {
   try {
-    return await readMessagesByHandles(handles, limit);
+    return await readMessagesByHandles(handles, limit, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
@@ -499,6 +508,12 @@ export async function handleReadMessages(
     const validated = extractAndValidateArgs(args, ReadMessagesSchema);
     const paginationMeta = { limit: validated.limit, offset: validated.offset };
 
+    // Build date range filter if either date param is provided
+    const dateRange: DateRange | undefined =
+      validated.startDate || validated.endDate
+        ? { startDate: validated.startDate, endDate: validated.endDate }
+        : undefined;
+
     // Find messages from a contact by name (reverse lookup)
     if (validated.contact) {
       const handles = await contactResolver.resolveNameToHandles(
@@ -511,6 +526,7 @@ export async function handleReadMessages(
       let results = await readMessagesByHandlesWithFallback(
         handles.phones,
         validated.limit ?? 50,
+        dateRange,
       );
       if (validated.enrichContacts !== false) {
         results = await enrichSearchMessagesWithContacts(results);
@@ -530,6 +546,7 @@ export async function handleReadMessages(
         let results = await searchMessagesWithFallback(
           validated.search,
           validated.limit ?? 50,
+          dateRange,
         );
         if (validated.enrichContacts !== false) {
           results = await enrichSearchMessagesWithContacts(results);
@@ -568,6 +585,7 @@ export async function handleReadMessages(
         validated.chatId,
         validated.limit ?? 50,
         validated.offset ?? 0,
+        dateRange,
       );
       if (validated.enrichContacts !== false) {
         messages = await enrichMessagesWithContacts(messages);

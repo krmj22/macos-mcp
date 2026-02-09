@@ -326,6 +326,8 @@ export const ReadMessagesSchema = z.object({
     VALIDATION.MAX_TITLE_LENGTH,
     'Contact name',
   ),
+  startDate: SafeDateSchema,
+  endDate: SafeDateSchema,
   ...PaginationFields,
 });
 

@@ -268,6 +268,10 @@ export interface MessagesToolArgs extends BaseToolArgs {
   enrichContacts?: boolean;
   /** Find messages from a contact by name (partial match, case-insensitive) */
   contact?: string;
+  /** Filter messages on or after this date (YYYY-MM-DD or ISO 8601) */
+  startDate?: string;
+  /** Filter messages on or before this date (YYYY-MM-DD or ISO 8601) */
+  endDate?: string;
 }
 
 // --- Contacts ---

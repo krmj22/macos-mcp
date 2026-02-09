@@ -502,7 +502,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset.',
+      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. (6) "Show messages from last week" → read with startDate/endDate to filter by date range. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -554,6 +554,16 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         text: {
           type: 'string',
           description: 'The message text to send (REQUIRED for create).',
+        },
+        startDate: {
+          type: 'string',
+          description:
+            "Filter messages on or after this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T09:00:00Z'). Use with endDate for a date range, or alone for 'since date'. Only applies to read action.",
+        },
+        endDate: {
+          type: 'string',
+          description:
+            "Filter messages on or before this date. RECOMMENDED format: 'YYYY-MM-DD HH:mm:ss' (local time). Also supports: 'YYYY-MM-DD' or ISO 8601 (e.g., '2025-11-04T17:00:00Z'). Use with startDate for a date range, or alone for 'before date'. Only applies to read action.",
         },
       },
       required: ['action'],
