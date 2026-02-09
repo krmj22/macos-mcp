@@ -6,6 +6,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { DateRangeShortcut, MessagesToolArgs } from '../../types/index.js';
 import {
+  ContactSearchError,
   contactResolver,
   type ResolvedContact,
 } from '../../utils/contactResolver.js';
@@ -615,15 +616,31 @@ export async function handleReadMessages(
 
     // Find messages from a contact by name (reverse lookup)
     if (validated.contact) {
-      const handles = await contactResolver.resolveNameToHandles(
-        validated.contact,
-      );
-      if (!handles || handles.phones.length === 0) {
-        return `No contact found matching "${validated.contact}", or the contact has no phone numbers associated.`;
+      let handles: Awaited<
+        ReturnType<typeof contactResolver.resolveNameToHandles>
+      >;
+      try {
+        handles = await contactResolver.resolveNameToHandles(validated.contact);
+      } catch (error) {
+        if (error instanceof ContactSearchError) {
+          return error.isTimeout
+            ? `Contact search timed out for "${validated.contact}". The Contacts app may be slow to respond. Please try again.`
+            : `Contact search failed for "${validated.contact}": ${error.message}`;
+        }
+        throw error;
+      }
+      if (
+        !handles ||
+        (handles.phones.length === 0 && handles.emails.length === 0)
+      ) {
+        return `No contact found matching "${validated.contact}", or the contact has no phone numbers or email addresses associated.`;
       }
 
+      // Combine phones and emails as message handles (iMessage uses both)
+      const allHandles = [...handles.phones, ...handles.emails];
+
       let results = await readMessagesByHandlesWithFallback(
-        handles.phones,
+        allHandles,
         validated.limit ?? 50,
         dateRange,
       );

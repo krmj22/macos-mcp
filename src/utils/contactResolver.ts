@@ -2,9 +2,13 @@
  * contactResolver.ts
  * Contact resolver service with caching and phone/email normalization.
  * Resolves phone numbers and email addresses to contact names.
+ *
+ * Design: resolveNameToHandles() uses targeted JXA search (people.whose)
+ * to avoid the O(n) bulk-fetch timeout with large contact lists (600+).
+ * resolveHandle() and resolveBatch() still use the bulk cache for enrichment.
  */
 
-import { executeJxaWithRetry } from './jxaExecutor.js';
+import { executeJxaWithRetry, sanitizeForJxa } from './jxaExecutor.js';
 
 /**
  * Resolved contact information
@@ -46,15 +50,8 @@ interface CacheState {
 }
 
 /**
- * Name-to-handles index cache for reverse lookup
- */
-interface NameIndexCache {
-  entries: Map<string, ContactHandles>; // lowercase name -> handles
-  timestamp: number;
-}
-
-/**
- * JXA script to fetch all contacts with phones and emails (10K safety limit)
+ * JXA script to fetch all contacts with phones and emails (10K safety limit).
+ * Used only for handle-based enrichment (resolveHandle/resolveBatch).
  */
 const BULK_FETCH_CONTACTS_SCRIPT = `
 (() => {
@@ -94,6 +91,66 @@ const BULK_FETCH_CONTACTS_SCRIPT = `
 `;
 
 /**
+ * Builds a JXA script for targeted contact search by name.
+ * Uses Apple's native `people.whose({name: {_contains: term}})` which
+ * leverages the Contacts database index -- O(1) instead of O(n).
+ *
+ * @param searchTerm - The sanitized search term to find in contact names
+ * @returns JXA script string
+ */
+function buildTargetedSearchScript(searchTerm: string): string {
+  const safeTerm = sanitizeForJxa(searchTerm);
+  return `
+(() => {
+  const Contacts = Application("Contacts");
+  const matches = Contacts.people.whose({name: {_contains: "${safeTerm}"}})();
+  const result = [];
+  const limit = Math.min(matches.length, 100);
+  for (let i = 0; i < limit; i++) {
+    const p = matches[i];
+    const phones = [];
+    try {
+      const ph = p.phones();
+      for (let j = 0; j < ph.length; j++) {
+        phones.push(ph[j].value());
+      }
+    } catch(e) {}
+    const emails = [];
+    try {
+      const em = p.emails();
+      for (let j = 0; j < em.length; j++) {
+        emails.push(em[j].value());
+      }
+    } catch(e) {}
+    result.push({
+      id: p.id(),
+      fullName: p.name() || "",
+      firstName: p.firstName() || "",
+      lastName: p.lastName() || "",
+      phones: phones,
+      emails: emails
+    });
+  }
+  return JSON.stringify(result);
+})()
+`.trim();
+}
+
+/**
+ * Error thrown when contact search fails due to timeout or other transient issues.
+ * Allows callers to distinguish search failures from "no results".
+ */
+export class ContactSearchError extends Error {
+  constructor(
+    message: string,
+    public readonly isTimeout: boolean,
+  ) {
+    super(message);
+    this.name = 'ContactSearchError';
+  }
+}
+
+/**
  * Default cache TTL in milliseconds (5 minutes)
  */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -104,7 +161,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
  * Features:
  * - Normalizes phone numbers (strips formatting, handles +country codes)
  * - Normalizes emails (lowercase, trim)
- * - LRU-style cache with 5-minute TTL
+ * - LRU-style cache with 5-minute TTL for handle-based lookups
+ * - Targeted JXA search for name-based lookups (avoids O(n) bulk fetch)
  * - Coalesces concurrent cache builds (single JXA call)
  * - Graceful degradation on permission failure
  */
@@ -113,11 +171,6 @@ export class ContactResolverService {
     entries: new Map(),
     timestamp: 0,
     building: null,
-  };
-
-  private nameIndex: NameIndexCache = {
-    entries: new Map(),
-    timestamp: 0,
   };
 
   private cacheTtlMs: number;
@@ -166,10 +219,6 @@ export class ContactResolverService {
       timestamp: 0,
       building: null,
     };
-    this.nameIndex = {
-      entries: new Map(),
-      timestamp: 0,
-    };
   }
 
   /**
@@ -215,10 +264,10 @@ export class ContactResolverService {
 
   /**
    * Actually performs the cache build (internal).
+   * Used only for handle-based enrichment (resolveHandle/resolveBatch).
    */
   private async doBuildCache(): Promise<void> {
     const entries = new Map<string, ResolvedContact>();
-    const nameEntries = new Map<string, ContactHandles>();
 
     try {
       const contacts = await executeJxaWithRetry<ContactCacheEntry[]>(
@@ -256,33 +305,6 @@ export class ContactResolverService {
             entries.set(normalized, resolved);
           }
         }
-
-        // Build name index for reverse lookup
-        // Index by full name, first name, last name (all lowercase for case-insensitive matching)
-        const handles: ContactHandles = {
-          phones: contact.phones
-            .map((p) => this.normalizePhone(p))
-            .filter(Boolean),
-          emails: contact.emails
-            .map((e) => this.normalizeEmail(e))
-            .filter(Boolean),
-        };
-
-        // Only index contacts that have at least one handle
-        if (handles.phones.length > 0 || handles.emails.length > 0) {
-          // Index by full name
-          if (contact.fullName) {
-            const key = contact.fullName.toLowerCase();
-            const existing = nameEntries.get(key);
-            if (existing) {
-              // Merge handles for same name
-              existing.phones.push(...handles.phones);
-              existing.emails.push(...handles.emails);
-            } else {
-              nameEntries.set(key, { ...handles });
-            }
-          }
-        }
       }
 
       const timestamp = Date.now();
@@ -290,10 +312,6 @@ export class ContactResolverService {
         entries,
         timestamp,
         building: null,
-      };
-      this.nameIndex = {
-        entries: nameEntries,
-        timestamp,
       };
     } catch (error) {
       // Graceful degradation: permission errors result in empty cache with valid timestamp
@@ -309,10 +327,6 @@ export class ContactResolverService {
           entries: new Map(),
           timestamp,
           building: null,
-        };
-        this.nameIndex = {
-          entries: new Map(),
-          timestamp,
         };
         return;
       }
@@ -390,10 +404,12 @@ export class ContactResolverService {
 
   /**
    * Resolves a contact name to their phone numbers and email addresses.
-   * Supports partial matching (case-insensitive).
+   * Uses targeted JXA search via `people.whose({name: {_contains: term}})` to
+   * avoid the O(n) bulk-fetch problem with large contact lists (600+ contacts).
    *
    * @param name - Contact name to search for (partial match, case-insensitive)
    * @returns ContactHandles with phones and emails, or null if no contact found
+   * @throws ContactSearchError if the search fails due to timeout or other issues
    *
    * @example
    * // Find by full name
@@ -405,16 +421,40 @@ export class ContactResolverService {
    * // Returns combined handles for all contacts matching "John"
    */
   async resolveNameToHandles(name: string): Promise<ContactHandles | null> {
-    try {
-      await this.buildCache();
-    } catch {
-      // Graceful degradation: return null on any error
+    const searchTerm = name.trim();
+    if (!searchTerm) {
       return null;
     }
 
-    const searchTerm = name.toLowerCase().trim();
-    if (!searchTerm) {
-      return null;
+    let contacts: ContactCacheEntry[];
+    try {
+      const script = buildTargetedSearchScript(searchTerm);
+      contacts = await executeJxaWithRetry<ContactCacheEntry[]>(
+        script,
+        15000, // 15s timeout — targeted search is fast
+        'Contacts',
+        2,
+        1000,
+      );
+    } catch (error) {
+      // Permission errors: graceful degradation (return null, no misleading message)
+      const isPermissionErr =
+        error instanceof Error &&
+        'isPermissionError' in error &&
+        (error as { isPermissionError: boolean }).isPermissionError === true;
+
+      if (isPermissionErr) {
+        return null;
+      }
+
+      // Timeout or other transient error: throw ContactSearchError so callers
+      // can show an accurate message instead of misleading "No contact found"
+      const message = error instanceof Error ? error.message : String(error);
+      const isTimeout = /timed?\s*out/i.test(message);
+      throw new ContactSearchError(
+        `Contact search failed for "${searchTerm}": ${message}`,
+        isTimeout,
+      );
     }
 
     const matchedHandles: ContactHandles = {
@@ -422,12 +462,16 @@ export class ContactResolverService {
       emails: [],
     };
 
-    // Search through name index for partial matches
-    for (const [indexedName, handles] of this.nameIndex.entries) {
-      if (indexedName.includes(searchTerm)) {
-        matchedHandles.phones.push(...handles.phones);
-        matchedHandles.emails.push(...handles.emails);
-      }
+    for (const contact of contacts) {
+      const phones = contact.phones
+        .map((p) => this.normalizePhone(p))
+        .filter(Boolean);
+      const emails = contact.emails
+        .map((e) => this.normalizeEmail(e))
+        .filter(Boolean);
+
+      matchedHandles.phones.push(...phones);
+      matchedHandles.emails.push(...emails);
     }
 
     // Deduplicate results
@@ -457,13 +501,6 @@ export class ContactResolverService {
    */
   getCacheTimestamp(): number {
     return this.cache.timestamp;
-  }
-
-  /**
-   * Gets the name index size (for testing/debugging).
-   */
-  getNameIndexSize(): number {
-    return this.nameIndex.entries.size;
   }
 }
 

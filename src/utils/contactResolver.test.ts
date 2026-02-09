@@ -3,11 +3,15 @@
  * Tests for ContactResolverService
  */
 
-import { ContactResolverService } from './contactResolver.js';
+import {
+  ContactResolverService,
+  ContactSearchError,
+} from './contactResolver.js';
 
 // Mock the jxaExecutor module
 jest.mock('./jxaExecutor.js', () => ({
   executeJxaWithRetry: jest.fn(),
+  sanitizeForJxa: jest.fn((input: string) => input),
   JxaError: class JxaError extends Error {
     constructor(
       message: string,
@@ -498,6 +502,9 @@ describe('ContactResolverService', () => {
 
   describe('resolveNameToHandles', () => {
     it('should resolve a full name to phone numbers and emails', async () => {
+      // Mock returns contacts matching "John Doe" via targeted search
+      mockExecuteJxa.mockResolvedValue([mockContacts[0]]);
+
       const result = await service.resolveNameToHandles('John Doe');
 
       expect(result).not.toBeNull();
@@ -506,22 +513,43 @@ describe('ContactResolverService', () => {
       expect(result?.emails).toContain('john@work.com');
     });
 
-    it('should support partial name matching (case-insensitive)', async () => {
+    it('should use targeted JXA search with people.whose', async () => {
+      mockExecuteJxa.mockResolvedValue([mockContacts[0]]);
+
+      await service.resolveNameToHandles('John');
+
+      // Verify JXA was called with a script containing people.whose
+      expect(mockExecuteJxa).toHaveBeenCalledWith(
+        expect.stringContaining('people.whose'),
+        15000,
+        'Contacts',
+        2,
+        1000,
+      );
+    });
+
+    it('should support partial name matching (via targeted search)', async () => {
+      // JXA people.whose handles partial matching natively
+      mockExecuteJxa.mockResolvedValue([mockContacts[0]]);
+
       const result = await service.resolveNameToHandles('john');
 
       expect(result).not.toBeNull();
-      // Should match John Doe
       expect(result?.phones).toContain('15551234567');
     });
 
     it('should match by last name', async () => {
+      mockExecuteJxa.mockResolvedValue([mockContacts[1]]);
+
       const result = await service.resolveNameToHandles('Smith');
 
       expect(result).not.toBeNull();
       expect(result?.emails).toContain('jane.smith@example.com');
     });
 
-    it('should return null for unknown name', async () => {
+    it('should return null for unknown name (empty results)', async () => {
+      mockExecuteJxa.mockResolvedValue([]);
+
       const result = await service.resolveNameToHandles('Unknown Person');
 
       expect(result).toBeNull();
@@ -531,12 +559,15 @@ describe('ContactResolverService', () => {
       const result = await service.resolveNameToHandles('');
 
       expect(result).toBeNull();
+      // Should not call JXA for empty input
+      expect(mockExecuteJxa).not.toHaveBeenCalled();
     });
 
     it('should return null for whitespace-only name', async () => {
       const result = await service.resolveNameToHandles('   ');
 
       expect(result).toBeNull();
+      expect(mockExecuteJxa).not.toHaveBeenCalled();
     });
 
     it('should combine handles from multiple contacts with similar names', async () => {
@@ -602,12 +633,14 @@ describe('ContactResolverService', () => {
       expect(result).toBeNull();
     });
 
-    it('should only call JXA once for resolve then resolveNameToHandles (shared cache)', async () => {
+    it('should make independent JXA calls for resolveHandle and resolveNameToHandles', async () => {
+      // resolveHandle uses bulk cache, resolveNameToHandles uses targeted search
       await service.resolveHandle('john@example.com');
+      mockExecuteJxa.mockResolvedValue([mockContacts[0]]);
       await service.resolveNameToHandles('John');
 
-      // JXA should only be called once - cache is shared
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      // Both should trigger separate JXA calls (different code paths)
+      expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
     });
 
     it('should handle contacts with only phones (no emails)', async () => {
@@ -647,21 +680,88 @@ describe('ContactResolverService', () => {
       expect(result?.phones.length).toBe(0);
       expect(result?.emails.length).toBe(1);
     });
+
+    it('should return null for contacts with no handles', async () => {
+      mockExecuteJxa.mockResolvedValue([
+        {
+          id: 'no-handles',
+          fullName: 'No Handles',
+          firstName: 'No',
+          lastName: 'Handles',
+          phones: [],
+          emails: [],
+        },
+      ]);
+
+      const result = await service.resolveNameToHandles('No Handles');
+
+      expect(result).toBeNull();
+    });
   });
 
-  describe('getNameIndexSize', () => {
-    it('should return the size of the name index', async () => {
-      await service.resolveHandle('john@example.com'); // Build cache
+  describe('resolveNameToHandles error handling', () => {
+    it('should throw ContactSearchError on timeout', async () => {
+      mockExecuteJxa.mockRejectedValue(
+        new Error('JXA execution failed for Contacts: timed out'),
+      );
 
-      // Name index should have entries for unique names
-      expect(service.getNameIndexSize()).toBeGreaterThan(0);
+      await expect(service.resolveNameToHandles('John')).rejects.toThrow(
+        ContactSearchError,
+      );
+
+      try {
+        await service.resolveNameToHandles('John');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ContactSearchError);
+        expect((error as ContactSearchError).isTimeout).toBe(true);
+      }
     });
 
-    it('should be 0 after invalidation', async () => {
-      await service.resolveHandle('john@example.com');
-      service.invalidateCache();
+    it('should throw ContactSearchError on non-permission JXA failure', async () => {
+      mockExecuteJxa.mockRejectedValue(
+        new Error('JXA execution failed for Contacts: script error'),
+      );
 
-      expect(service.getNameIndexSize()).toBe(0);
+      await expect(service.resolveNameToHandles('John')).rejects.toThrow(
+        ContactSearchError,
+      );
+
+      try {
+        await service.resolveNameToHandles('John');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ContactSearchError);
+        expect((error as ContactSearchError).isTimeout).toBe(false);
+      }
+    });
+
+    it('should include search term in error message', async () => {
+      mockExecuteJxa.mockRejectedValue(new Error('some error'));
+
+      try {
+        await service.resolveNameToHandles('John Doe');
+      } catch (error) {
+        expect((error as ContactSearchError).message).toContain('John Doe');
+      }
+    });
+  });
+
+  describe('ContactSearchError', () => {
+    it('should have correct name', () => {
+      const error = new ContactSearchError('test', false);
+      expect(error.name).toBe('ContactSearchError');
+    });
+
+    it('should preserve isTimeout flag', () => {
+      const timeoutError = new ContactSearchError('timeout', true);
+      expect(timeoutError.isTimeout).toBe(true);
+
+      const otherError = new ContactSearchError('other', false);
+      expect(otherError.isTimeout).toBe(false);
+    });
+
+    it('should be an instance of Error', () => {
+      const error = new ContactSearchError('test', false);
+      expect(error).toBeInstanceOf(Error);
     });
   });
 });

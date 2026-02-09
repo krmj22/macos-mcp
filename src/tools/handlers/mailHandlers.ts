@@ -5,7 +5,10 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { MailToolArgs } from '../../types/index.js';
-import { contactResolver } from '../../utils/contactResolver.js';
+import {
+  ContactSearchError,
+  contactResolver,
+} from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
   buildScript,
@@ -381,9 +384,19 @@ export async function handleReadMail(
 
     // Find emails from a contact by name (reverse lookup)
     if (validated.contact) {
-      const handles = await contactResolver.resolveNameToHandles(
-        validated.contact,
-      );
+      let handles: Awaited<
+        ReturnType<typeof contactResolver.resolveNameToHandles>
+      >;
+      try {
+        handles = await contactResolver.resolveNameToHandles(validated.contact);
+      } catch (error) {
+        if (error instanceof ContactSearchError) {
+          return error.isTimeout
+            ? `Contact search timed out for "${validated.contact}". The Contacts app may be slow to respond. Please try again.`
+            : `Contact search failed for "${validated.contact}": ${error.message}`;
+        }
+        throw error;
+      }
       if (!handles || handles.emails.length === 0) {
         return `No contact found matching "${validated.contact}", or the contact has no email addresses associated.`;
       }
