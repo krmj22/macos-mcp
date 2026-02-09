@@ -98,7 +98,7 @@ describe('ErrorHandling', () => {
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should show generic error in production mode', async () => {
+    it('should show Error.message in production mode', async () => {
       const originalNodeEnv = process.env.NODE_ENV;
       const originalDebug = process.env.DEBUG;
       delete process.env.DEBUG;
@@ -115,7 +115,7 @@ describe('ErrorHandling', () => {
 
       expect(result.content[0]).toHaveProperty('type', 'text');
       expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
-        'Failed to test operation: System error occurred',
+        'Failed to test operation: Detailed error',
       );
 
       process.env.NODE_ENV = originalNodeEnv;
@@ -140,7 +140,7 @@ describe('ErrorHandling', () => {
       );
     });
 
-    it('should show detailed error when DEBUG is set', async () => {
+    it('should show Error.message regardless of DEBUG env', async () => {
       process.env.DEBUG = '1';
       process.env.NODE_ENV = 'production';
 
@@ -159,6 +159,28 @@ describe('ErrorHandling', () => {
       );
 
       delete process.env.DEBUG;
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should never leak stack traces', async () => {
+      process.env.NODE_ENV = 'production';
+
+      const error = new Error('Something broke');
+      error.stack =
+        'Error: Something broke\n    at Object.<anonymous> (/app/src/handlers.ts:42:11)';
+      const mockOperation = jest.fn().mockRejectedValue(error);
+
+      const result = await handleAsyncOperation(
+        mockOperation,
+        'test operation',
+      );
+
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toBe('Failed to test operation: Something broke');
+      expect(text).not.toContain('at Object');
+      expect(text).not.toContain('.ts:');
+      expect(text).not.toContain('handlers');
+
       process.env.NODE_ENV = originalEnv;
     });
   });

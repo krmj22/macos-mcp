@@ -25,12 +25,13 @@ function createJxaHint(error: JxaError): string | null {
 }
 
 /**
- * Creates a descriptive error message, showing validation details in dev mode.
+ * Creates a descriptive error message from the thrown value.
+ * Error.message is surfaced in all modes; non-Error throws get a generic message.
+ * Stack traces are never included.
  */
 function createErrorMessage(operation: string, error: unknown): string {
   const message =
     error instanceof Error ? error.message : 'System error occurred';
-  const isDev = process.env.NODE_ENV === 'development' || process.env.DEBUG;
 
   // For validation errors, always return the detailed message.
   if (error instanceof ValidationError) {
@@ -43,10 +44,9 @@ function createErrorMessage(operation: string, error: unknown): string {
     if (hint) return `Failed to ${operation}: ${hint}`;
   }
 
-  // For other errors, be generic in production.
-  return isDev
-    ? `Failed to ${operation}: ${message}`
-    : `Failed to ${operation}: System error occurred`;
+  // Show Error.message for Error instances, generic message for non-Error throws.
+  // Stack traces are never included — only the message string.
+  return `Failed to ${operation}: ${message}`;
 }
 
 /**
