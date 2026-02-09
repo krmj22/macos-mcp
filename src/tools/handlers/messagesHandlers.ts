@@ -515,47 +515,52 @@ async function searchMessagesWithFallback(
  * Attempts to list chats via JXA first, falls back to SQLite.
  * JXA's Messages.chats() throws errors on macOS Sonoma+,
  * so SQLite (requires Full Disk Access) is the fallback.
+ * When date filtering is requested, skips JXA (no date filter support) and goes directly to SQLite.
  */
 async function listChatsWithFallback(
   limit: number,
   offset: number,
+  dateRange?: DateRange,
 ): Promise<ChatItem[]> {
-  // Try JXA first (works on some macOS versions)
-  try {
-    const script = buildScript(LIST_CHATS_SCRIPT, {
-      limit: String(limit),
-      offset: String(offset),
-    });
-    const chats = await executeJxaWithRetry<ChatItem[]>(
-      script,
-      15000,
-      'Messages',
-    );
-    if (Array.isArray(chats) && chats.length > 0) {
-      // Try to enrich chats that are missing lastMessage with SQLite data
-      for (const chat of chats) {
-        if (!chat.lastMessage) {
-          try {
-            const last = await getLastMessage(chat.id);
-            if (last) {
-              chat.lastMessage = last.text;
-              chat.lastDate = last.date;
+  // Skip JXA when date filtering is requested (JXA does not support date filtering)
+  if (!dateRange?.startDate && !dateRange?.endDate) {
+    // Try JXA first (works on some macOS versions)
+    try {
+      const script = buildScript(LIST_CHATS_SCRIPT, {
+        limit: String(limit),
+        offset: String(offset),
+      });
+      const chats = await executeJxaWithRetry<ChatItem[]>(
+        script,
+        15000,
+        'Messages',
+      );
+      if (Array.isArray(chats) && chats.length > 0) {
+        // Try to enrich chats that are missing lastMessage with SQLite data
+        for (const chat of chats) {
+          if (!chat.lastMessage) {
+            try {
+              const last = await getLastMessage(chat.id);
+              if (last) {
+                chat.lastMessage = last.text;
+                chat.lastDate = last.date;
+              }
+            } catch {
+              // SQLite unavailable, skip enrichment
+              break; // No point trying other chats
             }
-          } catch {
-            // SQLite unavailable, skip enrichment
-            break; // No point trying other chats
           }
         }
+        return chats;
       }
-      return chats;
+    } catch {
+      // JXA failed, try SQLite
     }
-  } catch {
-    // JXA failed, try SQLite
   }
 
-  // SQLite fallback
+  // SQLite fallback (or primary path when date filtering)
   try {
-    return await listChats(limit, offset);
+    return await listChats(limit, offset, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
@@ -719,6 +724,7 @@ export async function handleReadMessages(
     let chats = await listChatsWithFallback(
       validated.limit ?? 50,
       validated.offset ?? 0,
+      dateRange,
     );
     if (validated.enrichContacts !== false) {
       chats = await enrichChatParticipants(chats);

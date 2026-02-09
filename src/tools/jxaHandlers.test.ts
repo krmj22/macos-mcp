@@ -705,7 +705,7 @@ describe('Messages Handlers', () => {
       expect(getTextContent(result)).toContain('Chats');
       expect(getTextContent(result)).toContain('Jane Doe');
       expect(getTextContent(result)).toContain('Hello from SQLite');
-      expect(mockListChats).toHaveBeenCalledWith(50, 0);
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, undefined);
     });
 
     it('falls back to SQLite when JXA returns empty chat list', async () => {
@@ -909,6 +909,125 @@ describe('Messages Handlers', () => {
           ),
         }),
       );
+    });
+
+    it('passes date range to listChats on default path with startDate/endDate', async () => {
+      mockListChats.mockResolvedValue([
+        {
+          id: 'iMessage;-;+1234567890',
+          name: 'Jane Doe',
+          participants: ['+1234567890'],
+          lastMessage: 'Recent chat',
+          lastDate: '2025-01-15T12:00:00.000Z',
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Chats');
+      expect(getTextContent(result)).toContain('Jane Doe');
+      // Verify JXA was NOT called (date filtering skips JXA)
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      // Verify SQLite listChats was called with date range
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+    });
+
+    it('passes dateRange shortcut to listChats on default path', async () => {
+      mockListChats.mockResolvedValue([
+        {
+          id: 'chat1',
+          name: 'Bob',
+          participants: ['bob@example.com'],
+          lastMessage: 'Today msg',
+          lastDate: '2025-06-01T10:00:00.000Z',
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        dateRange: 'today',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Bob');
+      // Verify JXA was NOT called (date filtering skips JXA)
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      // Verify SQLite listChats was called with resolved date range
+      expect(mockListChats).toHaveBeenCalledWith(
+        50,
+        0,
+        expect.objectContaining({
+          startDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+          endDate: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+          ),
+        }),
+      );
+    });
+
+    it('returns empty list when no chats match date filter on default path', async () => {
+      mockListChats.mockResolvedValue([]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        startDate: '2020-01-01',
+        endDate: '2020-01-31',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('No chats found');
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
+        startDate: '2020-01-01',
+        endDate: '2020-01-31',
+      });
+    });
+
+    it('does not pass date range to listChats when no dates specified', async () => {
+      mockExecuteJxaWithRetry.mockResolvedValue([
+        {
+          id: 'c1',
+          name: 'John',
+          participants: ['+1234'],
+          lastMessage: 'Hi',
+          lastDate: '2025-01-01',
+        },
+      ]);
+
+      await handleReadMessages({ action: 'read' });
+      // JXA should be tried first when no date filtering
+      expect(mockExecuteJxaWithRetry).toHaveBeenCalled();
+    });
+
+    it('explicit dates take precedence over dateRange on default path', async () => {
+      mockListChats.mockResolvedValue([
+        {
+          id: 'chat1',
+          name: 'Alice',
+          participants: ['alice@example.com'],
+          lastMessage: 'Hello',
+          lastDate: '2025-01-15T12:00:00.000Z',
+        },
+      ]);
+
+      await handleReadMessages({
+        action: 'read',
+        dateRange: 'today',
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
+      // Explicit dates should be used, not the resolved dateRange
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+      });
     });
   });
 });

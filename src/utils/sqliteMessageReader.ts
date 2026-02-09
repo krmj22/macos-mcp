@@ -393,12 +393,21 @@ export async function getLastMessage(
 /**
  * List all chats from the Messages database.
  * Returns chats with their last message and participants.
+ * When dateRange is provided, only returns chats that have messages within
+ * the date range, and last_message/last_date reflect the most recent message
+ * within the range.
  */
 export async function listChats(
   limit: number,
   offset: number,
+  dateRange?: DateRange,
 ): Promise<ReadChatResult[]> {
-  // Query chats with their last message and participant handles
+  const dateFilter = buildDateFilter(dateRange);
+
+  // Query chats with their last message and participant handles.
+  // When date filtering is active, subqueries also apply the date filter
+  // so that last_message/last_date reflect the most recent message in range,
+  // and chats with no messages in range are excluded (last_date IS NULL).
   const query = `
     SELECT
       c.guid as chat_guid,
@@ -414,6 +423,7 @@ export async function listChats(
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
         WHERE cmj.chat_id = c.ROWID
+        ${dateFilter}
         ORDER BY m.date DESC
         LIMIT 1
       ) as last_message,
@@ -422,6 +432,7 @@ export async function listChats(
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
         WHERE cmj.chat_id = c.ROWID
+        ${dateFilter}
         ORDER BY m.date DESC
         LIMIT 1
       ) as last_message_attr_hex,
@@ -430,6 +441,7 @@ export async function listChats(
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
         WHERE cmj.chat_id = c.ROWID
+        ${dateFilter}
         ORDER BY m.date DESC
         LIMIT 1
       ) as last_message_attach_count,
@@ -438,6 +450,7 @@ export async function listChats(
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
         WHERE cmj.chat_id = c.ROWID
+        ${dateFilter}
         ORDER BY m.date DESC
         LIMIT 1
       ) as last_date
