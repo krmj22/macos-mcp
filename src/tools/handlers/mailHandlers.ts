@@ -130,6 +130,7 @@ const LIST_MAILBOX_SCRIPT = `
     for (let b = 0; b < mailboxes.length; b++) {
       if (mailboxes[b].name() !== targetMailbox) continue;
       const msgs = mailboxes[b].messages();
+      if (!msgs) continue;
       const end = Math.min(msgs.length, offset + limit);
       for (let i = offset; i < end; i++) {
         const m = msgs[i];
@@ -214,6 +215,7 @@ const SEARCH_MAIL_BY_SENDERS_SCRIPT = `
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length && result.length < limit; b++) {
       const msgs = mailboxes[b].messages();
+      if (!msgs) continue;
       const searchLimit = Math.min(msgs.length, 500); // Limit per mailbox for performance
       for (let i = 0; i < searchLimit && result.length < limit; i++) {
         try {
