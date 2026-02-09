@@ -5,6 +5,7 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { NotesFoldersToolArgs, NotesToolArgs } from '../../types/index.js';
+import { VALIDATION } from '../../utils/constants.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
   buildScript,
@@ -122,6 +123,22 @@ const UPDATE_NOTE_SCRIPT = `
   const n = notes[0];
   if ("{{hasName}}" === "true") n.name = "{{newName}}";
   if ("{{hasBody}}" === "true") n.body = "{{newBody}}";
+  {{moveToFolder}}
+  return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
+})()
+`;
+
+const APPEND_NOTE_SCRIPT = `
+(() => {
+  const Notes = Application("Notes");
+  const notes = Notes.notes.whose({id: "{{id}}"})();
+  if (notes.length === 0) throw new Error("Note not found");
+  const n = notes[0];
+  if ("{{hasName}}" === "true") n.name = "{{newName}}";
+  const existing = n.plaintext();
+  const combined = existing + "\\n" + "{{newBody}}";
+  if (combined.length > {{maxBodyLength}}) throw new Error("Combined note body exceeds {{maxBodyLength}} characters (existing: " + existing.length + " + new: " + "{{newBody}}".length + " = " + combined.length + ")");
+  n.body = combined;
   {{moveToFolder}}
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
@@ -318,14 +335,26 @@ export async function handleUpdateNote(
     const moveToFolder = validated.targetFolder
       ? `const targetFolder = Notes.folders.whose({name: "${sanitizeForJxa(validated.targetFolder)}"})()[0]; if (!targetFolder) throw new Error("Folder not found: ${sanitizeForJxa(validated.targetFolder)}"); n.move({to: targetFolder});`
       : '';
-    const script = buildScript(UPDATE_NOTE_SCRIPT, {
+
+    const useAppend = validated.append === true && validated.body !== undefined;
+    const scriptTemplate = useAppend ? APPEND_NOTE_SCRIPT : UPDATE_NOTE_SCRIPT;
+
+    const scriptParams: Record<string, string> = {
       id: validated.id,
       hasName: validated.title ? 'true' : 'false',
       newName: validated.title ?? '',
-      hasBody: validated.body !== undefined ? 'true' : 'false',
-      newBody: validated.body ?? '',
       moveToFolder,
-    });
+    };
+
+    if (useAppend) {
+      scriptParams.newBody = validated.body ?? '';
+      scriptParams.maxBodyLength = String(VALIDATION.MAX_NOTE_LENGTH);
+    } else {
+      scriptParams.hasBody = validated.body !== undefined ? 'true' : 'false';
+      scriptParams.newBody = validated.body ?? '';
+    }
+
+    const script = buildScript(scriptTemplate, scriptParams);
     const result = await executeJxa<{
       id: string;
       name: string;
@@ -334,7 +363,8 @@ export async function handleUpdateNote(
     const folderInfo = validated.targetFolder
       ? `\n- Folder: ${result.folder}`
       : '';
-    return `Successfully updated note "${result.name}".\n- ID: ${result.id}${folderInfo}`;
+    const appendInfo = useAppend ? ' (appended)' : '';
+    return `Successfully updated note "${result.name}"${appendInfo}.\n- ID: ${result.id}${folderInfo}`;
   }, 'update note');
 }
 

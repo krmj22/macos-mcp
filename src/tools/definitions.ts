@@ -296,7 +296,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_items',
     description:
-      'Manages Apple Notes. IMPORTANT: Apple Notes uses plain text, NOT markdown — do not send markdown formatting (no **, ##, -, etc.). Title max 200 chars, body max 2000 chars. Common actions: (1) "Find my note about X" → read with search param (searches title and body). (2) "Create a note" → create with title and body (plain text only). (3) "Move note to folder X" → update with id and targetFolder param. (4) "Edit my note" → update with id, and new title/body. Delete moves notes to Recently Deleted. Use folder param on read to filter by folder, or on create to place in a specific folder (defaults to "Notes"). Paginated: use limit (default 50, max 200) and offset.',
+      'Manages Apple Notes. IMPORTANT: Apple Notes uses plain text, NOT markdown — do not send markdown formatting (no **, ##, -, etc.). Title max 200 chars, body max 2000 chars (total after append). Common actions: (1) "Find my note about X" → read with search param (searches title and body). (2) "Create a note" → create with title and body (plain text only). (3) "Move note to folder X" → update with id and targetFolder param. (4) "Edit my note" → update with id, and new title/body. (5) "Add to my note" → update with id, body, and append=true (appends body to existing content without needing to read first). Delete moves notes to Recently Deleted. Use folder param on read to filter by folder, or on create to place in a specific folder (defaults to "Notes"). Note: updating body (with or without append) replaces rich text formatting with plain text. Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -329,6 +329,11 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
           type: 'string',
           description:
             'Move the note to this folder (for update action). This is how you move notes between folders — use update with id and targetFolder. Can be combined with title/body changes in the same update call.',
+        },
+        append: {
+          type: 'boolean',
+          description:
+            'When true, appends body content to the existing note instead of replacing it (for update action). Eliminates the need for a read-then-update round trip. The 2000 char limit applies to the final combined length. Note: appending converts existing rich text formatting to plain text.',
         },
         search: {
           type: 'string',

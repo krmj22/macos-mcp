@@ -112,12 +112,14 @@ describe('Notes Handlers', () => {
   });
 
   let handleReadNotes: typeof import('./handlers/notesHandlers.js').handleReadNotes;
+  let handleUpdateNote: typeof import('./handlers/notesHandlers.js').handleUpdateNote;
   let handleReadNotesFolders: typeof import('./handlers/notesHandlers.js').handleReadNotesFolders;
   let handleCreateNotesFolder: typeof import('./handlers/notesHandlers.js').handleCreateNotesFolder;
 
   beforeAll(async () => {
     const mod = await import('./handlers/notesHandlers.js');
     handleReadNotes = mod.handleReadNotes;
+    handleUpdateNote = mod.handleUpdateNote;
     handleReadNotesFolders = mod.handleReadNotesFolders;
     handleCreateNotesFolder = mod.handleCreateNotesFolder;
   });
@@ -218,6 +220,139 @@ describe('Notes Handlers', () => {
 
       const script = mockExecuteJxaWithRetry.mock.calls[0][0];
       expect(script).toContain('path\\\\to\\\\file');
+    });
+  });
+
+  describe('handleUpdateNote', () => {
+    it('updates note body with full replace (default behavior)', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Notes',
+      });
+
+      const result = await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        body: 'New content',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully updated note');
+      expect(getTextContent(result)).not.toContain('(appended)');
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      // Full replace uses hasBody flag, not plaintext()
+      expect(script).toContain('"true"');
+      expect(script).toContain('New content');
+      expect(script).not.toContain('plaintext()');
+    });
+
+    it('appends body when append=true', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Notes',
+      });
+
+      const result = await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        body: 'Appended content',
+        append: true,
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully updated note');
+      expect(getTextContent(result)).toContain('(appended)');
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      // Append mode uses n.plaintext() to read existing content
+      expect(script).toContain('n.plaintext()');
+      expect(script).toContain('Appended content');
+      // Should check combined length against max
+      expect(script).toContain('2000');
+    });
+
+    it('ignores append=true when body is not provided', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Notes',
+      });
+
+      const result = await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        title: 'New Title',
+        append: true,
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).not.toContain('(appended)');
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      // Should NOT use append script when no body provided
+      expect(script).not.toContain('plaintext()');
+    });
+
+    it('uses full replace when append=false', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Notes',
+      });
+
+      await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        body: 'Replaced content',
+        append: false,
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).not.toContain('plaintext()');
+      expect(script).toContain('Replaced content');
+    });
+
+    it('sanitizes user input in append mode', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Notes',
+      });
+
+      await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        body: 'O\'Brien\'s "notes"',
+        append: true,
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      // Verify sanitization happened (quotes escaped)
+      expect(script).toContain("O\\'Brien\\'s");
+      expect(script).toContain('\\"notes\\"');
+    });
+
+    it('supports append with targetFolder move', async () => {
+      mockExecuteJxa.mockResolvedValue({
+        id: 'n1',
+        name: 'Test Note',
+        folder: 'Work',
+      });
+
+      const result = await handleUpdateNote({
+        action: 'update',
+        id: 'n1',
+        body: 'More content',
+        append: true,
+        targetFolder: 'Work',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('(appended)');
+      expect(getTextContent(result)).toContain('Folder: Work');
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('plaintext()');
+      expect(script).toContain('targetFolder');
     });
   });
 
@@ -759,6 +894,7 @@ describe('Shared Formatting', () => {
 
 describe('Schema Validation', () => {
   let ReadNotesSchema: typeof import('../validation/schemas.js').ReadNotesSchema;
+  let UpdateNoteSchema: typeof import('../validation/schemas.js').UpdateNoteSchema;
   let ReadMailSchema: typeof import('../validation/schemas.js').ReadMailSchema;
   let ReadMessagesSchema: typeof import('../validation/schemas.js').ReadMessagesSchema;
   let CreateMailSchema: typeof import('../validation/schemas.js').CreateMailSchema;
@@ -769,6 +905,7 @@ describe('Schema Validation', () => {
   beforeAll(async () => {
     const mod = await import('../validation/schemas.js');
     ReadNotesSchema = mod.ReadNotesSchema;
+    UpdateNoteSchema = mod.UpdateNoteSchema;
     ReadMailSchema = mod.ReadMailSchema;
     ReadMessagesSchema = mod.ReadMessagesSchema;
     CreateMailSchema = mod.CreateMailSchema;
@@ -854,6 +991,44 @@ describe('Schema Validation', () => {
     it('ReadMailSchema accepts enrichContacts: false', () => {
       const result = ReadMailSchema.parse({ enrichContacts: false });
       expect(result.enrichContacts).toBe(false);
+    });
+  });
+
+  describe('UpdateNoteSchema with append', () => {
+    it('accepts append=true with body', () => {
+      const result = UpdateNoteSchema.parse({
+        id: 'n1',
+        body: 'New content',
+        append: true,
+      });
+      expect(result.append).toBe(true);
+      expect(result.body).toBe('New content');
+    });
+
+    it('accepts append=false', () => {
+      const result = UpdateNoteSchema.parse({
+        id: 'n1',
+        body: 'Replaced',
+        append: false,
+      });
+      expect(result.append).toBe(false);
+    });
+
+    it('defaults append to undefined when omitted', () => {
+      const result = UpdateNoteSchema.parse({
+        id: 'n1',
+        body: 'Content',
+      });
+      expect(result.append).toBeUndefined();
+    });
+
+    it('accepts append without body (no-op for append)', () => {
+      const result = UpdateNoteSchema.parse({
+        id: 'n1',
+        append: true,
+      });
+      expect(result.append).toBe(true);
+      expect(result.body).toBeUndefined();
     });
   });
 

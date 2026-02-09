@@ -200,6 +200,7 @@ export interface NotesToolArgs extends BaseToolArgs {
   search?: string;
   limit?: number;
   offset?: number;
+  append?: boolean;
 }
 
 export type NotesFoldersAction = 'read' | 'create';
