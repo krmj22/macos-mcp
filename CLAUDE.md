@@ -14,31 +14,16 @@ pnpm dev              # Run from source via tsx (stdio only, no build needed)
 
 **Note:** `bin/run.cjs` (used by `.mcp.json`) runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
 
-## Tools & Capabilities
+## Current State
 
-| Tool | Actions | Key Parameters | Status |
-|------|---------|----------------|--------|
-| `reminders_tasks` | read, create, update, delete | `filterList`, `dueWithin`, `search` | ✅ Working |
-| `reminders_lists` | read, create, update, delete | `name` | ✅ Working |
-| `calendar_events` | read, create, update, delete | `startDate`, `endDate`, `calendarName`, `recurrence` | ✅ Working |
-| `calendar_calendars` | read | — | ✅ Working |
-| `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
-| `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
-| `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
-| `messages_chat` | read, create | `chatId`, `search`, `to`, `dateRange`, `contact` | ✅ Working (SQLite-only reads) |
-| `contacts_people` | read, search, create, update, delete | `id`, `search` | ✅ Working |
+See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, and known limitations.
 
-Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
-
-## Known Issues & Permissions
-
-### Known Bugs (as of 2026-02-10)
-
-Currently no critical bugs. E2E test suite tracked in issues #64-72.
-
-### Minor Issues
+## Known Gotchas
 
 - **Calendar**: Recurring event deletion only removes single occurrence (uses `.thisEvent` span)
+- **Notes folders**: No rename/delete via JXA (Apple API limitation)
+- **Messages**: No delete/edit via JXA or SQLite (Apple API limitation)
+- **Mail create**: Creates draft only — user must click Send in Mail.app
 
 ### Messages JXA Broken (Sonoma+)
 
