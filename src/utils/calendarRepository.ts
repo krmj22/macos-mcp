@@ -36,7 +36,14 @@ class CalendarRepository {
   }
 
   async findEventById(id: string): Promise<CalendarEvent> {
-    const { events } = await this.readEvents();
+    // EventKit requires bounded date range — distantPast/distantFuture returns 0 events
+    const now = new Date();
+    const twoYearsBack = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+    const twoYearsForward = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00`;
+
+    const { events } = await this.readEvents(fmt(twoYearsBack), fmt(twoYearsForward));
     const event = events.find((e) => e.id === id);
     if (!event) {
       throw new Error(`Event with ID '${id}' not found.`);

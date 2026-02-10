@@ -47,7 +47,11 @@ describe('CalendarRepository', () => {
 
       const result = await repository.findEventById('2');
 
-      expect(mockExecuteCli).toHaveBeenCalledWith(['--action', 'read-events']);
+      // findEventById now bounds to ±2 years (fixes #73)
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs.slice(0, 2)).toEqual(['--action', 'read-events']);
+      expect(callArgs).toContain('--startDate');
+      expect(callArgs).toContain('--endDate');
 
       expect(result).toEqual({
         id: '2',
