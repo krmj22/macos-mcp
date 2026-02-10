@@ -72,11 +72,12 @@ const LIST_MAIL_SCRIPT = `
 (() => {
   const Mail = Application("Mail");
   const inbox = Mail.inbox();
-  const msgs = inbox.messages();
+  const msgs = inbox.messages;
+  const total = msgs.length;
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  const end = Math.min(msgs.length, offset + limit);
+  const end = Math.min(total, offset + limit);
   for (let i = offset; i < end; i++) {
     const m = msgs[i];
     result.push({
@@ -129,9 +130,9 @@ const LIST_MAILBOX_SCRIPT = `
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length; b++) {
       if (mailboxes[b].name() !== targetMailbox) continue;
-      const msgs = mailboxes[b].messages();
-      if (!msgs) continue;
-      const end = Math.min(msgs.length, offset + limit);
+      const msgs = mailboxes[b].messages;
+      const total = msgs.length;
+      const end = Math.min(total, offset + limit);
       for (let i = offset; i < end; i++) {
         const m = msgs[i];
         result.push({
@@ -156,32 +157,30 @@ const SEARCH_MAIL_SCRIPT = `
 (() => {
   const Mail = Application("Mail");
   const inbox = Mail.inbox();
-  const msgs = inbox.messages();
-  const term = "{{search}}".toLowerCase();
+  const term = "{{search}}";
+  const matched = inbox.messages.whose({
+    _or: [
+      {subject: {_contains: term}},
+      {sender: {_contains: term}}
+    ]
+  });
+  const total = matched.length;
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  let matched = 0;
-  for (let i = 0; i < msgs.length && result.length < limit; i++) {
-    const m = msgs[i];
-    const subj = m.subject() || "";
-    const sender = m.sender() || "";
-    const content = m.content() || "";
-    if (subj.toLowerCase().includes(term) || sender.toLowerCase().includes(term) || content.toLowerCase().includes(term)) {
-      if (matched >= offset) {
-        result.push({
-          id: m.id().toString(),
-          subject: subj || "(no subject)",
-          sender: sender,
-          dateReceived: m.dateReceived().toISOString(),
-          read: m.readStatus(),
-          mailbox: "Inbox",
-          account: m.mailbox().account().name(),
-          preview: (content).substring(0, 200)
-        });
-      }
-      matched++;
-    }
+  const end = Math.min(total, offset + limit);
+  for (let i = offset; i < end; i++) {
+    const m = matched[i];
+    result.push({
+      id: m.id().toString(),
+      subject: m.subject() || "(no subject)",
+      sender: m.sender(),
+      dateReceived: m.dateReceived().toISOString(),
+      read: m.readStatus(),
+      mailbox: "Inbox",
+      account: m.mailbox().account().name(),
+      preview: (m.content() || "").substring(0, 200)
+    });
   }
   return JSON.stringify(result);
 })()
@@ -219,9 +218,10 @@ const SEARCH_MAIL_BY_SENDERS_SCRIPT = `
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length && result.length < limit; b++) {
       if (skipMailboxes.has(mailboxes[b].name())) continue;
-      const msgs = mailboxes[b].messages();
-      if (!msgs) continue;
-      const searchLimit = Math.min(msgs.length, 500); // Limit per mailbox for performance
+      const msgs = mailboxes[b].messages;
+      const msgCount = msgs.length;
+      if (msgCount === 0) continue;
+      const searchLimit = Math.min(msgCount, 500); // Limit per mailbox for performance
       for (let i = 0; i < searchLimit && result.length < limit; i++) {
         try {
           const m = msgs[i];
