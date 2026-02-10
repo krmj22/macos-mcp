@@ -1,6 +1,6 @@
 /**
  * handlers/messagesHandlers.ts
- * Read chats and send iMessages via JXA
+ * Read chats via SQLite, send iMessages via JXA
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -15,11 +15,9 @@ import {
   buildScript,
   executeAppleScript,
   executeJxa,
-  executeJxaWithRetry,
 } from '../../utils/jxaExecutor.js';
 import {
   type DateRange,
-  getLastMessage,
   listChats,
   readChatMessages,
   readMessagesByHandles,
@@ -138,71 +136,6 @@ interface MessageItem {
 
 // --- JXA Script Templates ---
 
-const LIST_CHATS_SCRIPT = `
-(() => {
-  const Messages = Application("Messages");
-  const chats = Messages.chats();
-  const result = [];
-  const offset = {{offset}};
-  const limit = {{limit}};
-  const end = Math.min(chats.length, offset + limit);
-  for (let i = offset; i < end; i++) {
-    const c = chats[i];
-    let participants = [];
-    try { participants = c.participants().map(p => p.handle()); } catch(e) {}
-    let lastMsg = "";
-    let lastDate = "";
-    try {
-      const msgs = c.messages();
-      if (msgs.length > 0) {
-        const last = msgs[msgs.length - 1];
-        lastMsg = (last.text() || "").substring(0, 100);
-        lastDate = last.date().toISOString();
-      }
-    } catch(e) {}
-    result.push({
-      id: c.id(),
-      name: c.name() || participants.join(", ") || "Unknown",
-      participants: participants,
-      lastMessage: lastMsg,
-      lastDate: lastDate
-    });
-  }
-  return JSON.stringify(result);
-})()
-`;
-
-const READ_CHAT_MESSAGES_SCRIPT = `
-(() => {
-  const Messages = Application("Messages");
-  const chats = Messages.chats.whose({id: "{{chatId}}"})();
-  if (chats.length === 0) return JSON.stringify([]);
-  try {
-    const msgs = chats[0].messages();
-    const result = [];
-    const offset = {{offset}};
-    const limit = {{limit}};
-    const start = Math.max(0, msgs.length - offset - limit);
-    const end = Math.max(0, msgs.length - offset);
-    for (let i = start; i < end; i++) {
-      try {
-        const m = msgs[i];
-        result.push({
-          id: m.id().toString(),
-          text: m.text() || "",
-          sender: m.sender() || "me",
-          date: m.date().toISOString(),
-          isFromMe: m.sender() === null
-        });
-      } catch(e) { /* skip corrupt message */ }
-    }
-    return JSON.stringify(result);
-  } catch(e) {
-    return JSON.stringify({error: "Unable to read messages from this chat. The chat data may be in an incompatible format."});
-  }
-})()
-`;
-
 const SEND_TO_CHAT_SCRIPT = `
 (() => {
   const Messages = Application("Messages");
@@ -210,42 +143,6 @@ const SEND_TO_CHAT_SCRIPT = `
   if (chats.length === 0) throw new Error("Chat not found");
   Messages.send("{{text}}", {to: chats[0]});
   return JSON.stringify({sent: true, chatId: "{{chatId}}"});
-})()
-`;
-
-const SEARCH_CHATS_SCRIPT = `
-(() => {
-  const Messages = Application("Messages");
-  const chats = Messages.chats();
-  const term = "{{search}}".toLowerCase();
-  const result = [];
-  const limit = {{limit}};
-  for (let i = 0; i < chats.length && result.length < limit; i++) {
-    const c = chats[i];
-    let participants = [];
-    try { participants = c.participants().map(p => p.handle()); } catch(e) {}
-    const name = c.name() || participants.join(", ") || "Unknown";
-    if (name.toLowerCase().includes(term) || participants.some(p => p.toLowerCase().includes(term))) {
-      let lastMsg = "";
-      let lastDate = "";
-      try {
-        const msgs = c.messages();
-        if (msgs.length > 0) {
-          const last = msgs[msgs.length - 1];
-          lastMsg = (last.text() || "").substring(0, 100);
-          lastDate = last.date().toISOString();
-        }
-      } catch(e) {}
-      result.push({
-        id: c.id(),
-        name: name,
-        participants: participants,
-        lastMessage: lastMsg,
-        lastDate: lastDate
-      });
-    }
-  }
-  return JSON.stringify(result);
 })()
 `;
 
@@ -351,46 +248,6 @@ async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
   }));
 }
 
-const SEARCH_MESSAGES_SCRIPT = `
-(() => {
-  const Messages = Application("Messages");
-  const chats = Messages.chats();
-  const term = "{{search}}".toLowerCase();
-  const result = [];
-  const limit = {{limit}};
-  for (let ci = 0; ci < chats.length && result.length < limit; ci++) {
-    const c = chats[ci];
-    let chatName = "";
-    try {
-      const parts = c.participants().map(p => p.handle());
-      chatName = c.name() || parts.join(", ") || "Unknown";
-    } catch(e) { chatName = c.name() || "Unknown"; }
-    try {
-      const msgs = c.messages();
-      const start = Math.max(0, msgs.length - 200);
-      for (let i = start; i < msgs.length && result.length < limit; i++) {
-        try {
-          const m = msgs[i];
-          const text = m.text() || "";
-          if (text.toLowerCase().includes(term)) {
-            result.push({
-              chatId: c.id(),
-              chatName: chatName,
-              id: m.id().toString(),
-              text: text.substring(0, 300),
-              sender: m.sender() || "me",
-              date: m.date().toISOString(),
-              isFromMe: m.sender() === null
-            });
-          }
-        } catch(e) {}
-      }
-    } catch(e) {}
-  }
-  return JSON.stringify(result);
-})()
-`;
-
 // --- Formatting ---
 
 function formatChatMarkdown(chat: ChatItem): string[] {
@@ -421,89 +278,25 @@ function formatSearchMessageMarkdown(msg: SearchMessageResult): string[] {
   ];
 }
 
-// --- Handlers ---
+// --- SQLite Read Wrappers ---
 
 /**
- * Attempts to read messages via JXA first, falls back to SQLite.
- * JXA's c.messages() throws "Can't convert types" on modern macOS,
- * so SQLite (requires Full Disk Access) is the primary read path.
- * When date filtering is requested, skips JXA (no date filter support) and goes directly to SQLite.
+ * Reads messages from a chat via SQLite.
+ * JXA message reading is broken on macOS Sonoma+ ("Can't convert types"),
+ * so all message reads go through SQLite directly.
  */
-async function readMessagesWithFallback(
+async function readChatMessagesSqlite(
   chatId: string,
   limit: number,
   offset: number,
   dateRange?: DateRange,
 ): Promise<MessageItem[]> {
-  // Skip JXA when date filtering is requested (JXA does not support date filtering)
-  if (!dateRange?.startDate && !dateRange?.endDate) {
-    // Try JXA first (works on some macOS versions)
-    try {
-      const script = buildScript(READ_CHAT_MESSAGES_SCRIPT, {
-        chatId,
-        limit: String(limit),
-        offset: String(offset),
-      });
-      const result = await executeJxaWithRetry<
-        MessageItem[] | { error: string }
-      >(script, 15000, 'Messages');
-      if (Array.isArray(result) && result.length > 0) {
-        return result;
-      }
-    } catch {
-      // JXA failed, try SQLite
-    }
-  }
-
-  // SQLite fallback (or primary path when date filtering)
   try {
     return await readChatMessages(chatId, limit, offset, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
-        'Cannot read messages: JXA automation is unsupported for message reading on this macOS version, ' +
-          'and SQLite access requires Full Disk Access. ' +
-          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
-      );
-    }
-    throw error;
-  }
-}
-
-async function searchMessagesWithFallback(
-  search: string,
-  limit: number,
-  dateRange?: DateRange,
-): Promise<SearchMessageResult[]> {
-  // Skip JXA when date filtering is requested (JXA does not support date filtering)
-  if (!dateRange?.startDate && !dateRange?.endDate) {
-    // Try JXA first
-    try {
-      const script = buildScript(SEARCH_MESSAGES_SCRIPT, {
-        search,
-        limit: String(limit),
-      });
-      const results = await executeJxaWithRetry<SearchMessageResult[]>(
-        script,
-        30000,
-        'Messages',
-      );
-      if (results.length > 0) {
-        return results;
-      }
-    } catch {
-      // JXA failed, try SQLite
-    }
-  }
-
-  // SQLite fallback (or primary path when date filtering)
-  try {
-    return await searchMessages(search, limit, dateRange);
-  } catch (error) {
-    if (error instanceof SqliteAccessError && error.isPermissionError) {
-      throw new Error(
-        'Cannot search messages: JXA automation is unsupported for message reading on this macOS version, ' +
-          'and SQLite access requires Full Disk Access. ' +
+        'Cannot read messages: SQLite access requires Full Disk Access. ' +
           'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
       );
     }
@@ -512,60 +305,41 @@ async function searchMessagesWithFallback(
 }
 
 /**
- * Attempts to list chats via JXA first, falls back to SQLite.
- * JXA's Messages.chats() throws errors on macOS Sonoma+,
- * so SQLite (requires Full Disk Access) is the fallback.
- * When date filtering is requested, skips JXA (no date filter support) and goes directly to SQLite.
+ * Searches messages by content via SQLite.
  */
-async function listChatsWithFallback(
+async function searchMessagesSqlite(
+  search: string,
   limit: number,
-  offset: number,
   dateRange?: DateRange,
-): Promise<ChatItem[]> {
-  // Skip JXA when date filtering is requested (JXA does not support date filtering)
-  if (!dateRange?.startDate && !dateRange?.endDate) {
-    // Try JXA first (works on some macOS versions)
-    try {
-      const script = buildScript(LIST_CHATS_SCRIPT, {
-        limit: String(limit),
-        offset: String(offset),
-      });
-      const chats = await executeJxaWithRetry<ChatItem[]>(
-        script,
-        15000,
-        'Messages',
-      );
-      if (Array.isArray(chats) && chats.length > 0) {
-        // Try to enrich chats that are missing lastMessage with SQLite data
-        for (const chat of chats) {
-          if (!chat.lastMessage) {
-            try {
-              const last = await getLastMessage(chat.id);
-              if (last) {
-                chat.lastMessage = last.text;
-                chat.lastDate = last.date;
-              }
-            } catch {
-              // SQLite unavailable, skip enrichment
-              break; // No point trying other chats
-            }
-          }
-        }
-        return chats;
-      }
-    } catch {
-      // JXA failed, try SQLite
-    }
-  }
-
-  // SQLite fallback (or primary path when date filtering)
+): Promise<SearchMessageResult[]> {
   try {
-    return await listChats(limit, offset, dateRange);
+    return await searchMessages(search, limit, dateRange);
   } catch (error) {
     if (error instanceof SqliteAccessError && error.isPermissionError) {
       throw new Error(
-        'Cannot list chats: JXA automation is unsupported on this macOS version, ' +
-          'and SQLite access requires Full Disk Access. ' +
+        'Cannot search messages: SQLite access requires Full Disk Access. ' +
+          'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Lists chats via SQLite, with optional search and date filtering.
+ */
+async function listChatsSqlite(
+  limit: number,
+  offset: number,
+  dateRange?: DateRange,
+  search?: string,
+): Promise<ChatItem[]> {
+  try {
+    return await listChats(limit, offset, dateRange, search);
+  } catch (error) {
+    if (error instanceof SqliteAccessError && error.isPermissionError) {
+      throw new Error(
+        'Cannot list chats: SQLite access requires Full Disk Access. ' +
           'Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
       );
     }
@@ -664,7 +438,7 @@ export async function handleReadMessages(
     // Search chats by participant/name or search messages by content
     if (validated.search) {
       if (validated.searchMessages) {
-        let results = await searchMessagesWithFallback(
+        let results = await searchMessagesSqlite(
           validated.search,
           validated.limit ?? 50,
           dateRange,
@@ -680,14 +454,12 @@ export async function handleReadMessages(
           { includeTimezone: true },
         );
       }
-      const script = buildScript(SEARCH_CHATS_SCRIPT, {
-        search: validated.search,
-        limit: String(validated.limit),
-      });
-      let chats = await executeJxaWithRetry<ChatItem[]>(
-        script,
-        15000,
-        'Messages',
+      // Search chats by name/participant via SQLite
+      let chats = await listChatsSqlite(
+        validated.limit ?? 50,
+        0,
+        dateRange,
+        validated.search,
       );
       if (validated.enrichContacts !== false) {
         chats = await enrichChatParticipants(chats);
@@ -702,7 +474,7 @@ export async function handleReadMessages(
     }
 
     if (validated.chatId) {
-      let messages = await readMessagesWithFallback(
+      let messages = await readChatMessagesSqlite(
         validated.chatId,
         validated.limit ?? 50,
         validated.offset ?? 0,
@@ -720,8 +492,8 @@ export async function handleReadMessages(
       );
     }
 
-    // List chats — try JXA first, fall back to SQLite
-    let chats = await listChatsWithFallback(
+    // List chats via SQLite
+    let chats = await listChatsSqlite(
       validated.limit ?? 50,
       validated.offset ?? 0,
       dateRange,

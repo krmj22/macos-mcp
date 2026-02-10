@@ -23,41 +23,10 @@ jest.mock('../utils/sqliteMessageReader.js', () => ({
       this.isPermissionError = isPermissionError;
     }
   },
-  readChatMessages: jest.fn().mockRejectedValue(
-    (() => {
-      const e = new Error(
-        'Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
-      );
-      (e as any).name = 'SqliteAccessError';
-      (e as any).isPermissionError = true;
-      return e;
-    })(),
-  ),
-  searchMessages: jest.fn().mockRejectedValue(
-    (() => {
-      const e = new Error('Cannot access Messages database.');
-      (e as any).name = 'SqliteAccessError';
-      (e as any).isPermissionError = true;
-      return e;
-    })(),
-  ),
-  getLastMessage: jest.fn().mockRejectedValue(new Error('no access')),
-  listChats: jest.fn().mockRejectedValue(
-    (() => {
-      const e = new Error('Cannot access Messages database.');
-      (e as any).name = 'SqliteAccessError';
-      (e as any).isPermissionError = true;
-      return e;
-    })(),
-  ),
-  readMessagesByHandles: jest.fn().mockRejectedValue(
-    (() => {
-      const e = new Error('Cannot access Messages database.');
-      (e as any).name = 'SqliteAccessError';
-      (e as any).isPermissionError = true;
-      return e;
-    })(),
-  ),
+  readChatMessages: jest.fn().mockResolvedValue([]),
+  searchMessages: jest.fn().mockResolvedValue([]),
+  listChats: jest.fn().mockResolvedValue([]),
+  readMessagesByHandles: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../utils/errorHandling.js', () => ({
@@ -600,8 +569,8 @@ describe('Messages Handlers', () => {
   });
 
   describe('handleReadMessages', () => {
-    it('lists chats with pagination', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('lists chats via SQLite', async () => {
+      mockListChats.mockResolvedValue([
         {
           id: 'c1',
           name: 'John',
@@ -615,10 +584,11 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Chats');
       expect(getTextContent(result)).toContain('John');
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, undefined, undefined);
     });
 
-    it('reads chat messages', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('reads chat messages via SQLite', async () => {
+      mockReadChatMessages.mockResolvedValue([
         {
           id: 'msg1',
           text: 'Hello',
@@ -631,23 +601,21 @@ describe('Messages Handlers', () => {
       const result = await handleReadMessages({ action: 'read', chatId: 'c1' });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Hello');
+      expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, undefined);
     });
 
-    it('handles chat read error gracefully', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue({
-        error: 'incompatible format',
-      });
+    it('reports error when SQLite fails with permission error', async () => {
+      mockListChats.mockRejectedValue(
+        new MockSqliteAccessError('DB access denied', true),
+      );
 
-      const result = await handleReadMessages({
-        action: 'read',
-        chatId: 'bad',
-      });
+      const result = await handleReadMessages({ action: 'read' });
       expect(result.isError).toBe(true);
-      expect(getTextContent(result)).toContain('Messages database');
+      expect(getTextContent(result)).toContain('Full Disk Access');
     });
 
-    it('searches chats by name', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('searches chats by name via SQLite', async () => {
+      mockListChats.mockResolvedValue([
         {
           id: 'c1',
           name: 'John',
@@ -663,10 +631,12 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Chats matching "John"');
+      // Verify search param was passed to listChats
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, undefined, 'John');
     });
 
-    it('searches messages by content', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('searches messages by content via SQLite', async () => {
+      mockSearchMessages.mockResolvedValue([
         {
           chatId: 'c1',
           chatName: 'John',
@@ -686,58 +656,18 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Messages matching "meet"');
       expect(getTextContent(result)).toContain('John');
+      expect(mockSearchMessages).toHaveBeenCalledWith('meet', 50, undefined);
     });
 
-    it('falls back to SQLite when JXA fails to list chats', async () => {
-      mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
-      mockListChats.mockResolvedValue([
-        {
-          id: 'iMessage;-;+1234567890',
-          name: 'Jane Doe',
-          participants: ['+1234567890'],
-          lastMessage: 'Hello from SQLite',
-          lastDate: '2025-06-01T12:00:00.000Z',
-        },
-      ]);
+    it('does not use JXA for any read operations', async () => {
+      mockListChats.mockResolvedValue([]);
 
-      const result = await handleReadMessages({ action: 'read' });
-      expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('Chats');
-      expect(getTextContent(result)).toContain('Jane Doe');
-      expect(getTextContent(result)).toContain('Hello from SQLite');
-      expect(mockListChats).toHaveBeenCalledWith(50, 0, undefined);
-    });
-
-    it('falls back to SQLite when JXA returns empty chat list', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([]);
-      mockListChats.mockResolvedValue([
-        {
-          id: 'chat123',
-          name: 'Bob',
-          participants: ['bob@example.com'],
-          lastMessage: 'From SQLite',
-          lastDate: '2025-06-01',
-        },
-      ]);
-
-      const result = await handleReadMessages({ action: 'read' });
-      expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('Bob');
-    });
-
-    it('reports error when both JXA and SQLite fail for chat listing', async () => {
-      mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA failed'));
-      mockListChats.mockRejectedValue(
-        new MockSqliteAccessError('DB access denied', true),
-      );
-
-      const result = await handleReadMessages({ action: 'read' });
-      expect(result.isError).toBe(true);
-      expect(getTextContent(result)).toContain('Full Disk Access');
+      await handleReadMessages({ action: 'read' });
+      // JXA executeJxaWithRetry should never be called for reads
+      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
     });
 
     it('passes date range to readChatMessages when filtering by chatId with dates', async () => {
-      // JXA should be skipped when date filtering is active
       mockReadChatMessages.mockResolvedValue([
         {
           id: 'msg1',
@@ -756,9 +686,6 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Hello');
-      // Verify JXA was NOT called (date filtering skips JXA)
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      // Verify SQLite was called with date range
       expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, {
         startDate: '2025-01-01',
         endDate: '2025-01-31',
@@ -786,17 +713,14 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('meeting notes');
-      // Verify JXA was NOT called (date filtering skips JXA)
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      // Verify SQLite was called with date range
       expect(mockSearchMessages).toHaveBeenCalledWith('meeting', 50, {
         startDate: '2025-01-01',
         endDate: undefined,
       });
     });
 
-    it('does not pass date range when no dates specified (chatId path)', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('passes no date range when no dates specified (chatId path)', async () => {
+      mockReadChatMessages.mockResolvedValue([
         {
           id: 'msg1',
           text: 'Hello',
@@ -810,8 +734,7 @@ describe('Messages Handlers', () => {
         action: 'read',
         chatId: 'c1',
       });
-      // JXA should be tried first when no date filtering
-      expect(mockExecuteJxaWithRetry).toHaveBeenCalled();
+      expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, undefined);
     });
 
     it('resolves dateRange shortcut to date filter for chatId path', async () => {
@@ -832,9 +755,6 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Today msg');
-      // dateRange should skip JXA (uses date filtering)
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      // Verify SQLite was called with resolved date range
       expect(mockReadChatMessages).toHaveBeenCalledWith(
         'c1',
         50,
@@ -869,7 +789,6 @@ describe('Messages Handlers', () => {
         endDate: '2025-01-31',
       });
       expect(result.isError).toBe(false);
-      // Verify explicit dates were used, not the resolved dateRange
       expect(mockReadChatMessages).toHaveBeenCalledWith('c1', 50, 0, {
         startDate: '2025-01-01',
         endDate: '2025-01-31',
@@ -896,7 +815,6 @@ describe('Messages Handlers', () => {
         dateRange: 'last_7_days',
       });
       expect(result.isError).toBe(false);
-      // Verify SQLite search was called with resolved date range
       expect(mockSearchMessages).toHaveBeenCalledWith(
         'meeting',
         50,
@@ -930,13 +848,15 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Chats');
       expect(getTextContent(result)).toContain('Jane Doe');
-      // Verify JXA was NOT called (date filtering skips JXA)
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      // Verify SQLite listChats was called with date range
-      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
-        startDate: '2025-01-01',
-        endDate: '2025-01-31',
-      });
+      expect(mockListChats).toHaveBeenCalledWith(
+        50,
+        0,
+        {
+          startDate: '2025-01-01',
+          endDate: '2025-01-31',
+        },
+        undefined,
+      );
     });
 
     it('passes dateRange shortcut to listChats on default path', async () => {
@@ -956,9 +876,6 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Bob');
-      // Verify JXA was NOT called (date filtering skips JXA)
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      // Verify SQLite listChats was called with resolved date range
       expect(mockListChats).toHaveBeenCalledWith(
         50,
         0,
@@ -970,6 +887,7 @@ describe('Messages Handlers', () => {
             /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
           ),
         }),
+        undefined,
       );
     });
 
@@ -983,15 +901,19 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('No chats found');
-      expect(mockExecuteJxaWithRetry).not.toHaveBeenCalled();
-      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
-        startDate: '2020-01-01',
-        endDate: '2020-01-31',
-      });
+      expect(mockListChats).toHaveBeenCalledWith(
+        50,
+        0,
+        {
+          startDate: '2020-01-01',
+          endDate: '2020-01-31',
+        },
+        undefined,
+      );
     });
 
-    it('does not pass date range to listChats when no dates specified', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+    it('passes no date range to listChats when no dates specified', async () => {
+      mockListChats.mockResolvedValue([
         {
           id: 'c1',
           name: 'John',
@@ -1002,8 +924,7 @@ describe('Messages Handlers', () => {
       ]);
 
       await handleReadMessages({ action: 'read' });
-      // JXA should be tried first when no date filtering
-      expect(mockExecuteJxaWithRetry).toHaveBeenCalled();
+      expect(mockListChats).toHaveBeenCalledWith(50, 0, undefined, undefined);
     });
 
     it('explicit dates take precedence over dateRange on default path', async () => {
@@ -1023,11 +944,15 @@ describe('Messages Handlers', () => {
         startDate: '2025-01-01',
         endDate: '2025-01-31',
       });
-      // Explicit dates should be used, not the resolved dateRange
-      expect(mockListChats).toHaveBeenCalledWith(50, 0, {
-        startDate: '2025-01-01',
-        endDate: '2025-01-31',
-      });
+      expect(mockListChats).toHaveBeenCalledWith(
+        50,
+        0,
+        {
+          startDate: '2025-01-01',
+          endDate: '2025-01-31',
+        },
+        undefined,
+      );
     });
   });
 });

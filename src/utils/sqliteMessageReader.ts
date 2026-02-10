@@ -354,43 +354,6 @@ export async function searchMessages(
 }
 
 /**
- * Get the last message for a chat (for enriching chat listings).
- */
-export async function getLastMessage(
-  chatGuid: string,
-): Promise<{ text: string; date: string } | null> {
-  const escapedId = chatGuid.replace(/'/g, "''");
-  const query = `
-    SELECT m.text, m.date,
-           hex(m.attributedBody) as attributedBody_hex,
-           (SELECT COUNT(*) FROM message_attachment_join maj WHERE maj.message_id = m.ROWID) as attachment_count
-    FROM message m
-    JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
-    JOIN chat c ON c.ROWID = cmj.chat_id
-    WHERE c.guid = '${escapedId}'
-    ORDER BY m.date DESC
-    LIMIT 1
-  `;
-  const output = await runSqlite(query, 5000);
-  const rows = parseSqliteJson<{
-    text: string | null;
-    date: number;
-    attributedBody_hex: string | null;
-    attachment_count: number;
-  }>(output);
-  if (rows.length === 0) return null;
-  const text = getMessageText(
-    rows[0].text,
-    rows[0].attributedBody_hex,
-    rows[0].attachment_count,
-  );
-  return {
-    text: text.substring(0, 100),
-    date: appleTimestampToISO(rows[0].date),
-  };
-}
-
-/**
  * List all chats from the Messages database.
  * Returns chats with their last message and participants.
  * When dateRange is provided, only returns chats that have messages within
@@ -401,8 +364,25 @@ export async function listChats(
   limit: number,
   offset: number,
   dateRange?: DateRange,
+  search?: string,
 ): Promise<ReadChatResult[]> {
   const dateFilter = buildDateFilter(dateRange);
+
+  // Build optional search filter for chat name or participant handle
+  let searchFilter = '';
+  if (search) {
+    const escapedSearch = search.replace(/'/g, "''").toLowerCase();
+    searchFilter = `
+    AND (
+      LOWER(COALESCE(c.display_name, '')) LIKE '%${escapedSearch}%'
+      OR EXISTS (
+        SELECT 1 FROM chat_handle_join chj
+        JOIN handle h ON h.ROWID = chj.handle_id
+        WHERE chj.chat_id = c.ROWID
+        AND LOWER(h.id) LIKE '%${escapedSearch}%'
+      )
+    )`;
+  }
 
   // Query chats with their last message and participant handles.
   // When date filtering is active, subqueries also apply the date filter
@@ -456,6 +436,7 @@ export async function listChats(
       ) as last_date
     FROM chat c
     WHERE last_date IS NOT NULL
+    ${searchFilter}
     ORDER BY last_date DESC
     LIMIT ${limit} OFFSET ${offset}
   `;

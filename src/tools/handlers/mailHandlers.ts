@@ -199,6 +199,10 @@ const SEARCH_MAIL_BY_SENDERS_SCRIPT = `
   const limit = {{limit}};
   const emails = [%%emailsList%%];
   const emailsLower = emails.map(e => e.toLowerCase());
+  const skipMailboxes = new Set([
+    "Trash", "Junk", "Deleted Messages",
+    "Sent Messages", "Sent", "Drafts"
+  ]);
 
   // Helper to check if sender matches any email
   function senderMatches(sender) {
@@ -214,6 +218,7 @@ const SEARCH_MAIL_BY_SENDERS_SCRIPT = `
   for (let a = 0; a < accounts.length && result.length < limit; a++) {
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length && result.length < limit; b++) {
+      if (skipMailboxes.has(mailboxes[b].name())) continue;
       const msgs = mailboxes[b].messages();
       if (!msgs) continue;
       const searchLimit = Math.min(msgs.length, 500); // Limit per mailbox for performance
