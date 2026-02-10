@@ -15,17 +15,17 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 
 ## Tools
 
-| Tool | Backend | Actions | Status |
-|------|---------|---------|--------|
-| `reminders_tasks` | EventKit/Swift | read, create, update, delete | Working |
-| `reminders_lists` | EventKit/Swift | read, create, update, delete | Working |
-| `calendar_events` | EventKit/Swift | read, create, update, delete | Working |
-| `calendar_calendars` | EventKit/Swift | read | Working |
-| `notes_items` | JXA | read, create, update, delete, append | Working |
-| `notes_folders` | JXA | read, create | Working (no delete via API) |
-| `mail_messages` | JXA | read, create (draft), update, delete | Working |
-| `messages_chat` | SQLite + JXA | read, create (send) | Working |
-| `contacts_people` | JXA | read, search, create, update, delete | Working |
+| Tool | Backend | Actions | E2E Status |
+|------|---------|---------|------------|
+| `reminders_tasks` | EventKit/Swift | read, create, update, delete | ALL PASS (<1s) |
+| `reminders_lists` | EventKit/Swift | read, create, update, delete | ALL PASS (<400ms) |
+| `calendar_events` | EventKit/Swift | read, create, update, delete | 20/21 — read-by-ID broken (#73) |
+| `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
+| `notes_items` | JXA | read, create, update, delete, append | 16/17 — move-to-folder broken (#74), search 24s (#78) |
+| `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
+| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — inbox/search/delete TIMEOUT 60s (#76) |
+| `messages_chat` | SQLite + JXA | read, create (send) | 3/13 — enrichment TIMEOUT 60s (#75) |
+| `contacts_people` | JXA | read, search, create, update, delete | 12/14 — search TIMEOUT 30s (#77) |
 
 ## Contact Enrichment
 
@@ -67,35 +67,43 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Open Issues
 
-### E2E Test Suite (P0 to P2)
+### E2E Test Results
 
-Execution order: #64-69 parallel, then #70-71 sequential, then #72 informed by results.
+| Issue | Scope | Result | Status |
+|-------|-------|--------|--------|
+| #64 | Reminders — tasks + lists CRUD | 24/24 PASS | CLOSED |
+| #65 | Calendar — CRUD, recurrence, enrichment | 20/21 PASS | Open (bug #73) |
+| #66 | Notes — CRUD, append, search | 16/17 PASS | Open (bugs #74, #78) |
+| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | Open (bug #76) |
+| #68 | Messages — read, search, date filtering | 3/13 PASS | Open (bug #75) |
+| #69 | Contacts — CRUD, search | 12/14 PASS | Open (bug #77) |
+| #70 | Cross-tool intelligence | — | Blocked on #65-69 |
+| #71 | Performance benchmarks | — | Blocked on #65-69 |
+| #72 | Unit test audit | — | P2, after E2E |
 
-| Issue | Scope | Test Cases | Priority |
-|-------|-------|-----------|----------|
-| #64 | Reminders — tasks + lists CRUD | 22 | P0 |
-| #65 | Calendar — CRUD, recurrence, attendee enrichment | 20 | P0 |
-| #66 | Notes — CRUD, append, search | 21 | P0 |
-| #67 | Mail — read, draft, reply, contact enrichment | 18 | P0 |
-| #68 | Messages — read, search, send, date filtering | 19 | P0 |
-| #69 | Contacts — CRUD, search, cross-tool resolution | 15 | P0 |
-| #70 | Cross-tool intelligence — enrichment pipelines | 13 | P1 |
-| #71 | Performance benchmarks and reliability | 14 | P1 |
-| #72 | Unit test audit — redundancy, gaps, optimization | — | P2 |
+### Bug Fixes from E2E (Priority Order)
 
-**Total: ~142 E2E test cases** covering every tool action, edge case, and cross-tool workflow.
+| Issue | Problem | Severity | Fix Complexity |
+|-------|---------|----------|---------------|
+| #75 | Messages enrichment timeout 60s | P0 — blocks #1 use case | Medium (batch/cache enrichment) |
+| #76 | Mail JXA read/search timeout 60s | P0 — blocks #1 use case | Medium (JXA pagination) |
+| #73 | Calendar findEventById unbounded range | P1 — simple fix | Low (add 4yr bounds) |
+| #77 | Contacts search iterates all 30s | P1 — has working pattern | Low (use `whose()`) |
+| #74 | Notes move-to-folder double-escaping | P1 — broken feature | Low (fix sanitization) |
+| #78 | Notes search scans all 24s | P2 — slow but works | Low (use `whose()`) |
 
-## Performance Baselines (from previous smoke tests)
+## E2E Performance Baselines (2026-02-10)
 
-| Tool | Backend | Approx Latency | Notes |
-|------|---------|---------------|-------|
-| Messages | SQLite | ~50-150ms | Fastest — recently refactored |
-| Calendar | EventKit/Swift | ~100ms | Fast |
-| Mail | JXA | ~1.5s | JXA overhead |
-| Reminders | EventKit/Swift | ~1.7s | Includes Swift binary spawn |
-| Notes | JXA | ~2.2s | Slowest — AppleScript overhead |
+| Tool | Backend | CRUD | Search | Default Read | Enrichment |
+|------|---------|------|--------|-------------|------------|
+| Reminders | EventKit/Swift | 42-203ms | 339ms | 981ms (cold), 338ms | N/A |
+| Calendar | EventKit/Swift | 34-72ms | 51ms | **0 events (BUG #73)** | 59-67ms |
+| Notes | JXA | 146-583ms | **24s (BUG #78)** | 2.0s | N/A |
+| Mail | JXA | 563ms-2.5s | **60s TIMEOUT (#76)** | **60s TIMEOUT (#76)** | 1.1-3.6s (w/limit) |
+| Messages | SQLite | N/A (read-only) | 135ms | **60s TIMEOUT (#75)** | **60s TIMEOUT (#75)** |
+| Contacts | JXA | 161-955ms | **30s TIMEOUT (#77)** | 6.4s (slow) | N/A |
 
-Formal benchmarks pending (#71).
+Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
 ## Known Limitations
 
@@ -104,7 +112,9 @@ Formal benchmarks pending (#71).
 - **Calendar recurring delete**: Only removes single occurrence
 - **Mail create**: Creates draft only (user must click Send)
 - **Contacts update**: Basic fields only (name, org, jobTitle, note)
-- **JXA tools**: Slower than EventKit/SQLite due to AppleScript overhead
+- **JXA `collection.method()` is O(n)**: Always use `whose()` predicates for search/filter, never JS iteration
+- **EventKit date range limit**: `predicateForEvents` cannot span >4 years
+- **Contact enrichment at scale**: Per-handle JXA lookups don't scale beyond ~10 participants
 
 ## Infrastructure
 
