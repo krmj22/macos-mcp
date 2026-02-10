@@ -25,16 +25,16 @@ pnpm dev              # Run from source via tsx (stdio only, no build needed)
 | `notes_items` | read, create, update, delete | `search`, `folderId`, `limit`, `offset`, `targetFolderId` | ✅ Working |
 | `notes_folders` | read, create | `name` | ✅ Working (no delete via API) |
 | `mail_messages` | read, create (draft), update, delete | `mailbox`, `replyToId`, `cc`, `bcc` | ✅ Working (creates draft) |
-| `messages_chat` | read, create | `chatId`, `search`, `to` | ✅ Working (SQLite fallback) |
-| `contacts_people` | read, create, delete | `id` | ⚠️ Update/search deferred |
+| `messages_chat` | read, create | `chatId`, `search`, `to`, `dateRange`, `contact` | ✅ Working (SQLite-only reads) |
+| `contacts_people` | read, search, create, update, delete | `id`, `search` | ✅ Working |
 
 Both underscore (`reminders_tasks`) and dot notation (`reminders.tasks`) work.
 
 ## Known Issues & Permissions
 
-### Known Bugs (as of 2026-02-04)
+### Known Bugs (as of 2026-02-10)
 
-Currently no critical bugs. Deferred work tracked in separate issues.
+Currently no critical bugs. E2E test suite tracked in issues #64-72.
 
 ### Minor Issues
 
@@ -42,7 +42,7 @@ Currently no critical bugs. Deferred work tracked in separate issues.
 
 ### Messages JXA Broken (Sonoma+)
 
-JXA `c.messages()` throws "Can't convert types". Server auto-falls back to SQLite at `~/Library/Messages/chat.db`. Requires **Full Disk Access** for the process reading the database:
+JXA `c.messages()` throws "Can't convert types". All message reads use SQLite at `~/Library/Messages/chat.db` (JXA read paths removed in `cee2366`). Requires **Full Disk Access** for the process reading the database:
 - **stdio transport**: Grant Full Disk Access to your terminal app (Terminal, iTerm2, etc.)
 - **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **actual node binary** (not a version manager shim). See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions including troubleshooting.
 
@@ -105,7 +105,8 @@ MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
 MCP server providing native macOS integration via two bridges:
 
 - **EventKit (Swift binary)** — Reminders, Calendar
-- **JXA (JavaScript for Automation)** — Notes, Mail, Messages, Contacts
+- **JXA (JavaScript for Automation)** — Notes, Mail, Contacts (Messages send only)
+- **SQLite** — Messages reads (`~/Library/Messages/chat.db`)
 
 ### Key Files
 

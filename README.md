@@ -9,7 +9,8 @@ A Model Context Protocol (MCP) server for native macOS app integration: **Remind
 The server uses two bridging strategies to communicate with Apple apps:
 
 - **EventKit (Swift binary)** — Reminders and Calendar. A compiled Swift CLI binary performs EventKit operations and returns JSON.
-- **JXA (JavaScript for Automation)** — Notes, Mail, Messages. Scripts run via `osascript -l JavaScript` with template-based parameter interpolation.
+- **JXA (JavaScript for Automation)** — Notes, Mail, Contacts. Scripts run via `osascript -l JavaScript` with template-based parameter interpolation.
+- **SQLite** — Messages reads use `~/Library/Messages/chat.db` directly (JXA message reading is broken on macOS Sonoma+). Sends still use JXA.
 
 ## Features
 
@@ -24,7 +25,7 @@ The server uses two bridging strategies to communicate with Apple apps:
 - Date range and keyword filtering
 
 ### Notes (JXA)
-- Full CRUD for notes
+- Full CRUD for notes with append mode
 - Folder management (list, create)
 - Search by title/content with pagination
 
@@ -37,16 +38,18 @@ The server uses two bridging strategies to communicate with Apple apps:
 - Search by subject, sender, or body content
 
 ### Contacts (JXA)
-- List contacts with pagination
-- Create new contacts with email, phone, address
-- Delete contacts
-- *Note: Update and search have known issues*
+- Full CRUD for contacts (list, search, create, update, delete)
+- Search by name, email, or phone (partial match)
+- Create contacts with email, phone, address, organization
+- Cross-tool contact enrichment: resolves phone numbers and emails to names in Messages, Mail, and Calendar
 
-### Messages (JXA)
+### Messages (SQLite + JXA)
 - List iMessage chats with pagination
 - Read messages from specific chats
 - Send messages to existing chats or new recipients
 - Search chats by name/participant or search message content
+- Date range filtering with shortcuts (today, yesterday, this_week, last_7_days, last_30_days)
+- Contact enrichment: phone numbers automatically resolved to contact names
 
 ## Available MCP Tools
 
@@ -59,8 +62,8 @@ The server uses two bridging strategies to communicate with Apple apps:
 | `notes_items` | Notes | JXA | read, create, update, delete |
 | `notes_folders` | Notes | JXA | read, create |
 | `mail_messages` | Mail | JXA | read, create, update, delete |
-| `messages_chat` | Messages | JXA | read, create |
-| `contacts_people` | Contacts | JXA | read, create, delete |
+| `messages_chat` | Messages | SQLite + JXA | read, create |
+| `contacts_people` | Contacts | JXA | read, search, create, update, delete |
 
 All tools support both underscore (`reminders_tasks`) and dot (`reminders.tasks`) notation.
 
