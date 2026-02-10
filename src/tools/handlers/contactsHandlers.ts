@@ -158,46 +158,37 @@ const GET_CONTACT_SCRIPT = `
 const SEARCH_CONTACTS_SCRIPT = `
 (() => {
   const Contacts = Application("Contacts");
-  const people = Contacts.people();
-  const term = "{{search}}".toLowerCase();
+  const matches = Contacts.people.whose({name: {_contains: "{{search}}"}})();
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  let matched = 0;
-  for (let i = 0; i < people.length && result.length < limit; i++) {
-    const p = people[i];
-    // Only fetch name for initial match check (fast)
-    const name = (p.name() || "").toLowerCase();
-    if (name.includes(term)) {
-      if (matched >= offset) {
-        // Only fetch full details for matches
-        const emails = [];
-        try {
-          const em = p.emails();
-          for (let j = 0; j < em.length; j++) {
-            emails.push({ value: em[j].value(), label: em[j].label() || "" });
-          }
-        } catch(e) {}
-        const phones = [];
-        try {
-          const ph = p.phones();
-          for (let j = 0; j < ph.length; j++) {
-            phones.push({ value: ph[j].value(), label: ph[j].label() || "" });
-          }
-        } catch(e) {}
-        result.push({
-          id: p.id(),
-          firstName: p.firstName() || "",
-          lastName: p.lastName() || "",
-          fullName: p.name() || "",
-          organization: p.organization() || "",
-          emails: emails,
-          phones: phones,
-          addresses: []
-        });
+  const end = Math.min(matches.length, offset + limit);
+  for (let i = offset; i < end; i++) {
+    const p = matches[i];
+    const emails = [];
+    try {
+      const em = p.emails();
+      for (let j = 0; j < em.length; j++) {
+        emails.push({ value: em[j].value(), label: em[j].label() || "" });
       }
-      matched++;
-    }
+    } catch(e) {}
+    const phones = [];
+    try {
+      const ph = p.phones();
+      for (let j = 0; j < ph.length; j++) {
+        phones.push({ value: ph[j].value(), label: ph[j].label() || "" });
+      }
+    } catch(e) {}
+    result.push({
+      id: p.id(),
+      firstName: p.firstName() || "",
+      lastName: p.lastName() || "",
+      fullName: p.name() || "",
+      organization: p.organization() || "",
+      emails: emails,
+      phones: phones,
+      addresses: []
+    });
   }
   return JSON.stringify(result);
 })()
