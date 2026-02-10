@@ -123,7 +123,7 @@ const UPDATE_NOTE_SCRIPT = `
   const n = notes[0];
   if ("{{hasName}}" === "true") n.name = "{{newName}}";
   if ("{{hasBody}}" === "true") n.body = "{{newBody}}";
-  {{moveToFolder}}
+  %%moveToFolder%%
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
 `;
@@ -139,7 +139,7 @@ const APPEND_NOTE_SCRIPT = `
   const combined = existing + "\\n" + "{{newBody}}";
   if (combined.length > {{maxBodyLength}}) throw new Error("Combined note body exceeds {{maxBodyLength}} characters (existing: " + existing.length + " + new: " + "{{newBody}}".length + " = " + combined.length + ")");
   n.body = combined;
-  {{moveToFolder}}
+  %%moveToFolder%%
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
 `;
@@ -343,7 +343,6 @@ export async function handleUpdateNote(
       id: validated.id,
       hasName: validated.title ? 'true' : 'false',
       newName: validated.title ?? '',
-      moveToFolder,
     };
 
     if (useAppend) {
@@ -354,7 +353,12 @@ export async function handleUpdateNote(
       scriptParams.newBody = validated.body ?? '';
     }
 
-    const script = buildScript(scriptTemplate, scriptParams);
+    // Build script with data fields (sanitized by buildScript)
+    // moveToFolder uses %% placeholder to avoid double-sanitization (contains pre-sanitized JXA code)
+    const script = buildScript(scriptTemplate, scriptParams).replace(
+      '%%moveToFolder%%',
+      moveToFolder,
+    );
     const result = await executeJxa<{
       id: string;
       name: string;
