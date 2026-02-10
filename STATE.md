@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-10
+Last updated: 2026-02-10 (Wave 1 of #65-79 plan complete)
 
 ## Overview
 
@@ -19,13 +19,13 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 |------|---------|---------|------------|
 | `reminders_tasks` | EventKit/Swift | read, create, update, delete | ALL PASS (<1s) |
 | `reminders_lists` | EventKit/Swift | read, create, update, delete | ALL PASS (<400ms) |
-| `calendar_events` | EventKit/Swift | read, create, update, delete | 20/21 — read-by-ID broken (#73) |
+| `calendar_events` | EventKit/Swift | read, create, update, delete | 20/21 — read-by-ID **FIXED** (#73 `be122e7`) |
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
-| `notes_items` | JXA | read, create, update, delete, append | 16/17 — move-to-folder broken (#74), search 24s (#78) |
+| `notes_items` | JXA | read, create, update, delete, append | 16/17 — move-to-folder **FIXED** (#74 `1c61735`), search 24s (#78 open) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
-| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — inbox/search/delete TIMEOUT 60s (#76) |
+| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — inbox/search **FIXED** (#76 `df8bf7a`), needs E2E re-verify |
 | `messages_chat` | SQLite + JXA | read, create (send) | 3/13 — enrichment TIMEOUT 60s (#75) |
-| `contacts_people` | JXA | read, search, create, update, delete | 12/14 — search TIMEOUT 30s (#77) |
+| `contacts_people` | JXA | read, search, create, update, delete | 12/14 — search **FIXED** (#77 `b5c1430`), needs E2E re-verify |
 
 ## Contact Enrichment
 
@@ -40,6 +40,10 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 | Commit | Description |
 |--------|-------------|
+| `be122e7` | **fix(calendar)**: bound findEventById to 4-year date range (fixes #73) |
+| `1c61735` | **fix(notes)**: prevent double-escaping in move-to-folder (fixes #74) |
+| `b5c1430` | **fix(contacts)**: use whose() predicate for search (fixes #77) |
+| `df8bf7a` | **fix(mail)**: SOM-level access + whose() to prevent timeout (fixes #76) |
 | `cee2366` | Removed dead JXA read paths from Messages — SQLite-only now |
 | `62c0cb9` | Guard against null messages() in Mail mailbox iteration |
 | `ac37dcf` | Improved workflow guidance for mail contact and notes append |
@@ -85,23 +89,23 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 | Issue | Problem | Severity | Fix Complexity |
 |-------|---------|----------|---------------|
-| #75 | Messages enrichment timeout 60s | P0 — blocks #1 use case | Medium (batch/cache enrichment) |
-| #76 | Mail JXA read/search timeout 60s | P0 — blocks #1 use case | Medium (JXA pagination) |
-| #73 | Calendar findEventById unbounded range | P1 — simple fix | Low (add 4yr bounds) |
-| #77 | Contacts search iterates all 30s | P1 — has working pattern | Low (use `whose()`) |
-| #74 | Notes move-to-folder double-escaping | P1 — broken feature | Low (fix sanitization) |
-| #78 | Notes search scans all 24s | P2 — slow but works | Low (use `whose()`) |
+| #73 | Calendar findEventById unbounded range | ~~P1~~ | **FIXED** `be122e7` — 4yr bounded date range |
+| #74 | Notes move-to-folder double-escaping | ~~P1~~ | **FIXED** `1c61735` — %%placeholder%% pattern |
+| #76 | Mail JXA read/search timeout 60s | ~~P0~~ | **FIXED** `df8bf7a` — SOM-level access + whose() |
+| #77 | Contacts search iterates all 30s | ~~P1~~ | **FIXED** `b5c1430` — whose() predicate |
+| #75 | Messages enrichment timeout 60s | P0 — blocks #1 use case | **OPEN** — Wave 2 |
+| #78 | Notes search scans all 24s | P2 — slow but works | **OPEN** — Wave 2 |
 
 ## E2E Performance Baselines (2026-02-10)
 
 | Tool | Backend | CRUD | Search | Default Read | Enrichment |
 |------|---------|------|--------|-------------|------------|
 | Reminders | EventKit/Swift | 42-203ms | 339ms | 981ms (cold), 338ms | N/A |
-| Calendar | EventKit/Swift | 34-72ms | 51ms | **0 events (BUG #73)** | 59-67ms |
-| Notes | JXA | 146-583ms | **24s (BUG #78)** | 2.0s | N/A |
-| Mail | JXA | 563ms-2.5s | **60s TIMEOUT (#76)** | **60s TIMEOUT (#76)** | 1.1-3.6s (w/limit) |
-| Messages | SQLite | N/A (read-only) | 135ms | **60s TIMEOUT (#75)** | **60s TIMEOUT (#75)** |
-| Contacts | JXA | 161-955ms | **30s TIMEOUT (#77)** | 6.4s (slow) | N/A |
+| Calendar | EventKit/Swift | 34-72ms | 51ms | FIXED (#73) — needs re-baseline | 59-67ms |
+| Notes | JXA | 146-583ms | **24s (BUG #78 open)** | 2.0s | N/A |
+| Mail | JXA | 563ms-2.5s | FIXED (#76) — needs re-baseline | FIXED (#76) — needs re-baseline | 1.1-3.6s (w/limit) |
+| Messages | SQLite | N/A (read-only) | 135ms | **60s TIMEOUT (#75 open)** | **60s TIMEOUT (#75 open)** |
+| Contacts | JXA | 161-955ms | FIXED (#77) — needs re-baseline | 6.4s (slow) | N/A |
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
