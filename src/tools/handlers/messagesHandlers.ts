@@ -158,9 +158,36 @@ interface SearchMessageResult {
 
 // --- Contact Enrichment ---
 
+/** Max unique handles to enrich per request (prevents timeout with large chat lists) */
+const MAX_ENRICHMENT_HANDLES = 20;
+
+/** Timeout for enrichment operations (ms) */
+const ENRICHMENT_TIMEOUT_MS = 5000;
+
+/**
+ * Wraps a promise with a timeout. Returns the result or falls back to the
+ * fallback value if the operation exceeds the timeout.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 /**
  * Enriches messages with contact names instead of phone numbers.
  * Only enriches incoming messages (not isFromMe) with known senders.
+ * Caps at MAX_ENRICHMENT_HANDLES and ENRICHMENT_TIMEOUT_MS.
  */
 async function enrichMessagesWithContacts(
   messages: MessageItem[],
@@ -174,7 +201,12 @@ async function enrichMessagesWithContacts(
   ];
   if (handles.length === 0) return messages;
 
-  const resolved = await contactResolver.resolveBatch(handles);
+  const cappedHandles = handles.slice(0, MAX_ENRICHMENT_HANDLES);
+  const resolved = await withTimeout(
+    contactResolver.resolveBatch(cappedHandles),
+    ENRICHMENT_TIMEOUT_MS,
+    new Map(),
+  );
   return messages.map((m) => ({
     ...m,
     sender:
@@ -186,6 +218,7 @@ async function enrichMessagesWithContacts(
 
 /**
  * Enriches search results with contact names.
+ * Caps at MAX_ENRICHMENT_HANDLES and ENRICHMENT_TIMEOUT_MS.
  */
 async function enrichSearchMessagesWithContacts(
   messages: SearchMessageResult[],
@@ -199,7 +232,12 @@ async function enrichSearchMessagesWithContacts(
   ];
   if (handles.length === 0) return messages;
 
-  const resolved = await contactResolver.resolveBatch(handles);
+  const cappedHandles = handles.slice(0, MAX_ENRICHMENT_HANDLES);
+  const resolved = await withTimeout(
+    contactResolver.resolveBatch(cappedHandles),
+    ENRICHMENT_TIMEOUT_MS,
+    new Map(),
+  );
   return messages.map((m) => ({
     ...m,
     sender:
@@ -237,7 +275,12 @@ async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
   const handles = [...new Set(chats.flatMap((c) => c.participants || []))];
   if (handles.length === 0) return chats;
 
-  const resolved = await contactResolver.resolveBatch(handles);
+  const cappedHandles = handles.slice(0, MAX_ENRICHMENT_HANDLES);
+  const resolved = await withTimeout(
+    contactResolver.resolveBatch(cappedHandles),
+    ENRICHMENT_TIMEOUT_MS,
+    new Map(),
+  );
   return chats.map((c) => ({
     ...c,
     participants: c.participants?.map((p) => {
