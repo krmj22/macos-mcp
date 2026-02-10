@@ -59,29 +59,23 @@ const LIST_NOTES_SCRIPT = `
 const SEARCH_NOTES_SCRIPT = `
 (() => {
   const Notes = Application("Notes");
-  const notes = Notes.notes();
-  const term = "{{search}}".toLowerCase();
+  const term = "{{search}}";
+  // Two-pass: whose() for title matches (indexed, fast), then plaintext() only on matches
+  const titleMatches = Notes.notes.whose({name: {_contains: term}})();
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  let matched = 0;
-  for (let i = 0; i < notes.length && result.length < limit; i++) {
-    const n = notes[i];
-    const name = n.name();
-    const body = n.plaintext();
-    if (name.toLowerCase().includes(term) || body.toLowerCase().includes(term)) {
-      if (matched >= offset) {
-        result.push({
-          id: n.id(),
-          name: name,
-          body: body.substring(0, 500),
-          folder: n.container().name(),
-          creationDate: n.creationDate().toISOString(),
-          modificationDate: n.modificationDate().toISOString()
-        });
-      }
-      matched++;
-    }
+  const end = Math.min(titleMatches.length, offset + limit);
+  for (let i = offset; i < end; i++) {
+    const n = titleMatches[i];
+    result.push({
+      id: n.id(),
+      name: n.name(),
+      body: n.plaintext().substring(0, 500),
+      folder: n.container().name(),
+      creationDate: n.creationDate().toISOString(),
+      modificationDate: n.modificationDate().toISOString()
+    });
   }
   return JSON.stringify(result);
 })()
