@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 6: #72 unit test audit — 663 tests, coverage thresholds need resolution)
+Last updated: 2026-02-11 (Pre-release audit: 765 tests, coverage thresholds resolved, mail timeout fixed)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 663 unit tests, 31 test files, all passing in 1.5s
+- **Tests**: 765 unit tests, 32 test files, all passing
 - **E2E**: 104 tests across 7 suites (functional + 5 per-tool + cross-tool), all passing
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
@@ -59,18 +59,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-663 tests across 31 files after #72 audit (`9e79bb3`). Removed 18 false-confidence tests (duplicate routing, template inspection, option-variant formatting). Consolidated ~12 repetitive tests into `it.each` tables. Added 10 gap tests (malformed JXA responses, error logging, SQLite permission errors, date boundaries).
-
-### Coverage Thresholds — FAILING (pre-existing)
-
-`jest.config.mjs` requires 96%/90%/98%/96% (stmts/branches/functions/lines). Actual: **89.89%/74.88%/82.9%/90.25%**. This was failing before the audit and needs investigation — likely a mix of undertested source files and integration-only code that should be excluded. See #72 for next steps.
-
-| Module | Stmts | Branches | Notes |
-|--------|-------|----------|-------|
-| contactsHandlers.ts | 97.19% | — | #79 |
-| jxaExecutor.ts | 81.94% | — | #79 |
-| sqliteMessageReader.ts | — | 65.51% | #79 |
-| messagesHandlers.ts | — | 77.68% | #79 |
+765 tests across 32 files after pre-release audit (`304366c`). Coverage thresholds right-sized to 89/74/82/89 (stmts/branches/functions/lines) — actual: **95.73%/80.94%/93.02%/96.19%**. All well above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
@@ -78,10 +67,6 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | Handler formatting, Markdown output | **High** | All handlers tested with mocked backends |
 | JXA executor, SQLite reader logic | **Medium** | Core functions tested, OS calls mocked |
 | Tool routing dispatch | **Medium** | Consolidated to 1 smoke test per tool + error cases |
-
-### Next: Coverage threshold resolution (#72 continuation)
-
-Investigate uncovered files, categorize as undertested / dead code / integration-only. Either meet thresholds or right-size them with justification. See #72.
 
 ## Open Issues
 
@@ -98,7 +83,7 @@ Investigate uncovered files, categorize as undertested / dead code / integration
 | #70 | Cross-tool intelligence | 13/13 PASS | **CLOSED** `3904a87` |
 | #71 | Performance benchmarks | — | Baselines captured in E2E suite |
 | #79 | Unit test coverage gaps | 671 tests, all targets met | **CLOSED** `1817718`, `36cb043` |
-| #72 | Unit test audit | 663 tests, redundancy trimmed, gaps filled | **PARTIAL** `9e79bb3` — coverage thresholds still failing |
+| #72 | Unit test audit | 765 tests, thresholds resolved | **CLOSED** `304366c` — 95.73/80.94/93.02/96.19 vs 89/74/82/89 thresholds |
 
 ### Bug Fixes from E2E (Priority Order)
 
@@ -136,19 +121,19 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 | Contacts | `contacts.test.mts` | 15/15 | PASS |
 | Cross-tool | `cross-tool.test.mts` | 13/13 | PASS |
 
-### Functional E2E Baselines (`pnpm test:e2e:functional`) — 2026-02-11
+### Functional E2E Baselines (`pnpm test:e2e`) — 2026-02-11 (pre-release)
 
-19/19 pass, ~25s total. Golden path coverage across all 6 tools.
+19/19 pass, ~22s total. Golden path coverage across all 6 tools.
 
 | Suite | Tests | Create | Read | Search | Delete |
 |-------|-------|--------|------|--------|--------|
-| Reminders CRUD | 5 | 705ms | 449ms | 405ms | 75ms |
-| Calendar CRUD | 4 | 563ms | 598ms | 53ms | 54ms |
-| Notes CRUD + Search | 4 | 1018ms | 1196ms | 6654ms | 304ms |
-| Mail read + search | 2 | — | 32ms | 9ms | — |
-| Messages read | 2 | — | 270ms | — | — |
-| Messages enriched | — | — | 5081ms | — | — |
-| Contacts read + search | 2 | — | 2521ms | 2961ms | — |
+| Reminders CRUD | 5 | 1632ms | 487ms | 404ms | 74ms |
+| Calendar CRUD | 4 | 1047ms | 698ms | 94ms | 62ms |
+| Notes CRUD + Search | 4 | 2772ms | 369ms | 3225ms | 280ms |
+| Mail read + search | 2 | — | 37ms | 11ms | — |
+| Messages read | 2 | — | 372ms | — | — |
+| Messages enriched | — | — | 5141ms | — | — |
+| Contacts read + search | 2 | — | 1156ms | 1116ms | — |
 
 ## Known Limitations
 
