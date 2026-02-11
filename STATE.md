@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 3-4 complete: E2E suite + Gmail labels fix for all mailboxes)
+Last updated: 2026-02-11 (Wave 3 complete: all per-tool E2E + cross-tool intelligence verified)
 
 ## Overview
 
@@ -9,7 +9,8 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 552 unit tests, 28 test files, 96% statement coverage, all passing in 1.5s
+- **Tests**: 564 unit tests, 29 test files, 96% statement coverage, all passing in 1.6s
+- **E2E**: 104 tests across 7 suites (functional + 5 per-tool + cross-tool), all passing
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
 
@@ -76,12 +77,12 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | Issue | Scope | Result | Status |
 |-------|-------|--------|--------|
 | #64 | Reminders — tasks + lists CRUD | 24/24 PASS | CLOSED |
-| #65 | Calendar — CRUD, recurrence, enrichment | 21/21 PASS | Bugs fixed, needs re-verify to close |
-| #66 | Notes — CRUD, append, search | 17/17 PASS | Bugs fixed, needs re-verify to close |
-| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | #76 fixed, Gmail inbox fixed, needs re-verify |
-| #68 | Messages — read, search, date filtering | 13/13 PASS | Bug fixed, needs re-verify to close |
-| #69 | Contacts — CRUD, search | 14/14 PASS | Bug fixed, needs re-verify to close |
-| #70 | Cross-tool intelligence | — | Blocked on #65-69 |
+| #65 | Calendar — CRUD, recurrence, enrichment | 20/20 PASS | **CLOSED** `dcb2e31` |
+| #66 | Notes — CRUD, append, search | 21/21 PASS | **CLOSED** `5116908` |
+| #67 | Mail — read, draft, reply, enrichment | 18/18 PASS | **CLOSED** `dd13835` |
+| #68 | Messages — read, search, date filtering | 17/17 PASS (+2 send skipped) | **CLOSED** `3b95672` |
+| #69 | Contacts — CRUD, search | 15/15 PASS | **CLOSED** `cf978b0` |
+| #70 | Cross-tool intelligence | 13/13 PASS | **CLOSED** `3904a87` |
 | #71 | Performance benchmarks | — | Baselines captured in E2E suite |
 | #72 | Unit test audit | — | P2, after E2E |
 
@@ -109,7 +110,19 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
-### Functional E2E Suite (`pnpm test:e2e:functional`) — 2026-02-11
+### Per-Tool E2E Suites (2026-02-11)
+
+| Suite | File | Tests | Status |
+|-------|------|-------|--------|
+| Functional (golden path) | `functional.test.mts` | 19/19 | PASS |
+| Calendar | `calendar.test.mts` | 20/20 | PASS |
+| Notes | `notes.test.mts` | 21/21 | PASS |
+| Mail | `mail.test.mts` | 18/18 | PASS |
+| Messages | `messages.test.mts` | 17/17 (+2 skipped) | PASS |
+| Contacts | `contacts.test.mts` | 15/15 | PASS |
+| Cross-tool | `cross-tool.test.mts` | 13/13 | PASS |
+
+### Functional E2E Baselines (`pnpm test:e2e:functional`) — 2026-02-11
 
 19/19 pass, ~25s total. Golden path coverage across all 6 tools.
 
