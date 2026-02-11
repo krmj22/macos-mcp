@@ -343,8 +343,12 @@ export async function getMessageById(
 }
 
 /**
- * Lists messages from a specific mailbox by name.
- * Resolves mailbox name to URL using listMailboxes().
+ * Lists messages from a specific mailbox.
+ *
+ * Checks two sources:
+ * 1. Messages directly in the mailbox (non-Gmail accounts)
+ * 2. Messages labeled with this mailbox via the `labels` table (Gmail stores
+ *    all messages in "All Mail" and uses labels for folder membership)
  */
 export async function listMailboxMessages(
   mailboxUrl: string,
@@ -355,7 +359,14 @@ export async function listMailboxMessages(
   const query = `
     ${BASE_SELECT}
     WHERE m.deleted = 0
-    AND mb.url = '${escaped}'
+    AND (
+      mb.url = '${escaped}'
+      OR m.ROWID IN (
+        SELECT l.message_id FROM labels l
+        JOIN mailboxes lmb ON l.mailbox_id = lmb.ROWID
+        WHERE lmb.url = '${escaped}'
+      )
+    )
     ORDER BY m.date_received DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
