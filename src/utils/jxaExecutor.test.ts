@@ -1,15 +1,32 @@
 /**
  * jxaExecutor.test.ts
  * Tests for JXA executor utility functions: sanitizeForJxa, buildScript,
- * detectPermissionError, and executeJxaWithRetry logic.
+ * detectPermissionError, executeJxa, and executeJxaWithRetry.
  */
 
+import type { ExecFileException } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import {
   buildScript,
   detectPermissionError,
+  executeJxa,
+  executeJxaWithRetry,
   JxaError,
   sanitizeForJxa,
 } from './jxaExecutor.js';
+
+jest.mock('node:child_process');
+
+type ExecFileCallback =
+  | ((
+      error: ExecFileException | null,
+      stdout: string | Buffer,
+      stderr: string | Buffer,
+    ) => void)
+  | null
+  | undefined;
+
+const mockExecFile = execFile as jest.MockedFunction<typeof execFile>;
 
 describe('sanitizeForJxa', () => {
   it('escapes backslashes', () => {
@@ -193,5 +210,208 @@ describe('JxaError', () => {
   it('defaults stderr to undefined', () => {
     const err = new JxaError('msg', 'Mail', false);
     expect(err.stderr).toBeUndefined();
+  });
+});
+
+describe('executeJxa', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default: mock returns a child-like object with on()
+    mockExecFile.mockImplementation((..._args: unknown[]) => {
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+  });
+
+  it('returns parsed JSON on successful execution', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(null, '{"result": "ok"}', '');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    const result = await executeJxa<{ result: string }>(
+      'JSON.stringify({result: "ok"})',
+      10000,
+      'Notes',
+    );
+    expect(result).toEqual({ result: 'ok' });
+  });
+
+  it('returns undefined for empty stdout', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(null, '  \n  ', '');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    const result = await executeJxa('somescript', 10000, 'Notes');
+    expect(result).toBeUndefined();
+  });
+
+  it('returns raw string for non-JSON output', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(null, 'plain text output', '');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    const result = await executeJxa<string>('somescript', 10000, 'Notes');
+    expect(result).toBe('plain text output');
+  });
+
+  it('rejects with JxaError on execution error', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(new Error('Command failed') as ExecFileException, '', 'syntax error');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    await expect(executeJxa('bad script', 10000, 'Notes')).rejects.toThrow(
+      /JXA execution failed for Notes/,
+    );
+  });
+
+  it('rejects with permission JxaError when stderr indicates permission error', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(
+        new Error('failed') as ExecFileException,
+        '',
+        'not allowed to send Apple events',
+      );
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    try {
+      await executeJxa('script', 10000, 'Notes');
+      fail('Expected JxaError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(JxaError);
+      expect((err as JxaError).isPermissionError).toBe(true);
+    }
+  });
+
+  it('rejects when child process emits error event', async () => {
+    mockExecFile.mockImplementation((..._args: unknown[]) => {
+      const handlers: Record<string, Function> = {};
+      const child = {
+        on: (event: string, handler: Function) => {
+          handlers[event] = handler;
+          // Fire error immediately for the 'error' event listener
+          if (event === 'error') {
+            setTimeout(() => handler(new Error('spawn ENOENT')), 0);
+          }
+        },
+      };
+      return child as unknown as ReturnType<typeof execFile>;
+    });
+
+    await expect(executeJxa('script', 10000, 'Notes')).rejects.toThrow(
+      /Failed to start osascript/,
+    );
+  });
+});
+
+describe('executeJxaWithRetry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns result on first successful attempt', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(null, '{"ok":true}', '');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    const result = await executeJxaWithRetry<{ ok: boolean }>(
+      'script',
+      10000,
+      'Notes',
+      2,
+      10,
+    );
+    expect(result).toEqual({ ok: true });
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries on transient error and succeeds', async () => {
+    let calls = 0;
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      calls++;
+      const cb = args[3] as ExecFileCallback;
+      if (calls === 1) {
+        cb?.(
+          new Error('connection invalid') as ExecFileException,
+          '',
+          'connection invalid',
+        );
+      } else {
+        cb?.(null, '{"retried":true}', '');
+      }
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    const result = await executeJxaWithRetry<{ retried: boolean }>(
+      'script',
+      10000,
+      'Notes',
+      2,
+      10,
+    );
+    expect(result).toEqual({ retried: true });
+    expect(calls).toBe(2);
+  });
+
+  it('does not retry permission errors', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(new Error('failed') as ExecFileException, '', 'not allowed');
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    try {
+      await executeJxaWithRetry('script', 10000, 'Notes', 2, 10);
+      fail('Expected permission error');
+    } catch (err) {
+      expect(err).toBeInstanceOf(JxaError);
+      expect((err as JxaError).isPermissionError).toBe(true);
+    }
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws after max retries exhausted on transient errors', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(
+        new Error('connection invalid') as ExecFileException,
+        '',
+        'connection invalid',
+      );
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    await expect(
+      executeJxaWithRetry('script', 10000, 'Notes', 1, 10),
+    ).rejects.toThrow(/JXA execution failed/);
+    // 1 initial + 1 retry = 2 calls
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws immediately for non-transient errors', async () => {
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[3] as ExecFileCallback;
+      cb?.(
+        new Error('syntax error in script') as ExecFileException,
+        '',
+        'syntax error',
+      );
+      return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
+    });
+
+    await expect(
+      executeJxaWithRetry('script', 10000, 'Notes', 2, 10),
+    ).rejects.toThrow(/JXA execution failed/);
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
   });
 });

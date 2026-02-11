@@ -1207,6 +1207,95 @@ describe('Messages Handlers', () => {
       expect(result.isError).toBe(true);
       expect(getTextContent(result)).toContain('database is locked');
     });
+
+    it('handles SQLite permission error on search messages path', async () => {
+      mockSearchMessages.mockRejectedValue(
+        new MockSqliteAccessError('authorization denied', true),
+      );
+
+      const result = await handleReadMessages({
+        action: 'read',
+        search: 'test',
+        searchMessages: true,
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('Full Disk Access');
+    });
+
+    it('handles SQLite permission error on readMessagesByHandles path', async () => {
+      mockResolveNameToHandles.mockResolvedValue({
+        phones: ['+15551234567'],
+        emails: [],
+      });
+      mockReadMessagesByHandles.mockRejectedValue(
+        new MockSqliteAccessError('authorization denied', true),
+      );
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'John',
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('Full Disk Access');
+    });
+
+    it('re-throws non-ContactSearchError from contact resolver', async () => {
+      mockResolveNameToHandles.mockRejectedValue(new Error('unexpected'));
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'Broken',
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('unexpected');
+    });
+  });
+
+  describe('handleCreateMessage', () => {
+    let handleCreateMessage: typeof import('./handlers/messagesHandlers.js').handleCreateMessage;
+
+    beforeAll(async () => {
+      const mod = await import('./handlers/messagesHandlers.js');
+      handleCreateMessage = mod.handleCreateMessage;
+    });
+
+    it('sends message to chat via JXA', async () => {
+      mockExecuteJxa.mockResolvedValue({ sent: true });
+
+      const result = await handleCreateMessage({
+        action: 'create',
+        chatId: 'iMessage;-;+1234',
+        text: 'Hello!',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully sent message');
+      expect(mockExecuteJxa).toHaveBeenCalled();
+    });
+
+    it('sends message to phone/email via AppleScript', async () => {
+      const mockExecuteAppleScript = jest.requireMock(
+        '../utils/jxaExecutor.js',
+      ).executeAppleScript as jest.Mock;
+      mockExecuteAppleScript.mockResolvedValue('');
+
+      const result = await handleCreateMessage({
+        action: 'create',
+        to: '+15551234567',
+        text: 'Hello!',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully sent message to +15551234567');
+      expect(mockExecuteAppleScript).toHaveBeenCalled();
+    });
+
+    it('errors when neither to nor chatId provided', async () => {
+      const result = await handleCreateMessage({
+        action: 'create',
+        text: 'Hello!',
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('"to" or "chatId" is required');
+    });
   });
 });
 

@@ -1,13 +1,24 @@
 /**
  * sqliteMessageReader.test.ts
- * Tests for date filtering in SQLite message queries
+ * Tests for date filtering and reader functions in SQLite message queries
  */
 
+import { execFile } from 'node:child_process';
 import {
   buildDateFilter,
   type DateRange,
   dateToAppleTimestamp,
+  listChats,
+  readChatMessages,
+  readMessagesByHandles,
+  searchMessages,
+  SqliteAccessError,
 } from './sqliteMessageReader.js';
+
+jest.mock('node:child_process');
+
+// biome-ignore lint: simplified mock type for test helpers
+const mockExecFile = execFile as any as jest.Mock;
 
 // Apple epoch: 2001-01-01T00:00:00Z
 const APPLE_EPOCH_MS = new Date('2001-01-01T00:00:00Z').getTime();
@@ -207,6 +218,291 @@ describe('sqliteMessageReader date utilities', () => {
       const dateRange: DateRange = { startDate: '2025-01-01T00:00:00Z' };
       const result = buildDateFilter(dateRange, 'm');
       expect(result).toContain('m.date >=');
+    });
+  });
+});
+
+describe('sqliteMessageReader reader functions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function mockSqliteSuccess(output: string) {
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+        cb(null, output, '');
+      },
+    );
+  }
+
+  function mockSqliteError(message: string, stderr = '') {
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+        cb(new Error(message), '', stderr);
+      },
+    );
+  }
+
+  describe('listChats', () => {
+    it('returns parsed chat list', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            chat_guid: 'iMessage;-;+1234',
+            display_name: 'John',
+            participants: '+1234',
+            last_message: 'Hi',
+            last_message_attr_hex: null,
+            last_message_attach_count: 0,
+            last_date: 757382400000000000, // some Apple timestamp
+          },
+        ]),
+      );
+
+      const result = await listChats(10, 0);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('iMessage;-;+1234');
+      expect(result[0].name).toBe('John');
+      expect(result[0].lastMessage).toBe('Hi');
+    });
+
+    it('returns empty array for empty output', async () => {
+      mockSqliteSuccess('');
+      const result = await listChats(10, 0);
+      expect(result).toEqual([]);
+    });
+
+    it('throws SqliteAccessError on permission error', async () => {
+      mockSqliteError('unable to open database', 'unable to open database file');
+      await expect(listChats(10, 0)).rejects.toThrow(SqliteAccessError);
+      try {
+        await listChats(10, 0);
+      } catch (err) {
+        expect((err as InstanceType<typeof SqliteAccessError>).isPermissionError).toBe(true);
+      }
+    });
+
+    it('throws SqliteAccessError on non-permission error', async () => {
+      mockSqliteError('database is locked', 'database is locked');
+      await expect(listChats(10, 0)).rejects.toThrow(SqliteAccessError);
+      try {
+        await listChats(10, 0);
+      } catch (err) {
+        expect((err as InstanceType<typeof SqliteAccessError>).isPermissionError).toBe(false);
+      }
+    });
+
+    it('handles chat with no display name (uses participants)', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            chat_guid: 'iMessage;-;+5551234567',
+            display_name: '',
+            participants: '+5551234567',
+            last_message: 'Hello',
+            last_message_attr_hex: null,
+            last_message_attach_count: 0,
+            last_date: 757382400000000000,
+          },
+        ]),
+      );
+
+      const result = await listChats(10, 0);
+      expect(result[0].name).toBe('+5551234567');
+    });
+
+    it('handles chat with no participants and no display name', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            chat_guid: 'iMessage;-;+999',
+            display_name: '',
+            participants: null,
+            last_message: null,
+            last_message_attr_hex: null,
+            last_message_attach_count: null,
+            last_date: 757382400000000000,
+          },
+        ]),
+      );
+
+      const result = await listChats(10, 0);
+      expect(result[0].name).toBe('iMessage;-;+999');
+      expect(result[0].participants).toEqual([]);
+    });
+  });
+
+  describe('readChatMessages', () => {
+    it('returns parsed messages', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: 'Hello',
+            is_from_me: 0,
+            handle_id: '+1234',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 0,
+          },
+        ]),
+      );
+
+      const result = await readChatMessages('chat1', 10, 0);
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe('Hello');
+      expect(result[0].sender).toBe('+1234');
+      expect(result[0].isFromMe).toBe(false);
+    });
+
+    it('returns empty array for empty result', async () => {
+      mockSqliteSuccess('');
+      const result = await readChatMessages('chat1', 10, 0);
+      expect(result).toEqual([]);
+    });
+
+    it('handles malformed JSON output gracefully', async () => {
+      mockSqliteSuccess('not valid json');
+      const result = await readChatMessages('chat1', 10, 0);
+      expect(result).toEqual([]);
+    });
+
+    it('marks sender as "me" for outgoing messages', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: 'Sent',
+            is_from_me: 1,
+            handle_id: '',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 0,
+          },
+        ]),
+      );
+
+      const result = await readChatMessages('chat1', 10, 0);
+      expect(result[0].sender).toBe('me');
+      expect(result[0].isFromMe).toBe(true);
+    });
+
+    it('shows [Attachment] for attachment-only messages', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: null,
+            is_from_me: 0,
+            handle_id: '+1234',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 1,
+          },
+        ]),
+      );
+
+      const result = await readChatMessages('chat1', 10, 0);
+      expect(result[0].text).toBe('[Attachment]');
+    });
+  });
+
+  describe('searchMessages', () => {
+    it('returns search results', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: 'meeting at 5',
+            is_from_me: 0,
+            handle_id: '+1234',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 0,
+            chat_guid: 'chat1',
+            chat_name: 'Work',
+          },
+        ]),
+      );
+
+      const result = await searchMessages('meeting', 10);
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe('meeting at 5');
+      expect(result[0].chatId).toBe('chat1');
+      expect(result[0].chatName).toBe('Work');
+    });
+
+    it('returns empty array for no matches', async () => {
+      mockSqliteSuccess('');
+      const result = await searchMessages('nonexistent', 10);
+      expect(result).toEqual([]);
+    });
+
+    it('uses chat_guid as chatName fallback when chat_name is empty', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: 'hi',
+            is_from_me: 0,
+            handle_id: '+1234',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 0,
+            chat_guid: 'iMessage;-;+1234',
+            chat_name: '',
+          },
+        ]),
+      );
+
+      const result = await searchMessages('hi', 10);
+      expect(result[0].chatName).toBe('iMessage;-;+1234');
+    });
+  });
+
+  describe('readMessagesByHandles', () => {
+    it('returns messages for given handles', async () => {
+      mockSqliteSuccess(
+        JSON.stringify([
+          {
+            ROWID: 1,
+            text: 'From handle',
+            is_from_me: 0,
+            handle_id: '+5551234567',
+            date: 757382400000000000,
+            attributedBody_hex: null,
+            attachment_count: 0,
+            chat_guid: 'chat1',
+            chat_name: 'Someone',
+          },
+        ]),
+      );
+
+      const result = await readMessagesByHandles(['+5551234567'], 10);
+      expect(result).toHaveLength(1);
+      expect(result[0].sender).toBe('+5551234567');
+    });
+
+    it('returns empty array for empty handles', async () => {
+      const result = await readMessagesByHandles([], 10);
+      expect(result).toEqual([]);
+      // Should not even call sqlite
+      expect(mockExecFile).not.toHaveBeenCalled();
+    });
+
+    it('handles email handles with exact match', async () => {
+      mockSqliteSuccess(JSON.stringify([]));
+      await readMessagesByHandles(['user@example.com'], 10);
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+      const queryArg = mockExecFile.mock.calls[0][1][2] as string;
+      expect(queryArg).toContain("h.id = 'user@example.com'");
+    });
+
+    it('handles phone numbers with LIKE suffix match', async () => {
+      mockSqliteSuccess(JSON.stringify([]));
+      await readMessagesByHandles(['+15551234567'], 10);
+      const queryArg = mockExecFile.mock.calls[0][1][2] as string;
+      expect(queryArg).toContain("h.id LIKE '%5551234567'");
     });
   });
 });
