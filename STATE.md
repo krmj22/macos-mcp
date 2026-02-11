@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 1 verified, 5 issues closed)
+Last updated: 2026-02-11 (Wave 3-4 complete: functional E2E suite + Gmail inbox fix)
 
 ## Overview
 
@@ -23,7 +23,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
 | `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
-| `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, JXA writes only (#76 FIXED) |
+| `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, Gmail inbox fixed, JXA writes only (#76 FIXED) |
 | `messages_chat` | SQLite + JXA | read, create (send) | 13/13 — #75 CLOSED (5.3s, was 60s+) |
 | `contacts_people` | JXA | read, search, create, update, delete | 14/14 — #77 CLOSED (570ms, was 30s+) |
 
@@ -78,11 +78,11 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | #64 | Reminders — tasks + lists CRUD | 24/24 PASS | CLOSED |
 | #65 | Calendar — CRUD, recurrence, enrichment | 21/21 PASS | Bugs fixed, needs re-verify to close |
 | #66 | Notes — CRUD, append, search | 17/17 PASS | Bugs fixed, needs re-verify to close |
-| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | Open (#76 still broken) |
+| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | #76 fixed, Gmail inbox fixed, needs re-verify |
 | #68 | Messages — read, search, date filtering | 13/13 PASS | Bug fixed, needs re-verify to close |
 | #69 | Contacts — CRUD, search | 14/14 PASS | Bug fixed, needs re-verify to close |
 | #70 | Cross-tool intelligence | — | Blocked on #65-69 |
-| #71 | Performance benchmarks | — | Blocked on #65-69 |
+| #71 | Performance benchmarks | — | Baselines captured in E2E suite |
 | #72 | Unit test audit | — | P2, after E2E |
 
 ### Bug Fixes from E2E (Priority Order)
@@ -109,14 +109,19 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
-### Functional E2E Suite (`pnpm test:e2e`) — 2026-02-11
+### Functional E2E Suite (`pnpm test:e2e:functional`) — 2026-02-11
 
-| Suite | Tests | Total Time | Create | Read | Delete |
-|-------|-------|-----------|--------|------|--------|
-| Reminders CRUD | 4 | 1.9s | 699ms | 444ms | 141ms |
-| Calendar CRUD | 3 | 2.3s | 1399ms | 811ms | 52ms |
-| Notes CRUD | 3 | 3.6s | 1283ms | 1894ms | 420ms |
-| Messages read | 1 | 0.3s | — | 308ms | — |
+19/19 pass, ~25s total. Golden path coverage across all 6 tools.
+
+| Suite | Tests | Create | Read | Search | Delete |
+|-------|-------|--------|------|--------|--------|
+| Reminders CRUD | 5 | 705ms | 449ms | 405ms | 75ms |
+| Calendar CRUD | 4 | 563ms | 598ms | 53ms | 54ms |
+| Notes CRUD + Search | 4 | 1018ms | 1196ms | 6654ms | 304ms |
+| Mail read + search | 2 | — | 32ms | 9ms | — |
+| Messages read | 2 | — | 270ms | — | — |
+| Messages enriched | — | — | 5081ms | — | — |
+| Contacts read + search | 2 | — | 2521ms | 2961ms | — |
 
 ## Known Limitations
 

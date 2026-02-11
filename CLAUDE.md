@@ -26,6 +26,7 @@ See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, an
 - **Messages**: No delete/edit via JXA or SQLite (Apple API limitation)
 - **Mail create**: Creates draft only — user must click Send in Mail.app
 - **Mail reads**: Use SQLite (`~/Library/Mail/V10/MailData/Envelope Index`), JXA for writes only. See ADR-001 in DECISION.md
+- **Gmail inbox**: Messages live in `[Gmail]/All Mail`, not INBOX. Inbox membership is in the `labels` join table. See ADR-001 addendum
 - **JXA rule**: Always use `whose()` predicates for search, never JS iteration over collections
 
 ### Messages JXA Broken (Sonoma+)

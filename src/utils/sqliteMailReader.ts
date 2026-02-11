@@ -216,7 +216,11 @@ const SKIP_MAILBOXES = `
 
 /**
  * Lists inbox messages sorted by date (most recent first).
- * Matches mailbox URLs ending in /INBOX.
+ *
+ * Checks two sources:
+ * 1. Messages whose mailbox URL ends in /INBOX (non-Gmail accounts)
+ * 2. Messages labeled as INBOX via the `labels` table (Gmail stores messages
+ *    in "All Mail" and uses labels for INBOX membership)
  */
 export async function listInboxMessages(
   limit: number,
@@ -225,7 +229,14 @@ export async function listInboxMessages(
   const query = `
     ${BASE_SELECT}
     WHERE m.deleted = 0
-    AND LOWER(mb.url) LIKE '%/inbox'
+    AND (
+      LOWER(mb.url) LIKE '%/inbox'
+      OR m.ROWID IN (
+        SELECT l.message_id FROM labels l
+        JOIN mailboxes imb ON l.mailbox_id = imb.ROWID
+        WHERE LOWER(imb.url) LIKE '%/inbox'
+      )
+    )
     ORDER BY m.date_received DESC
     LIMIT ${limit} OFFSET ${offset}
   `;

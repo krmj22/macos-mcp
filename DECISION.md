@@ -40,6 +40,20 @@ Use SQLite for all read operations where Apple stores data in an accessible SQLi
 - Message ROWID in SQLite = `m.id()` in JXA — IDs are compatible across backends
 - Hybrid complexity: two code paths per tool (SQLite read + JXA write)
 
+### Addendum: Gmail Labels Table (2026-02-11)
+
+Gmail stores all messages in `[Gmail]/All Mail`, not in the INBOX mailbox. Inbox membership is tracked via the `labels` join table:
+
+```sql
+-- labels schema: message_id (FK messages.ROWID) → mailbox_id (FK mailboxes.ROWID)
+-- Gmail INBOX label = mailbox with url LIKE '%/INBOX'
+SELECT l.message_id FROM labels l
+JOIN mailboxes imb ON l.mailbox_id = imb.ROWID
+WHERE LOWER(imb.url) LIKE '%/inbox'
+```
+
+`listInboxMessages()` now checks both `messages.mailbox` (non-Gmail) and `labels` (Gmail). Without this, Gmail accounts return 0 inbox messages despite Mail.app showing them.
+
 ### References
 
 - `src/utils/sqliteMessageReader.ts` — Messages SQLite reader (established pattern)

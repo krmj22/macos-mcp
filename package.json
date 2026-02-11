@@ -51,6 +51,7 @@
     "dev": "node bin/dev.cjs",
     "test": "NODE_NO_WARNINGS=1 jest",
     "test:e2e": "pnpm build && node --import tsx/esm --test tests/e2e/functional.test.mts",
+    "test:e2e:functional": "pnpm build && node --import tsx/esm --test tests/e2e/functional.test.mts",
     "lint": "pnpm exec biome check --write --unsafe && pnpm exec tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
