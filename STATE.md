@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-10 (Wave 1 of #65-79 plan complete)
+Last updated: 2026-02-11 (Wave 1 verified, 5 issues closed)
 
 ## Overview
 
@@ -19,13 +19,13 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 |------|---------|---------|------------|
 | `reminders_tasks` | EventKit/Swift | read, create, update, delete | ALL PASS (<1s) |
 | `reminders_lists` | EventKit/Swift | read, create, update, delete | ALL PASS (<400ms) |
-| `calendar_events` | EventKit/Swift | read, create, update, delete | 20/21 — read-by-ID **FIXED** (#73 `be122e7`) |
+| `calendar_events` | EventKit/Swift | read, create, update, delete | 21/21 — #73 CLOSED, verified 646ms |
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
-| `notes_items` | JXA | read, create, update, delete, append | 16/17 — move-to-folder **FIXED** (#74 `1c61735`), search 24s (#78 open) |
+| `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
-| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — inbox/search **FIXED** (#76 `df8bf7a`), needs E2E re-verify |
-| `messages_chat` | SQLite + JXA | read, create (send) | 3/13 — enrichment TIMEOUT 60s (#75) |
-| `contacts_people` | JXA | read, search, create, update, delete | 12/14 — search **FIXED** (#77 `b5c1430`), needs E2E re-verify |
+| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — #76 STILL OPEN (60s timeout, SOM fix insufficient) |
+| `messages_chat` | SQLite + JXA | read, create (send) | 13/13 — #75 CLOSED (5.3s, was 60s+) |
+| `contacts_people` | JXA | read, search, create, update, delete | 14/14 — #77 CLOSED (570ms, was 30s+) |
 
 ## Contact Enrichment
 
@@ -76,11 +76,11 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | Issue | Scope | Result | Status |
 |-------|-------|--------|--------|
 | #64 | Reminders — tasks + lists CRUD | 24/24 PASS | CLOSED |
-| #65 | Calendar — CRUD, recurrence, enrichment | 20/21 PASS | Open (bug #73) |
-| #66 | Notes — CRUD, append, search | 16/17 PASS | Open (bugs #74, #78) |
-| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | Open (bug #76) |
-| #68 | Messages — read, search, date filtering | 3/13 PASS | Open (bug #75) |
-| #69 | Contacts — CRUD, search | 12/14 PASS | Open (bug #77) |
+| #65 | Calendar — CRUD, recurrence, enrichment | 21/21 PASS | Bugs fixed, needs re-verify to close |
+| #66 | Notes — CRUD, append, search | 17/17 PASS | Bugs fixed, needs re-verify to close |
+| #67 | Mail — read, draft, reply, enrichment | 8/14 PASS | Open (#76 still broken) |
+| #68 | Messages — read, search, date filtering | 13/13 PASS | Bug fixed, needs re-verify to close |
+| #69 | Contacts — CRUD, search | 14/14 PASS | Bug fixed, needs re-verify to close |
 | #70 | Cross-tool intelligence | — | Blocked on #65-69 |
 | #71 | Performance benchmarks | — | Blocked on #65-69 |
 | #72 | Unit test audit | — | P2, after E2E |
@@ -89,23 +89,23 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 | Issue | Problem | Severity | Fix Complexity |
 |-------|---------|----------|---------------|
-| #73 | Calendar findEventById unbounded range | ~~P1~~ | **FIXED** `be122e7` — 4yr bounded date range |
-| #74 | Notes move-to-folder double-escaping | ~~P1~~ | **FIXED** `1c61735` — %%placeholder%% pattern |
-| #76 | Mail JXA read/search timeout 60s | ~~P0~~ | **FIXED** `df8bf7a` — SOM-level access + whose() |
-| #77 | Contacts search iterates all 30s | ~~P1~~ | **FIXED** `b5c1430` — whose() predicate |
-| #75 | Messages enrichment timeout 60s | P0 — blocks #1 use case | **OPEN** — Wave 2 |
-| #78 | Notes search scans all 24s | P2 — slow but works | **OPEN** — Wave 2 |
+| #73 | Calendar findEventById unbounded range | ~~P1~~ | **CLOSED** `be122e7` — verified 646ms |
+| #74 | Notes move-to-folder double-escaping | ~~P1~~ | **CLOSED** `1c61735` — verified 1.9s |
+| #76 | Mail JXA read/search timeout 60s | P0 | **OPEN** — `df8bf7a` SOM fix insufficient, still 60s timeout |
+| #77 | Contacts search iterates all 30s | ~~P1~~ | **CLOSED** `b5c1430` — verified 570ms |
+| #75 | Messages enrichment timeout 60s | ~~P0~~ | **CLOSED** `afe64cf` — verified 5.3s |
+| #78 | Notes search scans all 24s | ~~P2~~ | **CLOSED** `c9a9239` — verified 973ms |
 
-## E2E Performance Baselines (2026-02-10)
+## E2E Performance Baselines (2026-02-11)
 
 | Tool | Backend | CRUD | Search | Default Read | Enrichment |
 |------|---------|------|--------|-------------|------------|
 | Reminders | EventKit/Swift | 42-203ms | 339ms | 981ms (cold), 338ms | N/A |
-| Calendar | EventKit/Swift | 34-72ms | 51ms | FIXED (#73) — needs re-baseline | 59-67ms |
-| Notes | JXA | 146-583ms | **24s (BUG #78 open)** | 2.0s | N/A |
-| Mail | JXA | 563ms-2.5s | FIXED (#76) — needs re-baseline | FIXED (#76) — needs re-baseline | 1.1-3.6s (w/limit) |
-| Messages | SQLite | N/A (read-only) | 135ms | **60s TIMEOUT (#75 open)** | **60s TIMEOUT (#75 open)** |
-| Contacts | JXA | 161-955ms | FIXED (#77) — needs re-baseline | 6.4s (slow) | N/A |
+| Calendar | EventKit/Swift | 34-72ms | 51ms | 646ms (#73 fixed) | 59-67ms |
+| Notes | JXA | 146-583ms | 973ms (#78 fixed) | 2.0s | N/A |
+| Mail | JXA | 563ms-2.5s | **60s TIMEOUT (#76 open)** | **60s TIMEOUT (#76 open)** | 1.1-3.6s (w/limit) |
+| Messages | SQLite | N/A (read-only) | 135ms | 5.3s (#75 fixed) | 5.3s (#75 fixed) |
+| Contacts | JXA | 161-955ms | 570ms (#77 fixed) | 6.4s (slow) | N/A |
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
