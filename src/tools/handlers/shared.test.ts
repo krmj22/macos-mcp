@@ -4,11 +4,17 @@
  */
 
 jest.mock('../../utils/timezone.js', () => ({
-  getSystemTimezone: jest.fn().mockReturnValue({ name: 'America/New_York', offset: '-05:00' }),
+  getSystemTimezone: jest
+    .fn()
+    .mockReturnValue({ name: 'America/New_York', offset: '-05:00' }),
   formatTimezoneInfo: jest.fn().mockReturnValue('America/New_York (UTC-05:00)'),
 }));
 
-import { formatDeleteMessage, formatListMarkdown, formatSuccessMessage } from './shared.js';
+import {
+  formatDeleteMessage,
+  formatListMarkdown,
+  formatSuccessMessage,
+} from './shared.js';
 
 describe('formatListMarkdown', () => {
   const formatItem = (item: string) => [`- ${item}`];

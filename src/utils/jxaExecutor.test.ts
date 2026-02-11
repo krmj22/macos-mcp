@@ -105,28 +105,19 @@ describe('detectPermissionError', () => {
   });
 
   it('returns JxaError for "permission" pattern', () => {
-    const err = detectPermissionError(
-      'User has not given permission',
-      'Mail',
-    );
+    const err = detectPermissionError('User has not given permission', 'Mail');
     expect(err).toBeInstanceOf(JxaError);
     expect(err?.isPermissionError).toBe(true);
   });
 
   it('returns JxaError for "not authorized" pattern', () => {
-    const err = detectPermissionError(
-      'Application is not authorized',
-      'Notes',
-    );
+    const err = detectPermissionError('Application is not authorized', 'Notes');
     expect(err).not.toBeNull();
     expect(err?.isPermissionError).toBe(true);
   });
 
   it('returns JxaError for "AppleEvent handler failed" pattern', () => {
-    const err = detectPermissionError(
-      'AppleEvent handler failed',
-      'Mail',
-    );
+    const err = detectPermissionError('AppleEvent handler failed', 'Mail');
     expect(err).not.toBeNull();
   });
 
@@ -229,7 +220,11 @@ describe('executeJxa', () => {
   it('rejects with JxaError on execution error', async () => {
     mockExecFile.mockImplementation((...args: unknown[]) => {
       const cb = args[3] as ExecFileCallback;
-      cb?.(new Error('Command failed') as ExecFileException, '', 'syntax error');
+      cb?.(
+        new Error('Command failed') as ExecFileException,
+        '',
+        'syntax error',
+      );
       return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
     });
 
@@ -394,17 +389,27 @@ describe('executeAppleScript', () => {
       cb?.(null, '  result text  \n', '');
       return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
     });
-    const result = await executeAppleScript('tell app "Notes" to count notes', 10000, 'Notes');
+    const result = await executeAppleScript(
+      'tell app "Notes" to count notes',
+      10000,
+      'Notes',
+    );
     expect(result).toBe('result text');
   });
 
   it('rejects with permission JxaError when stderr indicates permission error', async () => {
     mockExecFile.mockImplementation((...args: unknown[]) => {
       const cb = args[3] as ExecFileCallback;
-      cb?.(new Error('failed') as ExecFileException, '', 'not allowed to send Apple events');
+      cb?.(
+        new Error('failed') as ExecFileException,
+        '',
+        'not allowed to send Apple events',
+      );
       return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
     });
-    await expect(executeAppleScript('script', 10000, 'Notes')).rejects.toThrow(/Permission denied/);
+    await expect(executeAppleScript('script', 10000, 'Notes')).rejects.toThrow(
+      /Permission denied/,
+    );
     try {
       await executeAppleScript('script', 10000, 'Notes');
     } catch (err) {
@@ -416,16 +421,24 @@ describe('executeAppleScript', () => {
   it('rejects with JxaError for non-permission errors', async () => {
     mockExecFile.mockImplementation((...args: unknown[]) => {
       const cb = args[3] as ExecFileCallback;
-      cb?.(new Error('syntax error') as ExecFileException, '', 'syntax error in script');
+      cb?.(
+        new Error('syntax error') as ExecFileException,
+        '',
+        'syntax error in script',
+      );
       return { on: jest.fn() } as unknown as ReturnType<typeof execFile>;
     });
-    await expect(executeAppleScript('bad script', 10000, 'Notes')).rejects.toThrow(/AppleScript execution failed/);
+    await expect(
+      executeAppleScript('bad script', 10000, 'Notes'),
+    ).rejects.toThrow(/AppleScript execution failed/);
   });
 
   it('rejects when child process emits error event', async () => {
+    // biome-ignore lint/complexity/noBannedTypes: test helper for mock child process
+    const handlers: Record<string, Function> = {};
     mockExecFile.mockImplementation((..._args: unknown[]) => {
-      const handlers: Record<string, Function> = {};
       const child = {
+        // biome-ignore lint/complexity/noBannedTypes: test helper for mock child process
         on: (event: string, handler: Function) => {
           handlers[event] = handler;
           if (event === 'error') {
@@ -435,7 +448,9 @@ describe('executeAppleScript', () => {
       };
       return child as unknown as ReturnType<typeof execFile>;
     });
-    await expect(executeAppleScript('script', 10000, 'Notes')).rejects.toThrow(/Failed to start osascript/);
+    await expect(executeAppleScript('script', 10000, 'Notes')).rejects.toThrow(
+      /Failed to start osascript/,
+    );
   });
 
   it('passes correct flags to osascript (no -l JavaScript flag)', async () => {

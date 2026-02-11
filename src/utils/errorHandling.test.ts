@@ -198,7 +198,12 @@ describe('ErrorHandling', () => {
 
     it('provides connection invalid hint', async () => {
       const result = await handleAsyncOperation(async () => {
-        throw new JxaError('connection invalid', 'Mail', false, 'connection invalid');
+        throw new JxaError(
+          'connection invalid',
+          'Mail',
+          false,
+          'connection invalid',
+        );
       }, 'read mail');
       expect(result.isError).toBe(true);
       const text = (result.content[0] as { type: 'text'; text: string }).text;

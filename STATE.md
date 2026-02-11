@@ -59,14 +59,15 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-765 tests across 32 files after pre-release audit (`304366c`). Coverage thresholds right-sized to 89/74/82/89 (stmts/branches/functions/lines) — actual: **95.73%/80.94%/93.02%/96.19%**. All well above thresholds. `pnpm test --coverage` exits 0.
+765 tests across 32 files. Coverage thresholds right-sized to 95/80/93/95 (stmts/branches/functions/lines) — actual: **95.96%/80.97%/93.63%/96.35%**. All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
 | Validation (Zod), date filtering, phone normalization | **High** | Pure logic, no mocks |
 | Handler formatting, Markdown output | **High** | All handlers tested with mocked backends |
-| JXA executor, SQLite reader logic | **Medium** | Core functions tested, OS calls mocked |
-| Tool routing dispatch | **Medium** | Consolidated to 1 smoke test per tool + error cases |
+| JXA executor, SQLite readers | **High** | All public functions tested, OS calls mocked |
+| Tool routing dispatch | **High** | Every tool + action tested, plus alias routing |
+| Error handling (JxaError hints) | **High** | All 3 hint branches tested through handleAsyncOperation |
 
 ## Open Issues
 
@@ -83,7 +84,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | #70 | Cross-tool intelligence | 13/13 PASS | **CLOSED** `3904a87` |
 | #71 | Performance benchmarks | — | Baselines captured in E2E suite |
 | #79 | Unit test coverage gaps | 671 tests, all targets met | **CLOSED** `1817718`, `36cb043` |
-| #72 | Unit test audit | 765 tests, thresholds resolved | **CLOSED** `304366c` — 95.73/80.94/93.02/96.19 vs 89/74/82/89 thresholds |
+| #72 | Unit test audit | 765 tests, thresholds resolved | **CLOSED** — 95.96/80.97/93.63/96.35 vs 95/80/93/95 thresholds |
 
 ### Bug Fixes from E2E (Priority Order)
 

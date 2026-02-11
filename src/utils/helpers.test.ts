@@ -3,7 +3,13 @@
  * Tests for helper utility functions
  */
 
-import { addOptionalArg, addOptionalBooleanArg, addOptionalNumberArg, formatMultilineNotes, nullToUndefined } from './helpers.js';
+import {
+  addOptionalArg,
+  addOptionalBooleanArg,
+  addOptionalNumberArg,
+  formatMultilineNotes,
+  nullToUndefined,
+} from './helpers.js';
 
 describe('helpers', () => {
   describe('nullToUndefined', () => {

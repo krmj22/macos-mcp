@@ -103,14 +103,12 @@ const MockSqliteAccessError = jest.requireMock(
 const mockReadMessagesByHandles = jest.requireMock(
   '../utils/sqliteMessageReader.js',
 ).readMessagesByHandles as jest.Mock;
-const mockResolveNameToHandles = jest.requireMock(
-  '../utils/contactResolver.js',
-).contactResolver.resolveNameToHandles as jest.Mock;
+const mockResolveNameToHandles = jest.requireMock('../utils/contactResolver.js')
+  .contactResolver.resolveNameToHandles as jest.Mock;
 const mockResolveBatch = jest.requireMock('../utils/contactResolver.js')
   .contactResolver.resolveBatch as jest.Mock;
-const MockContactSearchError = jest.requireMock(
-  '../utils/contactResolver.js',
-).ContactSearchError as new (
+const MockContactSearchError = jest.requireMock('../utils/contactResolver.js')
+  .ContactSearchError as new (
   message: string,
   isTimeout: boolean,
 ) => Error & { isTimeout: boolean };
@@ -469,7 +467,10 @@ describe('Notes Handlers', () => {
     it('includes note ID in deletion message', async () => {
       mockExecuteJxa.mockResolvedValue({ deleted: true });
 
-      const result = await handleDeleteNote({ action: 'delete', id: 'x-coredata-123' });
+      const result = await handleDeleteNote({
+        action: 'delete',
+        id: 'x-coredata-123',
+      });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('x-coredata-123');
     });
@@ -477,7 +478,10 @@ describe('Notes Handlers', () => {
     it('returns error when JXA throws', async () => {
       mockExecuteJxa.mockRejectedValue(new Error('Note not found'));
 
-      const result = await handleDeleteNote({ action: 'delete', id: 'missing' });
+      const result = await handleDeleteNote({
+        action: 'delete',
+        id: 'missing',
+      });
       expect(result.isError).toBe(true);
       expect(getTextContent(result)).toContain('Note not found');
     });
@@ -621,7 +625,16 @@ describe('Mail Handlers', () => {
       ]);
       // Simulate a slow resolveBatch that never resolves within timeout
       mockResolveBatch.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(new Map([['slow@example.com', { fullName: 'Too Late' }]])), 10000)),
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  new Map([['slow@example.com', { fullName: 'Too Late' }]]),
+                ),
+              10000,
+            ),
+          ),
       );
 
       const result = await handleReadMail({ action: 'read' });
@@ -1196,7 +1209,9 @@ describe('Messages Handlers', () => {
         contact: 'Ghost',
       });
       expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('No contact found matching "Ghost"');
+      expect(getTextContent(result)).toContain(
+        'No contact found matching "Ghost"',
+      );
     });
 
     it('handles contact resolver returning null', async () => {
@@ -1207,7 +1222,9 @@ describe('Messages Handlers', () => {
         contact: 'Nobody',
       });
       expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('No contact found matching "Nobody"');
+      expect(getTextContent(result)).toContain(
+        'No contact found matching "Nobody"',
+      );
     });
 
     it('handles ContactSearchError with timeout', async () => {
@@ -1373,9 +1390,8 @@ describe('Messages Handlers', () => {
     });
 
     it('sends message to phone/email via AppleScript', async () => {
-      const mockExecuteAppleScript = jest.requireMock(
-        '../utils/jxaExecutor.js',
-      ).executeAppleScript as jest.Mock;
+      const mockExecuteAppleScript = jest.requireMock('../utils/jxaExecutor.js')
+        .executeAppleScript as jest.Mock;
       mockExecuteAppleScript.mockResolvedValue('');
 
       const result = await handleCreateMessage({
@@ -1384,7 +1400,9 @@ describe('Messages Handlers', () => {
         text: 'Hello!',
       });
       expect(result.isError).toBe(false);
-      expect(getTextContent(result)).toContain('Successfully sent message to +15551234567');
+      expect(getTextContent(result)).toContain(
+        'Successfully sent message to +15551234567',
+      );
       expect(mockExecuteAppleScript).toHaveBeenCalled();
     });
 
@@ -1557,7 +1575,9 @@ describe('Error logging integration', () => {
   });
 
   it('returns isError true for JXA permission errors', async () => {
-    const { JxaError } = jest.requireActual('../utils/jxaExecutor.js') as typeof import('../utils/jxaExecutor.js');
+    const { JxaError } = jest.requireActual(
+      '../utils/jxaExecutor.js',
+    ) as typeof import('../utils/jxaExecutor.js');
     mockExecuteJxaWithRetry.mockRejectedValue(
       new JxaError('Notes not allowed', 'Notes', true, 'not allowed'),
     );
@@ -1568,7 +1588,9 @@ describe('Error logging integration', () => {
   });
 
   it('returns isError true for JXA timeout errors', async () => {
-    mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA execution failed for Notes: timed out'));
+    mockExecuteJxaWithRetry.mockRejectedValue(
+      new Error('JXA execution failed for Notes: timed out'),
+    );
 
     const result = await handleReadNotes({ action: 'read' });
     expect(result.isError).toBe(true);

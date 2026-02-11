@@ -48,10 +48,12 @@ export default {
   coverageReporters: ['text', 'text-summary', 'html'],
   coverageThreshold: {
     global: {
-      statements: 89,
-      branches: 74,
-      functions: 82,
-      lines: 89,
+      // Right-sized to actual floor + ~1% buffer (2026-02-11)
+      // Actual: 95.96% stmts, 80.97% branches, 93.63% funcs, 96.35% lines
+      statements: 95,
+      branches: 80,
+      functions: 93,
+      lines: 95,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],

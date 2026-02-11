@@ -11,15 +11,15 @@ jest.mock('node:child_process');
 
 import { execFile } from 'node:child_process';
 import {
+  getMessageById,
+  listInboxMessages,
+  listMailboxes,
+  listMailboxMessages,
   mailDateToISO,
   parseMailboxUrl,
-  listInboxMessages,
-  searchMessages,
-  searchBySenderEmails,
-  getMessageById,
-  listMailboxMessages,
-  listMailboxes,
   SqliteMailAccessError,
+  searchBySenderEmails,
+  searchMessages,
 } from './sqliteMailReader.js';
 
 const mockExecFile = execFile as jest.MockedFunction<typeof execFile>;
@@ -81,16 +81,18 @@ function mockSqliteMalformed(output: string) {
 
 // --- Reusable raw row fixtures ---
 
-function makeRawMailRow(overrides: Partial<{
-  ROWID: number;
-  subject: string | null;
-  address: string | null;
-  comment: string | null;
-  date_received: number | null;
-  read: number;
-  mailbox_url: string | null;
-  summary: string | null;
-}> = {}) {
+function makeRawMailRow(
+  overrides: Partial<{
+    ROWID: number;
+    subject: string | null;
+    address: string | null;
+    comment: string | null;
+    date_received: number | null;
+    read: number;
+    mailbox_url: string | null;
+    summary: string | null;
+  }> = {},
+) {
   return {
     ROWID: 42,
     subject: 'Test Subject',
@@ -104,18 +106,20 @@ function makeRawMailRow(overrides: Partial<{
   };
 }
 
-function makeRawMailFullRow(overrides: Partial<{
-  ROWID: number;
-  subject: string | null;
-  address: string | null;
-  comment: string | null;
-  date_received: number | null;
-  read: number;
-  mailbox_url: string | null;
-  summary: string | null;
-  to_addresses: string | null;
-  cc_addresses: string | null;
-}> = {}) {
+function makeRawMailFullRow(
+  overrides: Partial<{
+    ROWID: number;
+    subject: string | null;
+    address: string | null;
+    comment: string | null;
+    date_received: number | null;
+    read: number;
+    mailbox_url: string | null;
+    summary: string | null;
+    to_addresses: string | null;
+    cc_addresses: string | null;
+  }> = {},
+) {
   return {
     ...makeRawMailRow(overrides),
     to_addresses: 'alice@test.com, bob@test.com',
@@ -347,11 +351,11 @@ describe('getMessageById', () => {
     const result = await getMessageById('42');
 
     expect(result).not.toBeNull();
-    expect(result!.id).toBe('42');
-    expect(result!.subject).toBe('Test Subject');
-    expect(result!.sender).toBe('sender@test.com');
-    expect(result!.toRecipients).toEqual(['alice@test.com', 'bob@test.com']);
-    expect(result!.ccRecipients).toEqual(['charlie@test.com']);
+    expect(result?.id).toBe('42');
+    expect(result?.subject).toBe('Test Subject');
+    expect(result?.sender).toBe('sender@test.com');
+    expect(result?.toRecipients).toEqual(['alice@test.com', 'bob@test.com']);
+    expect(result?.ccRecipients).toEqual(['charlie@test.com']);
   });
 
   it('returns null when no rows found', async () => {
@@ -371,12 +375,12 @@ describe('getMessageById', () => {
 
     const result = await getMessageById('42');
 
-    expect(result!.toRecipients).toEqual([
+    expect(result?.toRecipients).toEqual([
       'one@test.com',
       'two@test.com',
       'three@test.com',
     ]);
-    expect(result!.ccRecipients).toEqual([]);
+    expect(result?.ccRecipients).toEqual([]);
   });
 
   it('handles null to_addresses and cc_addresses', async () => {
@@ -388,8 +392,8 @@ describe('getMessageById', () => {
 
     const result = await getMessageById('42');
 
-    expect(result!.toRecipients).toEqual([]);
-    expect(result!.ccRecipients).toEqual([]);
+    expect(result?.toRecipients).toEqual([]);
+    expect(result?.ccRecipients).toEqual([]);
   });
 });
 

@@ -326,10 +326,14 @@ describe('CalendarRepository', () => {
 
       expect(mockExecuteCli).toHaveBeenCalledWith(
         expect.arrayContaining([
-          '--recurrence', 'weekly',
-          '--recurrenceInterval', '2',
-          '--recurrenceEnd', '2025-12-31',
-          '--recurrenceCount', '10',
+          '--recurrence',
+          'weekly',
+          '--recurrenceInterval',
+          '2',
+          '--recurrenceEnd',
+          '2025-12-31',
+          '--recurrenceCount',
+          '10',
         ]),
       );
     });
@@ -429,7 +433,12 @@ describe('CalendarRepository', () => {
       });
 
       expect(mockExecuteCli).toHaveBeenCalledWith(
-        expect.arrayContaining(['--recurrence', 'daily', '--recurrenceInterval', '1']),
+        expect.arrayContaining([
+          '--recurrence',
+          'daily',
+          '--recurrenceInterval',
+          '1',
+        ]),
       );
     });
 
