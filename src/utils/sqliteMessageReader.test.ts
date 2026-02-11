@@ -155,4 +155,58 @@ describe('sqliteMessageReader date utilities', () => {
       expect(result).toMatch(/AND m\.date >= \d+ AND m\.date <= \d+/);
     });
   });
+
+  describe('dateToAppleTimestamp edge cases', () => {
+    it('produces negative timestamp for dates before 2001', () => {
+      const result = dateToAppleTimestamp('2000-01-01T00:00:00Z');
+      expect(result).not.toBeNull();
+      // biome-ignore lint/style/noNonNullAssertion: test assertion after null check
+      expect(result!).toBeLessThan(0);
+    });
+
+    it('returns null for empty string', () => {
+      expect(dateToAppleTimestamp('')).toBeNull();
+    });
+
+    it('handles date-only format (no time) correctly', () => {
+      const result = dateToAppleTimestamp('2025-06-15');
+      expect(result).not.toBeNull();
+      // Should produce same result as explicit midnight UTC
+      const explicit = dateToAppleTimestamp('2025-06-15T00:00:00Z');
+      // Note: YYYY-MM-DD is treated as UTC by JS Date, so these should match
+      expect(result).toBe(explicit);
+    });
+
+    it('handles timestamps at millisecond precision', () => {
+      const result = dateToAppleTimestamp('2025-01-15T12:30:45.123Z');
+      expect(result).not.toBeNull();
+      const expectedMs = new Date('2025-01-15T12:30:45.123Z').getTime();
+      const expected = (expectedMs - APPLE_EPOCH_MS) * 1_000_000;
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('buildDateFilter edge cases', () => {
+    it('handles dateRange with only undefined values', () => {
+      const dateRange: DateRange = {
+        startDate: undefined,
+        endDate: undefined,
+      };
+      expect(buildDateFilter(dateRange)).toBe('');
+    });
+
+    it('returns correct SQL for very old dates', () => {
+      const dateRange: DateRange = { startDate: '1990-01-01T00:00:00Z' };
+      const result = buildDateFilter(dateRange);
+      expect(result).toContain('AND m.date >=');
+      // Should contain a negative timestamp
+      expect(result).toMatch(/m\.date >= -\d+/);
+    });
+
+    it('handles default alias (m) explicitly', () => {
+      const dateRange: DateRange = { startDate: '2025-01-01T00:00:00Z' };
+      const result = buildDateFilter(dateRange, 'm');
+      expect(result).toContain('m.date >=');
+    });
+  });
 });

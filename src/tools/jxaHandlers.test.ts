@@ -68,9 +68,18 @@ jest.mock('../utils/errorHandling.js', () => ({
 
 // Mock contactResolver for mail sender enrichment tests
 jest.mock('../utils/contactResolver.js', () => ({
+  ContactSearchError: class ContactSearchError extends Error {
+    isTimeout: boolean;
+    constructor(message: string, isTimeout: boolean) {
+      super(message);
+      this.name = 'ContactSearchError';
+      this.isTimeout = isTimeout;
+    }
+  },
   contactResolver: {
     resolveHandle: jest.fn().mockResolvedValue(null),
     resolveBatch: jest.fn().mockResolvedValue(new Map()),
+    resolveNameToHandles: jest.fn().mockResolvedValue(null),
   },
 }));
 
@@ -90,6 +99,21 @@ const MockSqliteAccessError = jest.requireMock(
   message: string,
   isPermissionError: boolean,
 ) => Error & { isPermissionError: boolean };
+
+const mockReadMessagesByHandles = jest.requireMock(
+  '../utils/sqliteMessageReader.js',
+).readMessagesByHandles as jest.Mock;
+const mockResolveNameToHandles = jest.requireMock(
+  '../utils/contactResolver.js',
+).contactResolver.resolveNameToHandles as jest.Mock;
+const mockResolveBatch = jest.requireMock('../utils/contactResolver.js')
+  .contactResolver.resolveBatch as jest.Mock;
+const MockContactSearchError = jest.requireMock(
+  '../utils/contactResolver.js',
+).ContactSearchError as new (
+  message: string,
+  isTimeout: boolean,
+) => Error & { isTimeout: boolean };
 
 const mockMailGetMessageById = jest.requireMock('../utils/sqliteMailReader.js')
   .getMessageById as jest.Mock;
@@ -1020,6 +1044,168 @@ describe('Messages Handlers', () => {
         },
         undefined,
       );
+    });
+
+    it('returns empty chat list from SQLite gracefully', async () => {
+      mockListChats.mockResolvedValue([]);
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('No chats found');
+    });
+
+    it('handles contact search with resolved handles', async () => {
+      mockResolveNameToHandles.mockResolvedValue({
+        phones: ['+15551234567'],
+        emails: ['john@test.com'],
+      });
+      mockReadMessagesByHandles.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Hello from John',
+          sender: '+15551234567',
+          date: '2025-01-01T12:00:00.000Z',
+          isFromMe: false,
+          chatId: 'c1',
+          chatName: 'John',
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'John',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Messages from contact "John"');
+      expect(getTextContent(result)).toContain('Hello from John');
+      expect(mockReadMessagesByHandles).toHaveBeenCalledWith(
+        ['+15551234567', 'john@test.com'],
+        50,
+        undefined,
+      );
+    });
+
+    it('handles contact with no handles found', async () => {
+      mockResolveNameToHandles.mockResolvedValue({
+        phones: [],
+        emails: [],
+      });
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'Ghost',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('No contact found matching "Ghost"');
+    });
+
+    it('handles contact resolver returning null', async () => {
+      mockResolveNameToHandles.mockResolvedValue(null);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'Nobody',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('No contact found matching "Nobody"');
+    });
+
+    it('handles ContactSearchError with timeout', async () => {
+      mockResolveNameToHandles.mockRejectedValue(
+        new MockContactSearchError('Contacts timed out', true),
+      );
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'Slow',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Contact search timed out');
+    });
+
+    it('handles ContactSearchError without timeout', async () => {
+      mockResolveNameToHandles.mockRejectedValue(
+        new MockContactSearchError('JXA failed', false),
+      );
+
+      const result = await handleReadMessages({
+        action: 'read',
+        contact: 'Broken',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Contact search failed');
+    });
+
+    it('enriches chat participants with contact names', async () => {
+      const resolvedMap = new Map();
+      resolvedMap.set('+15551234567', { fullName: 'John Doe' });
+      mockResolveBatch.mockResolvedValue(resolvedMap);
+      mockListChats.mockResolvedValue([
+        {
+          id: 'c1',
+          name: '+15551234567',
+          participants: ['+15551234567'],
+          lastMessage: 'Hi',
+          lastDate: '2025-01-01',
+        },
+      ]);
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('John Doe');
+    });
+
+    it('enriches message senders with contact names', async () => {
+      const resolvedMap = new Map();
+      resolvedMap.set('+15559876543', { fullName: 'Alice Wonder' });
+      mockResolveBatch.mockResolvedValue(resolvedMap);
+      mockReadChatMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Hello',
+          sender: '+15559876543',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+      ]);
+
+      const result = await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Alice Wonder');
+    });
+
+    it('skips enrichment when enrichContacts is false', async () => {
+      mockListChats.mockResolvedValue([
+        {
+          id: 'c1',
+          name: '+15551234567',
+          participants: ['+15551234567'],
+          lastMessage: 'Hi',
+          lastDate: '2025-01-01',
+        },
+      ]);
+
+      await handleReadMessages({
+        action: 'read',
+        enrichContacts: false,
+      });
+      expect(mockResolveBatch).not.toHaveBeenCalled();
+    });
+
+    it('handles SQLite non-permission error on chatId path', async () => {
+      mockReadChatMessages.mockRejectedValue(
+        new MockSqliteAccessError('database is locked', false),
+      );
+
+      const result = await handleReadMessages({
+        action: 'read',
+        chatId: 'c1',
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('database is locked');
     });
   });
 });
