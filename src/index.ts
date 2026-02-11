@@ -67,11 +67,22 @@ async function main(): Promise<void> {
   }
 }
 
-// Start the application
-main().catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  process.stderr.write(
-    `${JSON.stringify({ timestamp: new Date().toISOString(), error: 'fatal', message: errorMessage })}\n`,
-  );
-  process.exit(1);
-});
+// Handle --check flag for preflight validation
+if (process.argv.includes('--check')) {
+  import('./utils/preflight.js').then(async ({ runPreflight, formatResults }) => {
+    const results = await runPreflight();
+    process.stdout.write(`${formatResults(results)}\n`);
+    const hasFailure = results.some((r) => r.status === 'FAIL');
+    process.exit(hasFailure ? 1 : 0);
+  });
+} else {
+  // Start the application
+  main().catch((error: unknown) => {
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
+    process.stderr.write(
+      `${JSON.stringify({ timestamp: new Date().toISOString(), error: 'fatal', message: errorMessage })}\n`,
+    );
+    process.exit(1);
+  });
+}

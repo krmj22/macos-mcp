@@ -239,11 +239,124 @@ This script:
 
 Requirements: `jq` (install with `brew install jq`)
 
+### Preflight Check
+
+Verify your environment before starting the server:
+
+```bash
+node dist/index.js --check
+```
+
+This checks macOS version, Node.js version, EventKit binary, Full Disk Access, and JXA automation permissions.
+
 ### Dependencies
 
 **Runtime:** `@modelcontextprotocol/sdk`, `exit-on-epipe`, `tsx`, `zod`
 
 **Dev:** `typescript`, `jest`, `ts-jest`, `babel-jest`, `@biomejs/biome`
+
+## Remote Access (HTTP Transport)
+
+The server supports remote access from Claude iOS/web via Cloudflare Tunnel.
+
+### Quick Start
+
+```bash
+# Copy example config
+cp macos-mcp.config.example.json macos-mcp.config.json
+
+# Start in HTTP mode
+MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
+```
+
+### Configuration
+
+Set via environment variables or `macos-mcp.config.json`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `http`, or `both` |
+| `MCP_HTTP_ENABLED` | `false` | Enable HTTP transport |
+| `MCP_HTTP_PORT` | `3847` | HTTP server port |
+
+**Key design decisions:**
+- **Stateless mode** — required for multi-client support (Claude.ai serves multiple users)
+- **Root endpoint** — MCP handler at `/` (Claude expects this, not `/mcp`)
+- **JSON fallback** — `enableJsonResponse: true` for clients without SSE support
+
+For full Cloudflare Tunnel + Access setup, see [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md).
+
+> **Important:** When running via HTTP transport as a LaunchAgent, the Messages and Mail tools require Full Disk Access granted to the **actual node binary** (not a version manager shim). See the Troubleshooting section below.
+
+## Troubleshooting
+
+### Permission Quick Reference
+
+| App | Permission | System Settings Path |
+|-----|------------|---------------------|
+| Reminders | Full Access | Privacy & Security > Reminders |
+| Calendar | Full Access | Privacy & Security > Calendars |
+| Notes | Automation | Privacy & Security > Automation > Notes |
+| Mail | Automation | Privacy & Security > Automation > Mail |
+| Messages | Automation + Full Disk Access | Both locations |
+| Contacts | Automation | Privacy & Security > Automation > Contacts |
+
+### Quick-Fix Commands
+
+```bash
+# Open specific settings panes
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders"
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+
+# Run preflight check
+node dist/index.js --check
+```
+
+### Full Disk Access for Messages & Mail
+
+Both the Messages and Mail tools read SQLite databases protected by Full Disk Access.
+
+**stdio transport (Claude Desktop, terminal):** Grant FDA to your terminal app (Terminal, iTerm2, etc.).
+
+**HTTP transport (LaunchAgent):** Grant FDA to the **actual node binary**, not a version manager shim:
+
+```bash
+# Find the real node binary (not the shim)
+node -e "console.log(process.execPath)"
+
+# Reveal in Finder for drag-and-drop into FDA settings
+open -R "$(node -e "console.log(process.execPath)")"
+
+# Open FDA settings
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+```
+
+### Version Manager Shim Resolution
+
+If you use **Volta**, **nvm**, or **fnm**, the `node` command is a shim/launcher. System Settings needs the real binary:
+
+| Manager | Find real binary |
+|---------|-----------------|
+| Volta | `volta which node` or `node -e "console.log(process.execPath)"` |
+| nvm | `nvm which current` |
+| fnm | `fnm exec -- node -e "console.log(process.execPath)"` |
+
+The System Settings file picker may not show binaries in hidden directories — use the `open -R` command above to reveal the binary in Finder, then drag-and-drop it into the FDA list.
+
+### Gmail Labels / Missing Inbox Messages
+
+Gmail stores all messages in `[Gmail]/All Mail` and uses **labels** for folder membership. The server checks both the direct mailbox and the labels join table for inbox queries. If you're not seeing Gmail inbox messages, verify the Mail app has fully synced your account.
+
+### Server Restart (LaunchAgent)
+
+If running as a LaunchAgent with Cloudflare Tunnel, restart **both** services:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.macos-mcp.server
+launchctl kickstart -k gui/$(id -u)/com.cloudflare.macos-mcp-tunnel
+```
 
 ## License
 
