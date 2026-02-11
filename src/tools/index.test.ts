@@ -72,11 +72,13 @@ import {
   handleCreateNote,
   handleCreateNotesFolder,
   handleCreateReminder,
+  handleCreateReminderList,
   handleDeleteCalendarEvent,
   handleDeleteContact,
   handleDeleteMail,
   handleDeleteNote,
   handleDeleteReminder,
+  handleDeleteReminderList,
   handleReadCalendarEvents,
   handleReadCalendars,
   handleReadContacts,
@@ -84,12 +86,15 @@ import {
   handleReadMessages,
   handleReadNotes,
   handleReadNotesFolders,
+  handleReadReminderLists,
   handleReadReminders,
   handleSearchContacts,
+  handleUpdateCalendarEvent,
   handleUpdateContact,
   handleUpdateMail,
   handleUpdateNote,
   handleUpdateReminder,
+  handleUpdateReminderList,
 } from './handlers/index.js';
 
 const mockHandleCreateReminder = handleCreateReminder as jest.MockedFunction<
@@ -104,6 +109,22 @@ const mockHandleUpdateReminder = handleUpdateReminder as jest.MockedFunction<
 const mockHandleDeleteReminder = handleDeleteReminder as jest.MockedFunction<
   typeof handleDeleteReminder
 >;
+const mockHandleReadReminderLists =
+  handleReadReminderLists as jest.MockedFunction<
+    typeof handleReadReminderLists
+  >;
+const mockHandleCreateReminderList =
+  handleCreateReminderList as jest.MockedFunction<
+    typeof handleCreateReminderList
+  >;
+const mockHandleUpdateReminderList =
+  handleUpdateReminderList as jest.MockedFunction<
+    typeof handleUpdateReminderList
+  >;
+const mockHandleDeleteReminderList =
+  handleDeleteReminderList as jest.MockedFunction<
+    typeof handleDeleteReminderList
+  >;
 const mockHandleCreateCalendarEvent =
   handleCreateCalendarEvent as jest.MockedFunction<
     typeof handleCreateCalendarEvent
@@ -111,6 +132,10 @@ const mockHandleCreateCalendarEvent =
 const mockHandleReadCalendarEvents =
   handleReadCalendarEvents as jest.MockedFunction<
     typeof handleReadCalendarEvents
+  >;
+const mockHandleUpdateCalendarEvent =
+  handleUpdateCalendarEvent as jest.MockedFunction<
+    typeof handleUpdateCalendarEvent
   >;
 const mockHandleDeleteCalendarEvent =
   handleDeleteCalendarEvent as jest.MockedFunction<
@@ -204,6 +229,24 @@ describe('Tools Index', () => {
           { action: 'delete' as const, title: 'Del' },
         ],
         [
+          'reminders_lists',
+          'create',
+          mockHandleCreateReminderList,
+          { action: 'create' as const, name: 'Work' },
+        ],
+        [
+          'reminders_lists',
+          'update',
+          mockHandleUpdateReminderList,
+          { action: 'update' as const, name: 'Old', newName: 'New' },
+        ],
+        [
+          'reminders_lists',
+          'delete',
+          mockHandleDeleteReminderList,
+          { action: 'delete' as const, name: 'Del' },
+        ],
+        [
           'calendar_events',
           'read',
           mockHandleReadCalendarEvents,
@@ -218,6 +261,16 @@ describe('Tools Index', () => {
             title: 'Evt',
             startDate: '2025-11-04 14:00:00',
             endDate: '2025-11-04 16:00:00',
+          },
+        ],
+        [
+          'calendar_events',
+          'update',
+          mockHandleUpdateCalendarEvent,
+          {
+            action: 'update' as const,
+            id: 'evt-123',
+            title: 'Updated Event',
           },
         ],
         [
@@ -345,6 +398,19 @@ describe('Tools Index', () => {
         expect(mockHandler).toHaveBeenCalledWith(args);
         expect(result).toEqual(expectedResult);
       });
+    });
+
+    it('routes reminders_lists read (no-arg handler)', async () => {
+      const expectedResult: CallToolResult = {
+        content: [{ type: 'text', text: 'Lists' }],
+        isError: false,
+      };
+      mockHandleReadReminderLists.mockResolvedValue(expectedResult);
+
+      const result = await handleToolCall('reminders_lists', { action: 'read' });
+
+      expect(mockHandleReadReminderLists).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(expectedResult);
     });
 
     describe('legacy tool alias routing', () => {

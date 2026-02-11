@@ -9,6 +9,7 @@ import {
   CreateReminderSchema,
   DeleteReminderSchema,
   ReadRemindersSchema,
+  RecurrenceSchema,
   RequiredListNameSchema,
   SafeDateSchema,
   SafeNoteSchema,
@@ -351,6 +352,42 @@ describe('ValidationSchemas', () => {
       );
 
       schema.parse = originalParse;
+    });
+  });
+
+  describe('RecurrenceSchema', () => {
+    it('rejects when both endDate and occurrenceCount are provided', () => {
+      const result = RecurrenceSchema.safeParse({
+        frequency: 'weekly',
+        interval: 1,
+        endDate: '2025-12-31',
+        occurrenceCount: 10,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts with only endDate', () => {
+      const result = RecurrenceSchema.safeParse({
+        frequency: 'weekly',
+        interval: 1,
+        endDate: '2025-12-31',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts with only occurrenceCount', () => {
+      const result = RecurrenceSchema.safeParse({
+        frequency: 'monthly',
+        occurrenceCount: 5,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts with neither endDate nor occurrenceCount', () => {
+      const result = RecurrenceSchema.safeParse({
+        frequency: 'daily',
+      });
+      expect(result.success).toBe(true);
     });
   });
 });

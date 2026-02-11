@@ -42,6 +42,7 @@ export default {
     '!src/utils/projectUtils.ts', // Excluded: import.meta.url line cannot be tested in Jest
     '!src/server/transports/http/index.ts', // Excluded: HTTP transport integration tested via E2E
     '!src/index.ts', // Excluded: entry point with process signals + transport bootstrap (integration-only)
+    '!src/tools/handlers/index.ts', // Excluded: barrel re-export file (all handlers tested individually)
   ],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
   // Ignore import.meta.url line in projectUtils.ts
@@ -49,10 +50,12 @@ export default {
   coverageThreshold: {
     global: {
       // Right-sized to actual floor + ~1% buffer (2026-02-11)
-      // Actual: 95.96% stmts, 80.97% branches, 93.63% funcs, 96.35% lines
       statements: 95,
+      // Branches stays at 80%: many uncovered branches are defensive paths
+      // (empty catch, null coalesce, permission retry) that would require
+      // synthetic/contrived tests to cover. See #87 for rationale.
       branches: 80,
-      functions: 93,
+      functions: 95,
       lines: 95,
     },
   },

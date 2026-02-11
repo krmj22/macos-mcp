@@ -50,8 +50,9 @@
     "build": "pnpm run clean && pnpm run build:ts && pnpm run build:swift",
     "dev": "node bin/dev.cjs",
     "test": "NODE_NO_WARNINGS=1 jest",
-    "test:e2e": "pnpm build && node --import tsx/esm --test tests/e2e/functional.test.mts",
-    "test:e2e:functional": "pnpm build && node --import tsx/esm --test tests/e2e/functional.test.mts",
+    "test:e2e": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/functional.test.mts",
+    "test:e2e:functional": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/functional.test.mts",
+    "test:e2e:all": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/*.test.mts",
     "lint": "pnpm exec biome check --write --unsafe && pnpm exec tsc --noEmit --project tsconfig.json",
     "prepublishOnly": "pnpm build && pnpm test"
   },
