@@ -2,6 +2,8 @@
 
 Guidance for Claude Code working with this macOS MCP server.
 
+**Read [INTENT.md](INTENT.md) first.** Every decision must serve the intent. When in doubt, reference it.
+
 ## Commands
 
 ```bash
