@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 3 complete: all per-tool E2E + cross-tool intelligence verified)
+Last updated: 2026-02-11 (Wave 5 complete: #79 unit test coverage gaps closed, 671 tests)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 564 unit tests, 29 test files, 96% statement coverage, all passing in 1.6s
+- **Tests**: 671 unit tests, 31 test files, all passing in 1.6s
 - **E2E**: 104 tests across 7 suites (functional + 5 per-tool + cross-tool), all passing
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
@@ -59,16 +59,23 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-552 tests provide logic and formatting confidence but mock all OS calls:
+671 tests across 31 files. Coverage gaps closed by #79:
+
+| Module | Before | After | Target |
+|--------|--------|-------|--------|
+| contactsHandlers.ts | 14.95% stmts | 97.19% stmts | ≥80% |
+| jxaExecutor.ts | 27.77% stmts | 81.94% stmts | ≥80% |
+| sqliteMessageReader.ts | 19.54% branch | 65.51% branch | ≥50% |
+| messagesHandlers.ts | 52.06% branch | 77.68% branch | ≥70% |
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
 | Validation (Zod), date filtering, phone normalization | **High** | Pure logic, no mocks |
-| Handler formatting, Markdown output | **Medium** | Proves output format, mocked data |
+| Handler formatting, Markdown output | **High** | All handlers tested with mocked backends |
+| JXA executor, SQLite reader logic | **Medium** | Core functions tested, OS calls mocked |
 | Tool routing dispatch | **Low** | 13+ tests that all fail together |
-| EventKit CLI / JXA / SQLite integration | **None** | All mocked away |
 
-~10-15% of tests are redundant (repeated pagination, routing). E2E tests needed for real system confidence.
+~10-15% of tests may be redundant (repeated pagination, routing). See #72 for planned audit.
 
 ## Open Issues
 
@@ -84,7 +91,8 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | #69 | Contacts — CRUD, search | 15/15 PASS | **CLOSED** `cf978b0` |
 | #70 | Cross-tool intelligence | 13/13 PASS | **CLOSED** `3904a87` |
 | #71 | Performance benchmarks | — | Baselines captured in E2E suite |
-| #72 | Unit test audit | — | P2, after E2E |
+| #79 | Unit test coverage gaps | 671 tests, all targets met | **CLOSED** `1817718`, `36cb043` |
+| #72 | Unit test audit | — | P2, after #79 |
 
 ### Bug Fixes from E2E (Priority Order)
 
