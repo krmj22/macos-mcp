@@ -138,7 +138,21 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 | Messages enriched | — | — | 5141ms | — | — |
 | Contacts read + search | 2 | — | 1156ms | 1116ms | — |
 
-## Open Issues (Pre-Release Audit)
+## Open Issues
+
+### Production Readiness (2026-02-11)
+
+| Issue | Priority | Description |
+|-------|----------|-------------|
+| #83 | **P0** | README: Add troubleshooting section for common setup issues |
+| #84 | **P0** | Error messages should include remediation steps (System Settings paths) |
+| #85 | **P0** | Add prepublishOnly script to prevent broken npm publishes |
+| #87 | **P2** | Push functions coverage to 95%, document branch coverage rationale |
+| #88 | **P3** | README: Document HTTP transport / remote access feature |
+| #89 | **P3** | Startup pre-flight validation (permissions, binary, macOS version) |
+| #86 | **Deferred** | GitHub Actions CI pipeline (test + lint + release) |
+
+### Pre-Release Audit (Existing)
 
 | Issue | Severity | Description |
 |-------|----------|-------------|
