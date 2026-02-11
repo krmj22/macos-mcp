@@ -11,8 +11,8 @@ import {
   listChats,
   readChatMessages,
   readMessagesByHandles,
-  searchMessages,
   SqliteAccessError,
+  searchMessages,
 } from './sqliteMessageReader.js';
 
 jest.mock('node:child_process');
@@ -290,12 +290,17 @@ describe('sqliteMessageReader reader functions', () => {
     });
 
     it('throws SqliteAccessError on permission error with FDA hint', async () => {
-      mockSqliteError('unable to open database', 'unable to open database file');
+      mockSqliteError(
+        'unable to open database',
+        'unable to open database file',
+      );
       await expect(listChats(10, 0)).rejects.toThrow(SqliteAccessError);
       try {
         await listChats(10, 0);
       } catch (err) {
-        expect((err as InstanceType<typeof SqliteAccessError>).isPermissionError).toBe(true);
+        expect(
+          (err as InstanceType<typeof SqliteAccessError>).isPermissionError,
+        ).toBe(true);
         expect((err as Error).message).toContain('Full Disk Access');
         expect((err as Error).message).toContain('Messages database');
       }
@@ -307,7 +312,9 @@ describe('sqliteMessageReader reader functions', () => {
       try {
         await listChats(10, 0);
       } catch (err) {
-        expect((err as InstanceType<typeof SqliteAccessError>).isPermissionError).toBe(false);
+        expect(
+          (err as InstanceType<typeof SqliteAccessError>).isPermissionError,
+        ).toBe(false);
       }
     });
 

@@ -28,7 +28,9 @@ export const SYSTEM_SETTINGS = {
  * Creates an actionable hint for EventKit (Swift CLI) permission errors.
  * Includes the System Settings deep-link URL so the user can fix it immediately.
  */
-export function createCliPermissionHint(domain: 'reminders' | 'calendars'): string {
+export function createCliPermissionHint(
+  domain: 'reminders' | 'calendars',
+): string {
   const settingsUrl =
     domain === 'reminders'
       ? SYSTEM_SETTINGS.REMINDERS

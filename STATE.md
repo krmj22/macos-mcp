@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Pre-release audit complete — #80 #81 #82 filed)
+Last updated: 2026-02-11 (Production readiness issues #80-#89 resolved, #86 deferred)
 
 ## Overview
 
@@ -9,8 +9,8 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 765 unit tests, 32 test files, all passing
-- **E2E**: 124 tests across 7 suites — 119 pass, 3 timing failures (#81), 2 send skipped
+- **Tests**: 800 unit tests, 34 test files, all passing
+- **E2E**: 124 tests across 7 suites — serial runner (#81 fixed), 2 send skipped
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
 
@@ -59,7 +59,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-765 tests across 32 files. Coverage thresholds right-sized to 95/80/93/95 (stmts/branches/functions/lines) — actual: **95.96%/80.97%/93.63%/96.35%**. All above thresholds. `pnpm test --coverage` exits 0.
+800 tests across 34 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **96.15%/81.33%/98.73%/96.56%**. All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
@@ -67,7 +67,10 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | Handler formatting, Markdown output | **High** | All handlers tested with mocked backends |
 | JXA executor, SQLite readers | **High** | All public functions tested, OS calls mocked |
 | Tool routing dispatch | **High** | Every tool + action tested, plus alias routing |
-| Error handling (JxaError hints) | **High** | All 3 hint branches tested through handleAsyncOperation |
+| Error handling (JxaError hints, permission hints) | **High** | All hint branches tested including permission/FDA |
+| Preflight checks | **High** | All 6 sync checks + formatter tested with mocked OS |
+
+Branches stays at 80%: many uncovered branches are defensive paths (empty catch, null coalesce, permission retry) that would require synthetic tests to cover. See #87.
 
 ## Open Issues
 
@@ -110,19 +113,19 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
-### Per-Tool E2E Suites (2026-02-11, parallel run)
+### Per-Tool E2E Suites (2026-02-11)
 
 | Suite | File | Tests | Status |
 |-------|------|-------|--------|
 | Functional (golden path) | `functional.test.mts` | 19/19 | PASS |
 | Calendar | `calendar.test.mts` | 20/20 | PASS |
 | Notes | `notes.test.mts` | 21/21 | PASS |
-| Mail | `mail.test.mts` | 17/18 | 1 timing fail (#81) |
-| Messages | `messages.test.mts` | 16/19 | 1 timing fail, 2 send skipped (#81) |
-| Contacts | `contacts.test.mts` | 13/14 | 1 timing fail (#81) |
+| Mail | `mail.test.mts` | 18/18 | PASS |
+| Messages | `messages.test.mts` | 17/19 | PASS (2 send skipped) |
+| Contacts | `contacts.test.mts` | 14/14 | PASS |
 | Cross-tool | `cross-tool.test.mts` | 13/13 | PASS |
 
-3 timing failures are JXA contention from parallel execution — see #81. All return correct data.
+Run with `pnpm test:e2e:all` (uses `--test-concurrency=1` to prevent JXA contention, fixes #81).
 
 ### Functional E2E Baselines (`pnpm test:e2e`) — 2026-02-11 (pre-release)
 
@@ -138,27 +141,27 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 | Messages enriched | — | — | 5141ms | — | — |
 | Contacts read + search | 2 | — | 1156ms | 1116ms | — |
 
-## Open Issues
+## Resolved Issues (2026-02-11)
 
-### Production Readiness (2026-02-11)
+### Production Readiness
+
+| Issue | Priority | Resolution |
+|-------|----------|------------|
+| #80 | P1 | **CLOSED** — Bulk cache timeout 60s→15s, retries 2→1. Worst case 182s→31s. |
+| #81 | P2 | **CLOSED** — `--test-concurrency=1` for all E2E scripts, `test:e2e:all` added |
+| #82 | docs | **CLOSED** — STATE.md updated with final audit results |
+| #83 | P0 | **CLOSED** — README troubleshooting: permissions, FDA, shims, Gmail labels |
+| #84 | P0 | **CLOSED** — Actionable error messages with System Settings deep-link URLs |
+| #85 | P0 | **CLOSED** — `prepublishOnly: "pnpm build && pnpm test"` |
+| #87 | P2 | **CLOSED** — Functions 93→95% (actual 98.73%), branches 80% rationale documented |
+| #88 | P3 | **CLOSED** — README HTTP transport / remote access section |
+| #89 | P3 | **CLOSED** — `node dist/index.js --check` preflight validation |
+
+### Deferred
 
 | Issue | Priority | Description |
 |-------|----------|-------------|
-| #83 | **P0** | README: Add troubleshooting section for common setup issues |
-| #84 | **P0** | Error messages should include remediation steps (System Settings paths) |
-| #85 | **P0** | Add prepublishOnly script to prevent broken npm publishes |
-| #87 | **P2** | Push functions coverage to 95%, document branch coverage rationale |
-| #88 | **P3** | README: Document HTTP transport / remote access feature |
-| #89 | **P3** | Startup pre-flight validation (permissions, binary, macOS version) |
-| #86 | **Deferred** | GitHub Actions CI pipeline (test + lint + release) |
-
-### Pre-Release Audit (Existing)
-
-| Issue | Severity | Description |
-|-------|----------|-------------|
-| #80 | **P1** | Contact resolution timeout gaps — `resolveHandle` unprotected (182s worst case), `resolveNameToHandles` retries too aggressive (47s worst case) |
-| #81 | **P2** | E2E per-tool timing thresholds fail under parallel execution — need serial runner |
-| #82 | docs | Pre-release audit results and INTENT compliance assessment |
+| #86 | Deferred | GitHub Actions CI pipeline (test + lint + release) |
 
 ## Known Limitations
 

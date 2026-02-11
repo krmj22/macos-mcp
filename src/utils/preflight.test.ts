@@ -32,8 +32,8 @@ jest.mock('./projectUtils.js', () => ({
   findProjectRoot: jest.fn(() => '/test/project'),
 }));
 
-import { platform, release } from 'node:os';
 import { accessSync } from 'node:fs';
+import { platform, release } from 'node:os';
 
 const mockPlatform = platform as jest.MockedFunction<typeof platform>;
 const mockRelease = release as jest.MockedFunction<typeof release>;

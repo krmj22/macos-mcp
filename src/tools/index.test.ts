@@ -407,7 +407,9 @@ describe('Tools Index', () => {
       };
       mockHandleReadReminderLists.mockResolvedValue(expectedResult);
 
-      const result = await handleToolCall('reminders_lists', { action: 'read' });
+      const result = await handleToolCall('reminders_lists', {
+        action: 'read',
+      });
 
       expect(mockHandleReadReminderLists).toHaveBeenCalledTimes(1);
       expect(result).toEqual(expectedResult);

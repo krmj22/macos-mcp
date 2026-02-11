@@ -13,6 +13,8 @@ pnpm test             # Run all tests
 pnpm lint             # Lint and format with Biome
 pnpm dev              # Run from source via tsx (stdio only, no build needed)
 pnpm test:e2e         # Build + run functional E2E tests (node:test, real OS calls)
+pnpm test:e2e:all     # Build + run ALL per-tool E2E suites (serial, no JXA contention)
+node dist/index.js --check  # Preflight validation (macOS, Node, FDA, JXA permissions)
 ```
 
 **Note:** `bin/run.cjs` (used by `.mcp.json`) runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
@@ -122,7 +124,8 @@ src/
 │   ├── jxaExecutor.ts   # JXA/AppleScript execution + retry logic
 │   ├── logging.ts       # Structured error logging (tool failures → stderr)
 │   ├── sqliteMessageReader.ts  # Messages SQLite reader
-│   └── sqliteMailReader.ts     # Mail SQLite reader
+│   ├── sqliteMailReader.ts     # Mail SQLite reader
+│   └── preflight.ts            # Startup --check validation
 └── validation/
     └── schemas.ts       # Zod schemas
 ```
@@ -136,7 +139,7 @@ src/
 ### Key Patterns
 
 - **Zod validation**: All inputs validated via schemas in `validation/schemas.ts`
-- **Error handling**: Use `handleAsyncOperation()` wrapper from `errorHandling.ts`
+- **Error handling**: Use `handleAsyncOperation()` wrapper from `errorHandling.ts`. Permission/access errors include System Settings deep-link URLs via `createCliPermissionHint()`, `createFdaHint()`, and JXA automation hints.
 - **JXA safety**: Always use `sanitizeForJxa()` before interpolating user input
 - **Date formats**: `YYYY-MM-DD HH:mm:ss` for local time, ISO 8601 for UTC
 
@@ -165,7 +168,7 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 ## Testing
 
-- **Unit**: Jest with ts-jest ESM preset, all OS calls mocked. Coverage thresholds in `jest.config.mjs` (95%/80%/93%/95% stmts/branches/funcs/lines)
+- **Unit**: Jest with ts-jest ESM preset, all OS calls mocked. Coverage thresholds in `jest.config.mjs` (95%/80%/95%/95% stmts/branches/funcs/lines)
 - **E2E**: `pnpm test:e2e` — node:test suite, real MCP client via stdio, creates/reads/deletes actual items
   - Tests use `[E2E-TEST]` prefix for cleanup identification
   - Separate from Jest to avoid coverage threshold conflicts

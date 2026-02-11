@@ -247,7 +247,12 @@ describe('ErrorHandling', () => {
 
     it('provides permission hint when JxaError contains "not authorized"', async () => {
       const result = await handleAsyncOperation(async () => {
-        throw new JxaError('not authorized', 'Contacts', false, 'not authorized to send Apple events');
+        throw new JxaError(
+          'not authorized',
+          'Contacts',
+          false,
+          'not authorized to send Apple events',
+        );
       }, 'read contacts');
       expect(result.isError).toBe(true);
       const text = (result.content[0] as { type: 'text'; text: string }).text;

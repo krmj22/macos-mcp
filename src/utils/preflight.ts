@@ -84,11 +84,7 @@ export function checkNodeVersion(): CheckResult {
 export function checkSwiftBinary(): CheckResult {
   try {
     const projectRoot = findProjectRoot();
-    const binaryPath = join(
-      projectRoot,
-      'bin',
-      FILE_SYSTEM.SWIFT_BINARY_NAME,
-    );
+    const binaryPath = join(projectRoot, 'bin', FILE_SYSTEM.SWIFT_BINARY_NAME);
     accessSync(binaryPath, constants.X_OK);
     return {
       name: 'EventKit binary',
@@ -221,7 +217,9 @@ export function formatResults(results: CheckResult[]): string {
   lines.push('');
 
   if (hasFailure) {
-    lines.push('Result: FAIL — fix the issues above before starting the server.');
+    lines.push(
+      'Result: FAIL — fix the issues above before starting the server.',
+    );
   } else if (warnCount > 0) {
     lines.push(
       `Result: OK with ${warnCount} warning(s) — some features may not work.`,

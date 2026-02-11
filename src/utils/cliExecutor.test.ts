@@ -232,8 +232,20 @@ describe('cliExecutor', () => {
     });
 
     it.each([
-      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders', 'Privacy_Reminders'],
-      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars', 'Privacy_Calendars'],
+      [
+        'reminders',
+        'Reminder permission denied.',
+        ['--action', 'read'],
+        'reminders',
+        'Privacy_Reminders',
+      ],
+      [
+        'calendars',
+        'Calendar permission denied.',
+        ['--action', 'read-events'],
+        'calendars',
+        'Privacy_Calendars',
+      ],
     ])('throws %s permission error after retry with actionable hint', async (_domain, message, args, expectedDomain, expectedSettingsFragment) => {
       const permissionError = JSON.stringify({
         status: 'error',
@@ -381,12 +393,30 @@ describe('cliExecutor', () => {
     });
 
     it.each([
-      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders', { reminders: [] }],
-      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars', { events: [] }],
+      [
+        'reminders',
+        'Reminder permission denied.',
+        ['--action', 'read'],
+        'reminders',
+        { reminders: [] },
+      ],
+      [
+        'calendars',
+        'Calendar permission denied.',
+        ['--action', 'read-events'],
+        'calendars',
+        { events: [] },
+      ],
     ])('triggers %s permission prompt and retries successfully', async (_domain, errorMsg, args, expectedDomain, expectedResult) => {
       let callCount = 0;
-      const permissionError = JSON.stringify({ status: 'error', message: errorMsg });
-      const successResponse = JSON.stringify({ status: 'success', result: expectedResult });
+      const permissionError = JSON.stringify({
+        status: 'error',
+        message: errorMsg,
+      });
+      const successResponse = JSON.stringify({
+        status: 'success',
+        result: expectedResult,
+      });
 
       mockExecFile.mockImplementation(((
         _cliPath: string,
