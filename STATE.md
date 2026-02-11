@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 5 complete: #79 unit test coverage gaps closed, 671 tests)
+Last updated: 2026-02-11 (Wave 6: #72 unit test audit — 663 tests, coverage thresholds need resolution)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 671 unit tests, 31 test files, all passing in 1.6s
+- **Tests**: 663 unit tests, 31 test files, all passing in 1.5s
 - **E2E**: 104 tests across 7 suites (functional + 5 per-tool + cross-tool), all passing
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
@@ -59,23 +59,29 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-671 tests across 31 files. Coverage gaps closed by #79:
+663 tests across 31 files after #72 audit (`9e79bb3`). Removed 18 false-confidence tests (duplicate routing, template inspection, option-variant formatting). Consolidated ~12 repetitive tests into `it.each` tables. Added 10 gap tests (malformed JXA responses, error logging, SQLite permission errors, date boundaries).
 
-| Module | Before | After | Target |
-|--------|--------|-------|--------|
-| contactsHandlers.ts | 14.95% stmts | 97.19% stmts | ≥80% |
-| jxaExecutor.ts | 27.77% stmts | 81.94% stmts | ≥80% |
-| sqliteMessageReader.ts | 19.54% branch | 65.51% branch | ≥50% |
-| messagesHandlers.ts | 52.06% branch | 77.68% branch | ≥70% |
+### Coverage Thresholds — FAILING (pre-existing)
+
+`jest.config.mjs` requires 96%/90%/98%/96% (stmts/branches/functions/lines). Actual: **89.89%/74.88%/82.9%/90.25%**. This was failing before the audit and needs investigation — likely a mix of undertested source files and integration-only code that should be excluded. See #72 for next steps.
+
+| Module | Stmts | Branches | Notes |
+|--------|-------|----------|-------|
+| contactsHandlers.ts | 97.19% | — | #79 |
+| jxaExecutor.ts | 81.94% | — | #79 |
+| sqliteMessageReader.ts | — | 65.51% | #79 |
+| messagesHandlers.ts | — | 77.68% | #79 |
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
 | Validation (Zod), date filtering, phone normalization | **High** | Pure logic, no mocks |
 | Handler formatting, Markdown output | **High** | All handlers tested with mocked backends |
 | JXA executor, SQLite reader logic | **Medium** | Core functions tested, OS calls mocked |
-| Tool routing dispatch | **Low** | 13+ tests that all fail together |
+| Tool routing dispatch | **Medium** | Consolidated to 1 smoke test per tool + error cases |
 
-~10-15% of tests may be redundant (repeated pagination, routing). See #72 for planned audit.
+### Next: Coverage threshold resolution (#72 continuation)
+
+Investigate uncovered files, categorize as undertested / dead code / integration-only. Either meet thresholds or right-size them with justification. See #72.
 
 ## Open Issues
 
@@ -92,7 +98,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | #70 | Cross-tool intelligence | 13/13 PASS | **CLOSED** `3904a87` |
 | #71 | Performance benchmarks | — | Baselines captured in E2E suite |
 | #79 | Unit test coverage gaps | 671 tests, all targets met | **CLOSED** `1817718`, `36cb043` |
-| #72 | Unit test audit | — | P2, after #79 |
+| #72 | Unit test audit | 663 tests, redundancy trimmed, gaps filled | **PARTIAL** `9e79bb3` — coverage thresholds still failing |
 
 ### Bug Fixes from E2E (Priority Order)
 

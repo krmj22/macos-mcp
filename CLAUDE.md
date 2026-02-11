@@ -165,7 +165,7 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 ## Testing
 
-- **Unit**: Jest with ts-jest ESM preset, 96% coverage threshold, all OS calls mocked
+- **Unit**: Jest with ts-jest ESM preset, all OS calls mocked. Coverage thresholds in `jest.config.mjs` (96%/90%/98%/96%) are currently failing — see STATE.md for details and #72 for resolution plan
 - **E2E**: `pnpm test:e2e` — node:test suite, real MCP client via stdio, creates/reads/deletes actual items
   - Tests use `[E2E-TEST]` prefix for cleanup identification
   - Separate from Jest to avoid coverage threshold conflicts
