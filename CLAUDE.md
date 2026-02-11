@@ -28,7 +28,7 @@ See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, an
 - **Messages**: No delete/edit via JXA or SQLite (Apple API limitation)
 - **Messages**: Default chat list TIMEOUT 60s — contact enrichment doesn't scale (#75)
 - **Mail create**: Creates draft only — user must click Send in Mail.app
-- **Mail**: Default inbox/search/delete TIMEOUT 60s — JXA fetches all messages (#76)
+- **Mail reads**: Use SQLite (`~/Library/Mail/V10/MailData/Envelope Index`), JXA for writes only. See ADR-001 in DECISION.md
 - **Contacts**: Search TIMEOUT 30s — iterates all contacts instead of using `whose()` (#77)
 - **JXA rule**: Always use `whose()` predicates for search, never JS iteration over collections
 

@@ -14,6 +14,27 @@ jest.mock('../utils/jxaExecutor.js', () => {
   };
 });
 
+jest.mock('../utils/sqliteMailReader.js', () => ({
+  SqliteMailAccessError: class SqliteMailAccessError extends Error {
+    isPermissionError: boolean;
+    constructor(message: string, isPermissionError: boolean) {
+      super(message);
+      this.name = 'SqliteMailAccessError';
+      this.isPermissionError = isPermissionError;
+    }
+  },
+  listInboxMessages: jest.fn().mockResolvedValue([]),
+  searchMessages: jest.fn().mockResolvedValue([]),
+  searchBySenderEmails: jest.fn().mockResolvedValue([]),
+  getMessageById: jest.fn().mockResolvedValue(null),
+  listMailboxMessages: jest.fn().mockResolvedValue([]),
+  listMailboxes: jest.fn().mockResolvedValue([]),
+  mailDateToISO: jest.fn((ts: number) =>
+    ts ? new Date(ts * 1000).toISOString() : '',
+  ),
+  parseMailboxUrl: jest.fn((url: string) => ({ account: '', mailbox: url })),
+}));
+
 jest.mock('../utils/sqliteMessageReader.js', () => ({
   SqliteAccessError: class SqliteAccessError extends Error {
     isPermissionError: boolean;
@@ -69,6 +90,19 @@ const MockSqliteAccessError = jest.requireMock(
   message: string,
   isPermissionError: boolean,
 ) => Error & { isPermissionError: boolean };
+
+const mockMailGetMessageById = jest.requireMock('../utils/sqliteMailReader.js')
+  .getMessageById as jest.Mock;
+const mockMailListInboxMessages = jest.requireMock(
+  '../utils/sqliteMailReader.js',
+).listInboxMessages as jest.Mock;
+const mockMailSearchMessages = jest.requireMock('../utils/sqliteMailReader.js')
+  .searchMessages as jest.Mock;
+const mockMailListMailboxMessages = jest.requireMock(
+  '../utils/sqliteMailReader.js',
+).listMailboxMessages as jest.Mock;
+const mockMailListMailboxes = jest.requireMock('../utils/sqliteMailReader.js')
+  .listMailboxes as jest.Mock;
 
 // biome-ignore lint: test helper
 function getTextContent(result: any): string {
@@ -374,18 +408,23 @@ describe('Mail Handlers', () => {
 
   describe('handleReadMail', () => {
     it('returns single mail by ID', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue({
+      mockMailGetMessageById.mockResolvedValue({
         id: 'm1',
         subject: 'Test',
         sender: 'a@b.com',
+        senderName: '',
         dateReceived: '2025-01-01',
         read: true,
         mailbox: 'Inbox',
         account: 'Gmail',
-        content: 'Hello',
+        preview: 'Hello preview',
         toRecipients: ['c@d.com'],
         ccRecipients: [],
-        preview: '',
+      });
+      // JXA fallback for full content
+      mockExecuteJxaWithRetry.mockResolvedValue({
+        id: 'm1',
+        content: 'Hello full content',
       });
 
       const result = await handleReadMail({ action: 'read', id: 'm1' });
@@ -394,9 +433,21 @@ describe('Mail Handlers', () => {
     });
 
     it('lists mailboxes', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
-        { name: 'Inbox', account: 'Gmail', unreadCount: 5 },
-        { name: 'Sent', account: 'Gmail', unreadCount: 0 },
+      mockMailListMailboxes.mockResolvedValue([
+        {
+          name: 'Inbox',
+          account: 'Gmail',
+          url: 'imap://x/INBOX',
+          totalCount: 100,
+          unreadCount: 5,
+        },
+        {
+          name: 'Sent',
+          account: 'Gmail',
+          url: 'imap://x/Sent',
+          totalCount: 50,
+          unreadCount: 0,
+        },
       ]);
 
       const result = await handleReadMail({ action: 'read', mailbox: '_list' });
@@ -406,11 +457,21 @@ describe('Mail Handlers', () => {
     });
 
     it('reads from specific mailbox', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([
+      mockMailListMailboxes.mockResolvedValue([
+        {
+          name: 'Sent',
+          account: 'Gmail',
+          url: 'imap://x/Sent',
+          totalCount: 50,
+          unreadCount: 0,
+        },
+      ]);
+      mockMailListMailboxMessages.mockResolvedValue([
         {
           id: 'm2',
           subject: 'Sent Mail',
           sender: 'me@x.com',
+          senderName: '',
           dateReceived: '',
           read: true,
           mailbox: 'Sent',
@@ -425,7 +486,7 @@ describe('Mail Handlers', () => {
     });
 
     it('searches mail including body', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([]);
+      mockMailSearchMessages.mockResolvedValue([]);
 
       const result = await handleReadMail({
         action: 'read',
@@ -436,7 +497,7 @@ describe('Mail Handlers', () => {
     });
 
     it('lists inbox with pagination', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([]);
+      mockMailListInboxMessages.mockResolvedValue([]);
 
       const result = await handleReadMail({
         action: 'read',
@@ -464,18 +525,24 @@ describe('Mail Handlers', () => {
     });
 
     it('sends a reply', async () => {
+      // JXA returns full content for reply
       mockExecuteJxaWithRetry.mockResolvedValue({
+        id: 'm1',
+        content: 'Original body',
+      });
+      // SQLite returns metadata for reply header
+      mockMailGetMessageById.mockResolvedValue({
         id: 'm1',
         subject: 'Original',
         sender: 'a@b.com',
+        senderName: '',
         dateReceived: '2025-01-01',
         read: true,
         mailbox: 'Inbox',
         account: 'Gmail',
-        content: 'Original body',
+        preview: '',
         toRecipients: ['me@x.com'],
         ccRecipients: [],
-        preview: '',
       });
       mockExecuteJxa.mockResolvedValue({ sent: true });
 

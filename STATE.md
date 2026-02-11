@@ -4,7 +4,7 @@ Last updated: 2026-02-11 (Wave 1 verified, 5 issues closed)
 
 ## Overview
 
-macOS MCP server providing native integration with Reminders, Calendar, Notes, Mail, Messages, and Contacts. Two backends: EventKit (Swift binary) for Reminders/Calendar, JXA (AppleScript) for Notes/Mail/Messages/Contacts. Messages reads use SQLite directly (JXA broken on Sonoma+).
+macOS MCP server providing native integration with Reminders, Calendar, Notes, Mail, Messages, and Contacts. Three backends: EventKit (Swift binary) for Reminders/Calendar, JXA (AppleScript) for Notes/Mail writes/Contacts, SQLite for Messages and Mail reads. See ADR-001 in DECISION.md.
 
 ## Codebase
 
@@ -23,7 +23,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
 | `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
-| `mail_messages` | JXA | read, create (draft), update, delete | 8/14 — #76 STILL OPEN (60s timeout, SOM fix insufficient) |
+| `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, JXA writes only (#76 FIXED) |
 | `messages_chat` | SQLite + JXA | read, create (send) | 13/13 — #75 CLOSED (5.3s, was 60s+) |
 | `contacts_people` | JXA | read, search, create, update, delete | 14/14 — #77 CLOSED (570ms, was 30s+) |
 
@@ -91,7 +91,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 |-------|---------|----------|---------------|
 | #73 | Calendar findEventById unbounded range | ~~P1~~ | **CLOSED** `be122e7` — verified 646ms |
 | #74 | Notes move-to-folder double-escaping | ~~P1~~ | **CLOSED** `1c61735` — verified 1.9s |
-| #76 | Mail JXA read/search timeout 60s | P0 | **OPEN** — `df8bf7a` SOM fix insufficient, still 60s timeout |
+| #76 | Mail JXA read/search timeout 60s | ~~P0~~ | **CLOSED** — SQLite backend, reads <40ms |
 | #77 | Contacts search iterates all 30s | ~~P1~~ | **CLOSED** `b5c1430` — verified 570ms |
 | #75 | Messages enrichment timeout 60s | ~~P0~~ | **CLOSED** `afe64cf` — verified 5.3s |
 | #78 | Notes search scans all 24s | ~~P2~~ | **CLOSED** `c9a9239` — verified 973ms |
@@ -103,7 +103,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 | Reminders | EventKit/Swift | 42-203ms | 339ms | 981ms (cold), 338ms | N/A |
 | Calendar | EventKit/Swift | 34-72ms | 51ms | 646ms (#73 fixed) | 59-67ms |
 | Notes | JXA | 146-583ms | 973ms (#78 fixed) | 2.0s | N/A |
-| Mail | JXA | 563ms-2.5s | **60s TIMEOUT (#76 open)** | **60s TIMEOUT (#76 open)** | 1.1-3.6s (w/limit) |
+| Mail | SQLite + JXA | 563ms-2.5s (writes) | <10ms (#76 fixed) | <40ms (#76 fixed) | N/A (SQLite has sender) |
 | Messages | SQLite | N/A (read-only) | 135ms | 5.3s (#75 fixed) | 5.3s (#75 fixed) |
 | Contacts | JXA | 161-955ms | 570ms (#77 fixed) | 6.4s (slow) | N/A |
 
