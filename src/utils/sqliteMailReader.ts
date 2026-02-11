@@ -18,6 +18,7 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createFdaHint } from './errorHandling.js';
 
 const MAIL_DB_PATH = join(
   homedir(),
@@ -53,7 +54,7 @@ function runSqlite(query: string, timeoutMs = 15000): Promise<string> {
           ) {
             reject(
               new SqliteMailAccessError(
-                'Cannot access Mail database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+                `Cannot access Mail database. ${createFdaHint('Mail')}`,
                 true,
               ),
             );

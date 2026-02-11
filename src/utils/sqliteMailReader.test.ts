@@ -477,7 +477,7 @@ describe('listMailboxes', () => {
 });
 
 describe('error handling (runSqlite)', () => {
-  it('throws SqliteMailAccessError with isPermissionError=true for "authorization denied"', async () => {
+  it('throws SqliteMailAccessError with isPermissionError=true and FDA hint for "authorization denied"', async () => {
     mockSqliteError('authorization denied', 'authorization denied');
 
     await expect(listInboxMessages(10, 0)).rejects.toThrow(
@@ -486,9 +486,15 @@ describe('error handling (runSqlite)', () => {
     await expect(listInboxMessages(10, 0)).rejects.toMatchObject({
       isPermissionError: true,
     });
+    try {
+      await listInboxMessages(10, 0);
+    } catch (err) {
+      expect((err as Error).message).toContain('Full Disk Access');
+      expect((err as Error).message).toContain('Mail database');
+    }
   });
 
-  it('throws SqliteMailAccessError with isPermissionError=true for "unable to open"', async () => {
+  it('throws SqliteMailAccessError with isPermissionError=true and FDA hint for "unable to open"', async () => {
     mockSqliteError('unable to open database', 'unable to open database');
 
     await expect(searchMessages('test', 10, 0)).rejects.toThrow(
@@ -497,6 +503,12 @@ describe('error handling (runSqlite)', () => {
     await expect(searchMessages('test', 10, 0)).rejects.toMatchObject({
       isPermissionError: true,
     });
+    try {
+      await searchMessages('test', 10, 0);
+    } catch (err) {
+      expect((err as Error).message).toContain('Full Disk Access');
+      expect((err as Error).message).toContain('Mail database');
+    }
   });
 
   it('throws SqliteMailAccessError with isPermissionError=false for generic errors', async () => {

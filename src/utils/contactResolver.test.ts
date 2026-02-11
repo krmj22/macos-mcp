@@ -170,6 +170,19 @@ describe('ContactResolverService', () => {
       });
     });
 
+    it('should use 15s timeout and 1 retry for bulk cache build', async () => {
+      await service.resolveHandle('+1 (555) 123-4567');
+
+      // Verify the bulk fetch uses reduced timeout (15s) and retries (1)
+      expect(mockExecuteJxa).toHaveBeenCalledWith(
+        expect.stringContaining('Contacts.people()'),
+        15000,
+        'Contacts',
+        1,
+        1000,
+      );
+    });
+
     it('should only call JXA once for multiple resolves (caching)', async () => {
       await service.resolveHandle('john@example.com');
       await service.resolveHandle('jane@example.com');

@@ -289,13 +289,15 @@ describe('sqliteMessageReader reader functions', () => {
       expect(result).toEqual([]);
     });
 
-    it('throws SqliteAccessError on permission error', async () => {
+    it('throws SqliteAccessError on permission error with FDA hint', async () => {
       mockSqliteError('unable to open database', 'unable to open database file');
       await expect(listChats(10, 0)).rejects.toThrow(SqliteAccessError);
       try {
         await listChats(10, 0);
       } catch (err) {
         expect((err as InstanceType<typeof SqliteAccessError>).isPermissionError).toBe(true);
+        expect((err as Error).message).toContain('Full Disk Access');
+        expect((err as Error).message).toContain('Messages database');
       }
     });
 

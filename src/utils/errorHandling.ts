@@ -8,6 +8,44 @@ import { ValidationError } from '../validation/schemas.js';
 import { JxaError } from './jxaExecutor.js';
 
 /**
+ * Deep-link URLs for macOS System Settings panes.
+ * Used to provide actionable "how to fix" paths in error messages.
+ */
+export const SYSTEM_SETTINGS = {
+  AUTOMATION:
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
+  FULL_DISK_ACCESS:
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+  REMINDERS:
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders',
+  CALENDARS:
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars',
+  CONTACTS:
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts',
+} as const;
+
+/**
+ * Creates an actionable hint for EventKit (Swift CLI) permission errors.
+ * Includes the System Settings deep-link URL so the user can fix it immediately.
+ */
+export function createCliPermissionHint(domain: 'reminders' | 'calendars'): string {
+  const settingsUrl =
+    domain === 'reminders'
+      ? SYSTEM_SETTINGS.REMINDERS
+      : SYSTEM_SETTINGS.CALENDARS;
+  const appName = domain === 'reminders' ? 'Reminders' : 'Calendars';
+  return `Grant ${appName} access in System Settings > Privacy & Security > ${appName}. Open settings: ${settingsUrl}`;
+}
+
+/**
+ * Creates an actionable hint for Full Disk Access errors on SQLite databases.
+ * Includes the System Settings deep-link URL for FDA.
+ */
+export function createFdaHint(dbName: string): string {
+  return `Grant Full Disk Access to your terminal app (or the actual node binary for LaunchAgent) in System Settings > Privacy & Security > Full Disk Access. Open settings: ${SYSTEM_SETTINGS.FULL_DISK_ACCESS} (${dbName} database)`;
+}
+
+/**
  * Creates a user-friendly error message for known JXA failure modes.
  */
 function createJxaHint(error: JxaError): string | null {
@@ -20,6 +58,13 @@ function createJxaHint(error: JxaError): string | null {
   }
   if (/not running/i.test(msg) || /Can.t get application/i.test(msg)) {
     return `${error.app} does not appear to be running. Open ${error.app} and try again.`;
+  }
+  if (
+    /not authorized/i.test(msg) ||
+    /permission/i.test(msg) ||
+    /not allowed/i.test(msg)
+  ) {
+    return `${error.app} automation permission denied. Grant access in System Settings > Privacy & Security > Automation. Open settings: ${SYSTEM_SETTINGS.AUTOMATION}`;
   }
   return null;
 }

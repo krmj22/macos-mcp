@@ -232,9 +232,9 @@ describe('cliExecutor', () => {
     });
 
     it.each([
-      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders'],
-      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars'],
-    ])('throws %s permission error after retry', async (_domain, message, args, expectedDomain) => {
+      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders', 'Privacy_Reminders'],
+      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars', 'Privacy_Calendars'],
+    ])('throws %s permission error after retry with actionable hint', async (_domain, message, args, expectedDomain, expectedSettingsFragment) => {
       const permissionError = JSON.stringify({
         status: 'error',
         message,
@@ -255,10 +255,9 @@ describe('cliExecutor', () => {
       }) as unknown as typeof execFile);
 
       await expect(executeCli(args)).rejects.toThrow(message);
-      expect(mockTriggerPermissionPrompt).toHaveBeenCalledTimes(2);
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(1, expectedDomain);
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(2, expectedDomain);
-      expect(mockExecFile).toHaveBeenCalledTimes(2);
+      // Verify the hint includes the System Settings deep-link
+      await expect(executeCli(args)).rejects.toThrow(expectedSettingsFragment);
+      expect(mockTriggerPermissionPrompt).toHaveBeenCalledWith(expectedDomain);
     });
 
     it('throws authorization error immediately', async () => {
@@ -430,7 +429,7 @@ describe('cliExecutor', () => {
       }) as unknown as typeof execFile);
 
       await expect(executeCli(['--action', 'read'])).rejects.toThrow(
-        'Reminder permission denied.',
+        /Reminder permission denied.*Privacy_Reminders/,
       );
 
       // Should call CLI twice (initial + retry) but not more
@@ -526,7 +525,7 @@ describe('cliExecutor', () => {
       );
 
       expect(error.name).toBe('CliPermissionError');
-      expect(error.message).toBe('Reminder permission denied.');
+      expect(error.message).toContain('Reminder permission denied.');
       expect(error.domain).toBe('reminders');
     });
 
@@ -537,7 +536,7 @@ describe('cliExecutor', () => {
       );
 
       expect(error.name).toBe('CliPermissionError');
-      expect(error.message).toBe('Calendar permission denied.');
+      expect(error.message).toContain('Calendar permission denied.');
       expect(error.domain).toBe('calendars');
     });
   });

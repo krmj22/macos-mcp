@@ -7,6 +7,7 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createFdaHint } from './errorHandling.js';
 
 const CHAT_DB_PATH = join(homedir(), 'Library', 'Messages', 'chat.db');
 
@@ -35,7 +36,7 @@ function runSqlite(query: string, timeoutMs = 15000): Promise<string> {
           ) {
             reject(
               new SqliteAccessError(
-                'Cannot access Messages database. Grant Full Disk Access to your terminal app in System Settings > Privacy & Security > Full Disk Access.',
+                `Cannot access Messages database. ${createFdaHint('Messages')}`,
                 true,
               ),
             );

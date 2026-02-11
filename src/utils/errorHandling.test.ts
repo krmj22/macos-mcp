@@ -4,7 +4,12 @@
  */
 
 import { ValidationError } from '../validation/schemas.js';
-import { handleAsyncOperation } from './errorHandling.js';
+import {
+  createCliPermissionHint,
+  createFdaHint,
+  handleAsyncOperation,
+  SYSTEM_SETTINGS,
+} from './errorHandling.js';
 import { JxaError } from './jxaExecutor.js';
 
 describe('ErrorHandling', () => {
@@ -238,6 +243,66 @@ describe('ErrorHandling', () => {
       expect(text).toContain('syntax error');
       expect(text).not.toContain('did not respond');
       expect(text).not.toContain('Lost connection');
+    });
+
+    it('provides permission hint when JxaError contains "not authorized"', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('not authorized', 'Contacts', false, 'not authorized to send Apple events');
+      }, 'read contacts');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('automation permission denied');
+      expect(text).toContain('Automation');
+      expect(text).toContain(SYSTEM_SETTINGS.AUTOMATION);
+    });
+
+    it('provides permission hint when JxaError contains "permission"', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('permission denied', 'Mail', false);
+      }, 'read mail');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('automation permission denied');
+      expect(text).toContain(SYSTEM_SETTINGS.AUTOMATION);
+    });
+  });
+
+  describe('SYSTEM_SETTINGS constants', () => {
+    it('contains all required deep-link URLs', () => {
+      expect(SYSTEM_SETTINGS.AUTOMATION).toContain('Privacy_Automation');
+      expect(SYSTEM_SETTINGS.FULL_DISK_ACCESS).toContain('Privacy_AllFiles');
+      expect(SYSTEM_SETTINGS.REMINDERS).toContain('Privacy_Reminders');
+      expect(SYSTEM_SETTINGS.CALENDARS).toContain('Privacy_Calendars');
+      expect(SYSTEM_SETTINGS.CONTACTS).toContain('Privacy_Contacts');
+    });
+  });
+
+  describe('createCliPermissionHint', () => {
+    it('returns reminders hint with correct settings URL', () => {
+      const hint = createCliPermissionHint('reminders');
+      expect(hint).toContain('Reminders');
+      expect(hint).toContain(SYSTEM_SETTINGS.REMINDERS);
+    });
+
+    it('returns calendars hint with correct settings URL', () => {
+      const hint = createCliPermissionHint('calendars');
+      expect(hint).toContain('Calendars');
+      expect(hint).toContain(SYSTEM_SETTINGS.CALENDARS);
+    });
+  });
+
+  describe('createFdaHint', () => {
+    it('returns FDA hint with database name and settings URL', () => {
+      const hint = createFdaHint('Messages');
+      expect(hint).toContain('Full Disk Access');
+      expect(hint).toContain('Messages database');
+      expect(hint).toContain(SYSTEM_SETTINGS.FULL_DISK_ACCESS);
+    });
+
+    it('returns FDA hint for Mail database', () => {
+      const hint = createFdaHint('Mail');
+      expect(hint).toContain('Mail database');
+      expect(hint).toContain(SYSTEM_SETTINGS.FULL_DISK_ACCESS);
     });
   });
 });

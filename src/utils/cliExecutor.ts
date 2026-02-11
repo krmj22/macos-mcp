@@ -12,6 +12,7 @@ import {
   getEnvironmentBinaryConfig,
 } from './binaryValidator.js';
 import { FILE_SYSTEM } from './constants.js';
+import { createCliPermissionHint } from './errorHandling.js';
 import {
   hasBeenPrompted,
   type PermissionDomain,
@@ -144,10 +145,11 @@ const parseCliOutput = <T>(output: string): T => {
     return parsed.result;
   }
 
-  // Check for permission errors and throw specialized error
+  // Check for permission errors and throw specialized error with actionable hint
   const permissionDomain = detectPermissionError(parsed.message);
   if (permissionDomain) {
-    throw new CliPermissionError(parsed.message, permissionDomain);
+    const hint = createCliPermissionHint(permissionDomain);
+    throw new CliPermissionError(`${parsed.message} ${hint}`, permissionDomain);
   }
 
   throw new Error(parsed.message);
