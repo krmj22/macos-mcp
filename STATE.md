@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Wave 3-4 complete: functional E2E suite + Gmail inbox fix)
+Last updated: 2026-02-11 (Wave 3-4 complete: E2E suite + Gmail labels fix for all mailboxes)
 
 ## Overview
 
@@ -23,7 +23,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
 | `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
-| `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, Gmail inbox fixed, JXA writes only (#76 FIXED) |
+| `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, Gmail labels supported (all mailboxes), JXA writes only (#76 FIXED) |
 | `messages_chat` | SQLite + JXA | read, create (send) | 13/13 — #75 CLOSED (5.3s, was 60s+) |
 | `contacts_people` | JXA | read, search, create, update, delete | 14/14 — #77 CLOSED (570ms, was 30s+) |
 

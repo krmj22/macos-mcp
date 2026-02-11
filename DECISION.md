@@ -52,7 +52,7 @@ JOIN mailboxes imb ON l.mailbox_id = imb.ROWID
 WHERE LOWER(imb.url) LIKE '%/inbox'
 ```
 
-`listInboxMessages()` now checks both `messages.mailbox` (non-Gmail) and `labels` (Gmail). Without this, Gmail accounts return 0 inbox messages despite Mail.app showing them.
+`listInboxMessages()` and `listMailboxMessages()` now check both `messages.mailbox` (non-Gmail) and `labels` (Gmail). Without this, Gmail accounts return 0 messages for any folder — inbox, custom labels (Business, Real Estate, etc.), all of them.
 
 ### References
 
