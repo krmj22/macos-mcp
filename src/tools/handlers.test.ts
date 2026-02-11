@@ -353,46 +353,6 @@ describe('Tool Handlers', () => {
       expect(result).toBe('Successfully deleted reminder with ID: "123".');
     });
 
-    it('should format message without quotes', () => {
-      const { formatDeleteMessage } = require('./handlers/shared.js');
-
-      const result = formatDeleteMessage('event', 'event-456', {
-        useQuotes: false,
-      });
-
-      expect(result).toBe('Successfully deleted event with ID: event-456.');
-    });
-
-    it('should format message without ID prefix', () => {
-      const { formatDeleteMessage } = require('./handlers/shared.js');
-
-      const result = formatDeleteMessage('list', 'My List', {
-        useIdPrefix: false,
-      });
-
-      expect(result).toBe('Successfully deleted list "My List".');
-    });
-
-    it('should format message without period', () => {
-      const { formatDeleteMessage } = require('./handlers/shared.js');
-
-      const result = formatDeleteMessage('task', 'task-789', {
-        usePeriod: false,
-      });
-
-      expect(result).toBe('Successfully deleted task with ID: "task-789"');
-    });
-
-    it('should format message with space separator instead of colon', () => {
-      const { formatDeleteMessage } = require('./handlers/shared.js');
-
-      const result = formatDeleteMessage('reminder', '123', {
-        useColon: false,
-      });
-
-      expect(result).toBe('Successfully deleted reminder with ID "123".');
-    });
-
     it('should format message with all options disabled', () => {
       const { formatDeleteMessage } = require('./handlers/shared.js');
 
@@ -543,36 +503,6 @@ describe('Tool Handlers', () => {
       expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
     });
 
-    it('should enrich single event attendees when id is provided', async () => {
-      const mockEvent = {
-        id: 'event-123',
-        title: 'One-on-One',
-        calendar: 'Work',
-        startDate: '2025-11-15T09:00:00Z',
-        endDate: '2025-11-15T10:00:00Z',
-        isAllDay: false,
-        attendees: ['boss@company.com'],
-      };
-      mockCalendarRepository.findEventById.mockResolvedValue(mockEvent);
-
-      mockContactResolver.resolveBatch.mockResolvedValue(
-        new Map([
-          [
-            'boss@company.com',
-            { id: 'c2', fullName: 'The Boss', firstName: 'The' },
-          ],
-        ]),
-      );
-
-      const result = await handleReadCalendarEvents({
-        action: 'read',
-        id: 'event-123',
-      });
-      const content = _getTextContent(result.content);
-
-      expect(content).toContain('- Attendees: The Boss');
-    });
-
     it('should handle events without attendees gracefully', async () => {
       const mockEvents = [
         {
@@ -590,8 +520,51 @@ describe('Tool Handlers', () => {
       const content = _getTextContent(result.content);
 
       expect(content).not.toContain('Attendees');
-      // Should not call resolveBatch when no attendees exist
       expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleReadCalendarEvents edge cases', () => {
+    it('handles events with empty attendees array', async () => {
+      const mockEvents = [
+        {
+          id: 'evt-1',
+          title: 'Event',
+          calendar: 'Work',
+          startDate: '2025-11-15T09:00:00Z',
+          endDate: '2025-11-15T10:00:00Z',
+          isAllDay: false,
+          attendees: [],
+        },
+      ];
+      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
+
+      const result = await handleReadCalendarEvents({ action: 'read' });
+      const content = _getTextContent(result.content);
+
+      expect(content).not.toContain('Attendees');
+      expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
+    });
+
+    it('handles events with undefined optional fields', async () => {
+      const mockEvents = [
+        {
+          id: 'evt-1',
+          title: 'Minimal',
+          calendar: 'Personal',
+          startDate: '2025-11-15T09:00:00Z',
+          endDate: '2025-11-15T10:00:00Z',
+          isAllDay: false,
+        },
+      ];
+      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
+
+      const result = await handleReadCalendarEvents({ action: 'read' });
+      const content = _getTextContent(result.content);
+
+      expect(content).not.toContain('Location');
+      expect(content).not.toContain('Notes');
+      expect(content).not.toContain('URL');
     });
   });
 

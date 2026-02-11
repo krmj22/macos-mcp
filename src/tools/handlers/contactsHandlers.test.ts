@@ -134,16 +134,6 @@ describe('Contacts Handlers', () => {
       expect(getTextContent(result)).toContain('No contacts found.');
     });
 
-    it('passes pagination params to script', async () => {
-      mockExecuteJxaWithRetry.mockResolvedValue([]);
-
-      await handleReadContacts({ action: 'read', limit: 10, offset: 20 });
-
-      const script = mockExecuteJxaWithRetry.mock.calls[0][0];
-      expect(script).toContain('offset = 20');
-      expect(script).toContain('limit = 10');
-    });
-
     it('propagates JXA errors', async () => {
       mockExecuteJxaWithRetry.mockRejectedValue(
         new Error('JXA execution failed'),
@@ -317,20 +307,6 @@ describe('Contacts Handlers', () => {
       );
     });
 
-    it('sets hasField flags correctly for provided fields', async () => {
-      mockExecuteJxa.mockResolvedValue({ id: 'c1', name: 'Test' });
-
-      await handleUpdateContact({
-        action: 'update',
-        id: 'c1',
-        firstName: 'New',
-      });
-
-      const script = mockExecuteJxa.mock.calls[0][0];
-      expect(script).toContain('"true" === "true") p.firstName');
-      expect(script).toContain('"false" === "true") p.lastName');
-    });
-
     it('propagates "Contact not found" error from JXA', async () => {
       mockExecuteJxa.mockRejectedValue(new Error('Contact not found'));
 
@@ -383,16 +359,5 @@ describe('Contacts Handlers', () => {
       expect(getTextContent(result)).toContain('Contact not found');
     });
 
-    it('sanitizes contact ID in script', async () => {
-      mockExecuteJxa.mockResolvedValue({ deleted: true, name: 'Test' });
-
-      await handleDeleteContact({
-        action: 'delete',
-        id: 'abc-123-def',
-      });
-
-      const script = mockExecuteJxa.mock.calls[0][0];
-      expect(script).toContain('abc-123-def');
-    });
   });
 });

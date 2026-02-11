@@ -1408,12 +1408,71 @@ describe('resolveDateRange', () => {
   });
 });
 
-describe('Retry Logic (executeJxaWithRetry)', () => {
-  it('is exported and callable', async () => {
-    await jest.isolateModulesAsync(async () => {
-      const { executeJxaWithRetry } = await import('../utils/jxaExecutor.js');
-      expect(typeof executeJxaWithRetry).toBe('function');
-    });
+describe('JXA malformed response handling', () => {
+  let handleReadNotes: typeof import('./handlers/notesHandlers.js').handleReadNotes;
+
+  beforeAll(async () => {
+    const mod = await import('./handlers/notesHandlers.js');
+    handleReadNotes = mod.handleReadNotes;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('handles non-JSON response from JXA gracefully', async () => {
+    mockExecuteJxaWithRetry.mockResolvedValue('not valid json string');
+
+    const result = await handleReadNotes({ action: 'read', id: 'n1' });
+    // Should not crash — the handler receives the raw string value
+    expect(result.isError).toBe(false);
+  });
+
+  it('handles undefined response from JXA', async () => {
+    mockExecuteJxaWithRetry.mockResolvedValue(undefined);
+
+    const result = await handleReadNotes({ action: 'read', id: 'missing' });
+    expect(getTextContent(result)).toContain('not found');
+  });
+
+  it('handles empty array response from JXA', async () => {
+    mockExecuteJxaWithRetry.mockResolvedValue([]);
+
+    const result = await handleReadNotes({ action: 'read' });
+    expect(result.isError).toBe(false);
+    expect(getTextContent(result)).toContain('No notes found');
+  });
+});
+
+describe('Error logging integration', () => {
+  let handleReadNotes: typeof import('./handlers/notesHandlers.js').handleReadNotes;
+
+  beforeAll(async () => {
+    const mod = await import('./handlers/notesHandlers.js');
+    handleReadNotes = mod.handleReadNotes;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns isError true for JXA permission errors', async () => {
+    const { JxaError } = jest.requireActual('../utils/jxaExecutor.js') as typeof import('../utils/jxaExecutor.js');
+    mockExecuteJxaWithRetry.mockRejectedValue(
+      new JxaError('Notes not allowed', 'Notes', true, 'not allowed'),
+    );
+
+    const result = await handleReadNotes({ action: 'read' });
+    expect(result.isError).toBe(true);
+    expect(getTextContent(result)).toContain('not allowed');
+  });
+
+  it('returns isError true for JXA timeout errors', async () => {
+    mockExecuteJxaWithRetry.mockRejectedValue(new Error('JXA execution failed for Notes: timed out'));
+
+    const result = await handleReadNotes({ action: 'read' });
+    expect(result.isError).toBe(true);
+    expect(getTextContent(result)).toContain('timed out');
   });
 });
 

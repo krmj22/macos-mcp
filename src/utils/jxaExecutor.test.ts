@@ -29,52 +29,22 @@ type ExecFileCallback =
 const mockExecFile = execFile as jest.MockedFunction<typeof execFile>;
 
 describe('sanitizeForJxa', () => {
-  it('escapes backslashes', () => {
-    expect(sanitizeForJxa('path\\to\\file')).toBe('path\\\\to\\\\file');
-  });
-
-  it('escapes single quotes', () => {
-    expect(sanitizeForJxa("O'Brien")).toBe("O\\'Brien");
-  });
-
-  it('escapes double quotes', () => {
-    expect(sanitizeForJxa('He said "hello"')).toBe('He said \\"hello\\"');
-  });
-
-  it('escapes backticks', () => {
-    expect(sanitizeForJxa('`code`')).toBe('\\`code\\`');
-  });
-
-  it('escapes dollar signs', () => {
-    expect(sanitizeForJxa('$100')).toBe('\\$100');
-  });
-
-  it('escapes newlines', () => {
-    expect(sanitizeForJxa('line1\nline2')).toBe('line1\\nline2');
-  });
-
-  it('escapes carriage returns', () => {
-    expect(sanitizeForJxa('line1\rline2')).toBe('line1\\rline2');
-  });
-
-  it('escapes tabs', () => {
-    expect(sanitizeForJxa('col1\tcol2')).toBe('col1\\tcol2');
-  });
-
-  it('removes null bytes', () => {
-    expect(sanitizeForJxa('before\0after')).toBe('beforeafter');
-  });
-
-  it('escapes Unicode line separator U+2028', () => {
-    expect(sanitizeForJxa('text\u2028more')).toBe('text\\u2028more');
-  });
-
-  it('escapes Unicode paragraph separator U+2029', () => {
-    expect(sanitizeForJxa('text\u2029more')).toBe('text\\u2029more');
-  });
-
-  it('returns empty string for empty input', () => {
-    expect(sanitizeForJxa('')).toBe('');
+  it.each([
+    ['path\\to\\file', 'path\\\\to\\\\file', 'backslashes'],
+    ["O'Brien", "O\\'Brien", 'single quotes'],
+    ['He said "hello"', 'He said \\"hello\\"', 'double quotes'],
+    ['`code`', '\\`code\\`', 'backticks'],
+    ['$100', '\\$100', 'dollar signs'],
+    ['line1\nline2', 'line1\\nline2', 'newlines'],
+    ['line1\rline2', 'line1\\rline2', 'carriage returns'],
+    ['col1\tcol2', 'col1\\tcol2', 'tabs'],
+    ['before\0after', 'beforeafter', 'null bytes'],
+    ['text\u2028more', 'text\\u2028more', 'U+2028'],
+    ['text\u2029more', 'text\\u2029more', 'U+2029'],
+    ['', '', 'empty string'],
+    ['Hello 世界 🌍', 'Hello 世界 🌍', 'unicode preservation'],
+  ])('escapes %s → %s (%s)', (input, expected) => {
+    expect(sanitizeForJxa(input)).toBe(expected);
   });
 
   it('handles combined special characters', () => {
@@ -84,10 +54,6 @@ describe('sanitizeForJxa', () => {
     expect(result).toContain("\\'");
     expect(result).toContain('\\$');
     expect(result).toContain('\\\\');
-  });
-
-  it('preserves unicode text (CJK, emoji)', () => {
-    expect(sanitizeForJxa('Hello 世界 🌍')).toBe('Hello 世界 🌍');
   });
 
   it('handles very long strings without error', () => {

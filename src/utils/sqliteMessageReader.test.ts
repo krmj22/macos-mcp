@@ -167,6 +167,23 @@ describe('sqliteMessageReader date utilities', () => {
     });
   });
 
+  describe('dateToAppleTimestamp boundary conditions', () => {
+    it('handles far-future dates (year 3000)', () => {
+      const result = dateToAppleTimestamp('3000-01-01T00:00:00Z');
+      expect(result).not.toBeNull();
+      // biome-ignore lint/style/noNonNullAssertion: test assertion after null check
+      expect(result!).toBeGreaterThan(0);
+    });
+
+    it('handles dates near Unix epoch (1970)', () => {
+      const result = dateToAppleTimestamp('1970-01-01T00:00:00Z');
+      expect(result).not.toBeNull();
+      // Before Apple epoch (2001), so should be negative
+      // biome-ignore lint/style/noNonNullAssertion: test assertion after null check
+      expect(result!).toBeLessThan(0);
+    });
+  });
+
   describe('dateToAppleTimestamp edge cases', () => {
     it('produces negative timestamp for dates before 2001', () => {
       const result = dateToAppleTimestamp('2000-01-01T00:00:00Z');
@@ -329,6 +346,22 @@ describe('sqliteMessageReader reader functions', () => {
       const result = await listChats(10, 0);
       expect(result[0].name).toBe('iMessage;-;+999');
       expect(result[0].participants).toEqual([]);
+    });
+  });
+
+  describe('SqliteAccessError', () => {
+    it('distinguishes permission vs non-permission errors', () => {
+      const permErr = new SqliteAccessError('unable to open database', true);
+      expect(permErr.isPermissionError).toBe(true);
+      expect(permErr.name).toBe('SqliteAccessError');
+
+      const otherErr = new SqliteAccessError('database is locked', false);
+      expect(otherErr.isPermissionError).toBe(false);
+    });
+
+    it('is instanceof Error', () => {
+      const err = new SqliteAccessError('test', false);
+      expect(err).toBeInstanceOf(Error);
     });
   });
 

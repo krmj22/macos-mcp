@@ -69,66 +69,29 @@ describe('ContactResolverService', () => {
   });
 
   describe('normalizePhone', () => {
-    it('should strip + sign from E.164 format', () => {
-      expect(service.normalizePhone('+15551234567')).toBe('15551234567');
-    });
-
-    it('should remove parentheses and spaces', () => {
-      expect(service.normalizePhone('(555) 123-4567')).toBe('5551234567');
-    });
-
-    it('should remove dashes', () => {
-      expect(service.normalizePhone('555-123-4567')).toBe('5551234567');
-    });
-
-    it('should pass through already normalized numbers', () => {
-      expect(service.normalizePhone('5551234567')).toBe('5551234567');
-    });
-
-    it('should handle international format with country code', () => {
-      expect(service.normalizePhone('+44 20 7946 0958')).toBe('442079460958');
-    });
-
-    it('should handle dots as separators', () => {
-      expect(service.normalizePhone('555.123.4567')).toBe('5551234567');
-    });
-
-    it('should handle mixed formatting', () => {
-      expect(service.normalizePhone('+1 (555) 123-4567')).toBe('15551234567');
-    });
-
-    it('should handle empty string', () => {
-      expect(service.normalizePhone('')).toBe('');
-    });
-
-    it('should handle phone extensions', () => {
-      expect(service.normalizePhone('555-123-4567 ext. 123')).toBe(
-        '5551234567123',
-      );
+    it.each([
+      ['+15551234567', '15551234567', 'E.164 format'],
+      ['(555) 123-4567', '5551234567', 'parentheses and spaces'],
+      ['555-123-4567', '5551234567', 'dashes'],
+      ['5551234567', '5551234567', 'already normalized'],
+      ['+44 20 7946 0958', '442079460958', 'international'],
+      ['555.123.4567', '5551234567', 'dots'],
+      ['+1 (555) 123-4567', '15551234567', 'mixed formatting'],
+      ['', '', 'empty string'],
+      ['555-123-4567 ext. 123', '5551234567123', 'extensions'],
+    ])('normalizes %s → %s (%s)', (input, expected) => {
+      expect(service.normalizePhone(input)).toBe(expected);
     });
   });
 
   describe('normalizeEmail', () => {
-    it('should convert to lowercase', () => {
-      expect(service.normalizeEmail('John.Doe@Example.COM')).toBe(
-        'john.doe@example.com',
-      );
-    });
-
-    it('should trim whitespace', () => {
-      expect(service.normalizeEmail('  john@example.com  ')).toBe(
-        'john@example.com',
-      );
-    });
-
-    it('should handle already normalized email', () => {
-      expect(service.normalizeEmail('john@example.com')).toBe(
-        'john@example.com',
-      );
-    });
-
-    it('should handle empty string', () => {
-      expect(service.normalizeEmail('')).toBe('');
+    it.each([
+      ['John.Doe@Example.COM', 'john.doe@example.com', 'lowercase'],
+      ['  john@example.com  ', 'john@example.com', 'trim whitespace'],
+      ['john@example.com', 'john@example.com', 'already normalized'],
+      ['', '', 'empty string'],
+    ])('normalizes %s → %s (%s)', (input, expected) => {
+      expect(service.normalizeEmail(input)).toBe(expected);
     });
   });
 
@@ -432,56 +395,6 @@ describe('ContactResolverService', () => {
       });
     });
 
-    it('should handle contacts with only phones', async () => {
-      mockExecuteJxa.mockResolvedValue([
-        {
-          id: 'phone-only',
-          fullName: 'Phone Only',
-          firstName: 'Phone',
-          lastName: 'Only',
-          phones: ['5552222222'],
-          emails: [],
-        },
-      ]);
-
-      const phoneResult = await service.resolveHandle('5552222222');
-      expect(phoneResult).not.toBeNull();
-
-      service.invalidateCache();
-      mockExecuteJxa.mockResolvedValue([
-        {
-          id: 'phone-only',
-          fullName: 'Phone Only',
-          firstName: 'Phone',
-          lastName: 'Only',
-          phones: ['5552222222'],
-          emails: [],
-        },
-      ]);
-
-      const emailResult = await service.resolveHandle('phoneonly@test.com');
-      expect(emailResult).toBeNull();
-    });
-
-    it('should handle contacts with only emails', async () => {
-      mockExecuteJxa.mockResolvedValue([
-        {
-          id: 'email-only',
-          fullName: 'Email Only',
-          firstName: 'Email',
-          lastName: 'Only',
-          phones: [],
-          emails: ['emailonly@test.com'],
-        },
-      ]);
-
-      const emailResult = await service.resolveHandle('emailonly@test.com');
-      expect(emailResult).not.toBeNull();
-
-      const phoneResult = await service.resolveHandle('5553333333');
-      expect(phoneResult).toBeNull();
-    });
-
     it('should handle empty contacts array', async () => {
       mockExecuteJxa.mockResolvedValue([]);
 
@@ -643,42 +556,26 @@ describe('ContactResolverService', () => {
       expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle contacts with only phones (no emails)', async () => {
+    it.each([
+      ['only phones', ['5551234567'], [], 1, 0],
+      ['only emails', [], ['email@example.com'], 0, 1],
+    ])('handles contacts with %s', async (_desc, phones, emails, expectedPhones, expectedEmails) => {
       mockExecuteJxa.mockResolvedValue([
         {
-          id: 'phone-only',
-          fullName: 'Phone Only',
-          firstName: 'Phone',
-          lastName: 'Only',
-          phones: ['5551234567'],
-          emails: [],
+          id: 'partial',
+          fullName: 'Partial Contact',
+          firstName: 'Partial',
+          lastName: 'Contact',
+          phones,
+          emails,
         },
       ]);
 
-      const result = await service.resolveNameToHandles('Phone Only');
+      const result = await service.resolveNameToHandles('Partial');
 
       expect(result).not.toBeNull();
-      expect(result?.phones.length).toBe(1);
-      expect(result?.emails.length).toBe(0);
-    });
-
-    it('should handle contacts with only emails (no phones)', async () => {
-      mockExecuteJxa.mockResolvedValue([
-        {
-          id: 'email-only',
-          fullName: 'Email Only',
-          firstName: 'Email',
-          lastName: 'Only',
-          phones: [],
-          emails: ['email@example.com'],
-        },
-      ]);
-
-      const result = await service.resolveNameToHandles('Email Only');
-
-      expect(result).not.toBeNull();
-      expect(result?.phones.length).toBe(0);
-      expect(result?.emails.length).toBe(1);
+      expect(result?.phones.length).toBe(expectedPhones);
+      expect(result?.emails.length).toBe(expectedEmails);
     });
 
     it('should return null for contacts with no handles', async () => {

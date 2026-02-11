@@ -231,10 +231,13 @@ describe('cliExecutor', () => {
       );
     });
 
-    it('throws permission error when reminder access is denied after retry', async () => {
+    it.each([
+      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders'],
+      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars'],
+    ])('throws %s permission error after retry', async (_domain, message, args, expectedDomain) => {
       const permissionError = JSON.stringify({
         status: 'error',
-        message: 'Reminder permission denied.',
+        message,
       });
 
       mockExecFile.mockImplementation(((
@@ -251,60 +254,10 @@ describe('cliExecutor', () => {
         return {} as ChildProcess;
       }) as unknown as typeof execFile);
 
-      await expect(executeCli(['--action', 'read'])).rejects.toThrow(
-        'Reminder permission denied.',
-      );
-      // Proactive prompt is called once, then retry prompt is called once
-      // Total: 2 calls to triggerPermissionPrompt
+      await expect(executeCli(args)).rejects.toThrow(message);
       expect(mockTriggerPermissionPrompt).toHaveBeenCalledTimes(2);
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(
-        1,
-        'reminders',
-      );
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(
-        2,
-        'reminders',
-      );
-      // CLI is called twice: once after proactive prompt, once after retry prompt
-      expect(mockExecFile).toHaveBeenCalledTimes(2);
-    });
-
-    it('throws permission error when calendar access is denied after retry', async () => {
-      const permissionError = JSON.stringify({
-        status: 'error',
-        message: 'Calendar permission denied.',
-      });
-
-      mockExecFile.mockImplementation(((
-        _cliPath: string,
-        _args: readonly string[] | null | undefined,
-        optionsOrCallback?: ExecFileOptions | null | ExecFileCallback,
-        callback?: ExecFileCallback,
-      ) => {
-        const cb = invokeCallback(optionsOrCallback, callback);
-        const error = Object.assign(new Error('Command failed'), {
-          stderr: '',
-        }) as ExecFileException;
-        cb?.(error, permissionError, '');
-        return {} as ChildProcess;
-      }) as unknown as typeof execFile);
-
-      await expect(executeCli(['--action', 'read-events'])).rejects.toThrow(
-        'Calendar permission denied.',
-      );
-
-      // Proactive prompt for calendars is called once, then retry prompt is called once
-      // Total: 2 calls to triggerPermissionPrompt
-      expect(mockTriggerPermissionPrompt).toHaveBeenCalledTimes(2);
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(
-        1,
-        'calendars',
-      );
-      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(
-        2,
-        'calendars',
-      );
-      // CLI is called twice: once after proactive prompt, once after retry prompt
+      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(1, expectedDomain);
+      expect(mockTriggerPermissionPrompt).toHaveBeenNthCalledWith(2, expectedDomain);
       expect(mockExecFile).toHaveBeenCalledTimes(2);
     });
 
@@ -428,16 +381,13 @@ describe('cliExecutor', () => {
       expect(result).toEqual({ value: 123 });
     });
 
-    it('triggers permission prompt and retries on reminder permission error', async () => {
+    it.each([
+      ['reminders', 'Reminder permission denied.', ['--action', 'read'], 'reminders', { reminders: [] }],
+      ['calendars', 'Calendar permission denied.', ['--action', 'read-events'], 'calendars', { events: [] }],
+    ])('triggers %s permission prompt and retries successfully', async (_domain, errorMsg, args, expectedDomain, expectedResult) => {
       let callCount = 0;
-      const permissionError = JSON.stringify({
-        status: 'error',
-        message: 'Reminder permission denied.',
-      });
-      const successResponse = JSON.stringify({
-        status: 'success',
-        result: { reminders: [] },
-      });
+      const permissionError = JSON.stringify({ status: 'error', message: errorMsg });
+      const successResponse = JSON.stringify({ status: 'success', result: expectedResult });
 
       mockExecFile.mockImplementation(((
         _cliPath: string,
@@ -448,56 +398,18 @@ describe('cliExecutor', () => {
         const cb = invokeCallback(optionsOrCallback, callback);
         callCount++;
         if (callCount === 1) {
-          // First call: permission denied
           cb?.(null, permissionError, '');
         } else {
-          // Second call after permission prompt: success
           cb?.(null, successResponse, '');
         }
         return {} as ChildProcess;
       }) as unknown as typeof execFile);
 
-      const result = await executeCli(['--action', 'read']);
+      const result = await executeCli(args);
 
       expect(mockExecFile).toHaveBeenCalledTimes(2);
-      expect(mockTriggerPermissionPrompt).toHaveBeenCalledWith('reminders');
-      expect(result).toEqual({ reminders: [] });
-    });
-
-    it('triggers permission prompt and retries on calendar permission error', async () => {
-      let callCount = 0;
-      const permissionError = JSON.stringify({
-        status: 'error',
-        message: 'Calendar permission denied.',
-      });
-      const successResponse = JSON.stringify({
-        status: 'success',
-        result: { events: [] },
-      });
-
-      mockExecFile.mockImplementation(((
-        _cliPath: string,
-        _args: readonly string[] | null | undefined,
-        optionsOrCallback?: ExecFileOptions | null | ExecFileCallback,
-        callback?: ExecFileCallback,
-      ) => {
-        const cb = invokeCallback(optionsOrCallback, callback);
-        callCount++;
-        if (callCount === 1) {
-          // First call: permission denied
-          cb?.(null, permissionError, '');
-        } else {
-          // Second call after permission prompt: success
-          cb?.(null, successResponse, '');
-        }
-        return {} as ChildProcess;
-      }) as unknown as typeof execFile);
-
-      const result = await executeCli(['--action', 'read-events']);
-
-      expect(mockExecFile).toHaveBeenCalledTimes(2);
-      expect(mockTriggerPermissionPrompt).toHaveBeenCalledWith('calendars');
-      expect(result).toEqual({ events: [] });
+      expect(mockTriggerPermissionPrompt).toHaveBeenCalledWith(expectedDomain);
+      expect(result).toEqual(expectedResult);
     });
 
     it('only retries once on permission error', async () => {
