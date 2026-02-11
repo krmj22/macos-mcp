@@ -109,6 +109,15 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
+### Functional E2E Suite (`pnpm test:e2e`) — 2026-02-11
+
+| Suite | Tests | Total Time | Create | Read | Delete |
+|-------|-------|-----------|--------|------|--------|
+| Reminders CRUD | 4 | 1.9s | 699ms | 444ms | 141ms |
+| Calendar CRUD | 3 | 2.3s | 1399ms | 811ms | 52ms |
+| Notes CRUD | 3 | 3.6s | 1283ms | 1894ms | 420ms |
+| Messages read | 1 | 0.3s | — | 308ms | — |
+
 ## Known Limitations
 
 - **Messages**: No delete/edit (Apple API limitation)

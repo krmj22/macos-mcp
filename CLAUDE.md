@@ -10,6 +10,7 @@ pnpm build            # Build TypeScript + Swift binary (required before running
 pnpm test             # Run all tests
 pnpm lint             # Lint and format with Biome
 pnpm dev              # Run from source via tsx (stdio only, no build needed)
+pnpm test:e2e         # Build + run functional E2E tests (node:test, real OS calls)
 ```
 
 **Note:** `bin/run.cjs` (used by `.mcp.json`) runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
@@ -21,15 +22,10 @@ See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, an
 ## Known Gotchas
 
 - **Calendar**: Recurring event deletion only removes single occurrence (uses `.thisEvent` span)
-- **Calendar**: `findEventById()` broken — unbounded date range returns 0 events (#73)
 - **Notes folders**: No rename/delete via JXA (Apple API limitation)
-- **Notes**: move-to-folder broken — JXA double-escaping (#74)
-- **Notes**: search scans all notes, 24s on large collections (#78)
 - **Messages**: No delete/edit via JXA or SQLite (Apple API limitation)
-- **Messages**: Default chat list TIMEOUT 60s — contact enrichment doesn't scale (#75)
 - **Mail create**: Creates draft only — user must click Send in Mail.app
 - **Mail reads**: Use SQLite (`~/Library/Mail/V10/MailData/Envelope Index`), JXA for writes only. See ADR-001 in DECISION.md
-- **Contacts**: Search TIMEOUT 30s — iterates all contacts instead of using `whose()` (#77)
 - **JXA rule**: Always use `whose()` predicates for search, never JS iteration over collections
 
 ### Messages JXA Broken (Sonoma+)
@@ -98,7 +94,7 @@ MCP server providing native macOS integration via two bridges:
 
 - **EventKit (Swift binary)** — Reminders, Calendar
 - **JXA (JavaScript for Automation)** — Notes, Mail, Contacts (Messages send only)
-- **SQLite** — Messages reads (`~/Library/Messages/chat.db`)
+- **SQLite** — Messages reads (`~/Library/Messages/chat.db`), Mail reads (`~/Library/Mail/V10/MailData/Envelope Index`)
 
 ### Key Files
 
@@ -122,7 +118,8 @@ src/
 │   ├── cliExecutor.ts   # Swift binary execution + permission retry
 │   ├── jxaExecutor.ts   # JXA/AppleScript execution + retry logic
 │   ├── logging.ts       # Structured error logging (tool failures → stderr)
-│   └── sqliteMessageReader.ts  # Messages SQLite fallback
+│   ├── sqliteMessageReader.ts  # Messages SQLite reader
+│   └── sqliteMailReader.ts     # Mail SQLite reader
 └── validation/
     └── schemas.ts       # Zod schemas
 ```
@@ -165,8 +162,10 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 ## Testing
 
-- Jest with ts-jest ESM preset
-- Coverage threshold: 96% statements, 90% branches
+- **Unit**: Jest with ts-jest ESM preset, 96% coverage threshold, all OS calls mocked
+- **E2E**: `pnpm test:e2e` — node:test suite, real MCP client via stdio, creates/reads/deletes actual items
+  - Tests use `[E2E-TEST]` prefix for cleanup identification
+  - Separate from Jest to avoid coverage threshold conflicts
 - Mock CLI: `src/utils/__mocks__/cliExecutor.ts`
 - Mock JXA: `src/tools/jxaHandlers.test.ts`
 
