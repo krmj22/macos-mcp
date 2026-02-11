@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Pre-release audit: 765 tests, coverage thresholds resolved, mail timeout fixed)
+Last updated: 2026-02-11 (Pre-release audit complete — #80 #81 #82 filed)
 
 ## Overview
 
@@ -10,7 +10,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 
 - **Source**: ~10k LOC TypeScript across `src/`
 - **Tests**: 765 unit tests, 32 test files, all passing
-- **E2E**: 104 tests across 7 suites (functional + 5 per-tool + cross-tool), all passing
+- **E2E**: 124 tests across 7 suites — 119 pass, 3 timing failures (#81), 2 send skipped
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
 
@@ -110,17 +110,19 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over collections is O(n) and times out.**
 
-### Per-Tool E2E Suites (2026-02-11)
+### Per-Tool E2E Suites (2026-02-11, parallel run)
 
 | Suite | File | Tests | Status |
 |-------|------|-------|--------|
 | Functional (golden path) | `functional.test.mts` | 19/19 | PASS |
 | Calendar | `calendar.test.mts` | 20/20 | PASS |
 | Notes | `notes.test.mts` | 21/21 | PASS |
-| Mail | `mail.test.mts` | 18/18 | PASS |
-| Messages | `messages.test.mts` | 17/17 (+2 skipped) | PASS |
-| Contacts | `contacts.test.mts` | 15/15 | PASS |
+| Mail | `mail.test.mts` | 17/18 | 1 timing fail (#81) |
+| Messages | `messages.test.mts` | 16/19 | 1 timing fail, 2 send skipped (#81) |
+| Contacts | `contacts.test.mts` | 13/14 | 1 timing fail (#81) |
 | Cross-tool | `cross-tool.test.mts` | 13/13 | PASS |
+
+3 timing failures are JXA contention from parallel execution — see #81. All return correct data.
 
 ### Functional E2E Baselines (`pnpm test:e2e`) — 2026-02-11 (pre-release)
 
@@ -135,6 +137,14 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 | Messages read | 2 | — | 372ms | — | — |
 | Messages enriched | — | — | 5141ms | — | — |
 | Contacts read + search | 2 | — | 1156ms | 1116ms | — |
+
+## Open Issues (Pre-Release Audit)
+
+| Issue | Severity | Description |
+|-------|----------|-------------|
+| #80 | **P1** | Contact resolution timeout gaps — `resolveHandle` unprotected (182s worst case), `resolveNameToHandles` retries too aggressive (47s worst case) |
+| #81 | **P2** | E2E per-tool timing thresholds fail under parallel execution — need serial runner |
+| #82 | docs | Pre-release audit results and INTENT compliance assessment |
 
 ## Known Limitations
 
