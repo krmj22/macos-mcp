@@ -5,6 +5,7 @@
 
 import { ValidationError } from '../validation/schemas.js';
 import { handleAsyncOperation } from './errorHandling.js';
+import { JxaError } from './jxaExecutor.js';
 
 describe('ErrorHandling', () => {
   const originalEnv = process.env.NODE_ENV;
@@ -182,6 +183,56 @@ describe('ErrorHandling', () => {
       expect(text).not.toContain('handlers');
 
       process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  describe('JxaError hints', () => {
+    it('provides timeout hint when JxaError message contains "timed out"', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('timed out', 'Notes', false, 'osascript timed out');
+      }, 'read notes');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('did not respond in time');
+    });
+
+    it('provides connection invalid hint', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('connection invalid', 'Mail', false, 'connection invalid');
+      }, 'read mail');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('Lost connection to Mail');
+    });
+
+    it('provides not running hint for "not running" pattern', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('not running', 'Notes', false);
+      }, 'read notes');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('does not appear to be running');
+    });
+
+    it('provides not running hint for "Can\'t get application" pattern', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError("Can't get application", 'Notes', false);
+      }, 'read notes');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('does not appear to be running');
+    });
+
+    it('falls back to generic message for unrecognized JxaError', async () => {
+      const result = await handleAsyncOperation(async () => {
+        throw new JxaError('syntax error', 'Notes', false, 'some stderr');
+      }, 'read notes');
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(text).toContain('Failed to');
+      expect(text).toContain('syntax error');
+      expect(text).not.toContain('did not respond');
+      expect(text).not.toContain('Lost connection');
     });
   });
 });

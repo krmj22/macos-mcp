@@ -142,6 +142,8 @@ describe('Notes Handlers', () => {
   let handleUpdateNote: typeof import('./handlers/notesHandlers.js').handleUpdateNote;
   let handleReadNotesFolders: typeof import('./handlers/notesHandlers.js').handleReadNotesFolders;
   let handleCreateNotesFolder: typeof import('./handlers/notesHandlers.js').handleCreateNotesFolder;
+  let handleCreateNote: typeof import('./handlers/notesHandlers.js').handleCreateNote;
+  let handleDeleteNote: typeof import('./handlers/notesHandlers.js').handleDeleteNote;
 
   beforeAll(async () => {
     const mod = await import('./handlers/notesHandlers.js');
@@ -149,6 +151,8 @@ describe('Notes Handlers', () => {
     handleUpdateNote = mod.handleUpdateNote;
     handleReadNotesFolders = mod.handleReadNotesFolders;
     handleCreateNotesFolder = mod.handleCreateNotesFolder;
+    handleCreateNote = mod.handleCreateNote;
+    handleDeleteNote = mod.handleDeleteNote;
   });
 
   describe('handleReadNotes', () => {
@@ -410,6 +414,74 @@ describe('Notes Handlers', () => {
       expect(getTextContent(result)).toContain('Successfully created folder');
     });
   });
+
+  describe('handleCreateNote', () => {
+    it('creates a note with title and body', async () => {
+      mockExecuteJxa.mockResolvedValue({ id: 'new-note-1', name: 'My Note' });
+
+      const result = await handleCreateNote({
+        action: 'create',
+        title: 'My Note',
+        body: 'Note body content',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully created note');
+      expect(getTextContent(result)).toContain('My Note');
+      expect(getTextContent(result)).toContain('new-note-1');
+    });
+
+    it('creates a note in a specific folder', async () => {
+      mockExecuteJxa.mockResolvedValue({ id: 'new-note-2', name: 'Work Note' });
+
+      const result = await handleCreateNote({
+        action: 'create',
+        title: 'Work Note',
+        body: 'Work content',
+        folder: 'Work',
+      });
+      expect(result.isError).toBe(false);
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('Work');
+    });
+
+    it('creates a note with minimal fields (title only)', async () => {
+      mockExecuteJxa.mockResolvedValue({ id: 'n3', name: 'Title Only' });
+
+      const result = await handleCreateNote({
+        action: 'create',
+        title: 'Title Only',
+      });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Title Only');
+    });
+  });
+
+  describe('handleDeleteNote', () => {
+    it('deletes a note by ID', async () => {
+      mockExecuteJxa.mockResolvedValue({ deleted: true });
+
+      const result = await handleDeleteNote({ action: 'delete', id: 'n1' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('Successfully deleted note');
+      expect(getTextContent(result)).toContain('n1');
+    });
+
+    it('includes note ID in deletion message', async () => {
+      mockExecuteJxa.mockResolvedValue({ deleted: true });
+
+      const result = await handleDeleteNote({ action: 'delete', id: 'x-coredata-123' });
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('x-coredata-123');
+    });
+
+    it('returns error when JXA throws', async () => {
+      mockExecuteJxa.mockRejectedValue(new Error('Note not found'));
+
+      const result = await handleDeleteNote({ action: 'delete', id: 'missing' });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('Note not found');
+    });
+  });
 });
 
 describe('Mail Handlers', () => {
@@ -530,6 +602,34 @@ describe('Mail Handlers', () => {
       });
       expect(result.isError).toBe(false);
     });
+
+    it('falls back gracefully when contact enrichment times out', async () => {
+      mockMailListInboxMessages.mockResolvedValue([
+        {
+          id: 'm1',
+          subject: 'Slow enrichment',
+          sender: 'slow@example.com',
+          senderName: '',
+          dateReceived: '2025-01-01',
+          read: false,
+          mailbox: 'Inbox',
+          account: 'Gmail',
+          preview: 'Preview text',
+          toRecipients: [],
+          ccRecipients: [],
+        },
+      ]);
+      // Simulate a slow resolveBatch that never resolves within timeout
+      mockResolveBatch.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(new Map([['slow@example.com', { fullName: 'Too Late' }]])), 10000)),
+      );
+
+      const result = await handleReadMail({ action: 'read' });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      // Should show email address (fallback), not "Too Late" (timed out)
+      expect(text).toContain('slow@example.com');
+    }, 10000);
   });
 
   describe('handleCreateMail', () => {

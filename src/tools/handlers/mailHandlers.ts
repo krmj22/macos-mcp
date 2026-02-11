@@ -43,8 +43,36 @@ interface MailboxItem {
 
 // --- Contact Enrichment ---
 
+/** Max unique addresses to enrich per request */
+const MAX_ENRICHMENT_ADDRESSES = 20;
+
+/** Timeout for enrichment operations (ms) */
+const ENRICHMENT_TIMEOUT_MS = 5000;
+
+/**
+ * Wraps a promise with a timeout. Returns the result or falls back to the
+ * fallback value if the operation exceeds the timeout.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 /**
  * Enriches mail senders with contact names instead of email addresses.
+ * Caps at MAX_ENRICHMENT_ADDRESSES and ENRICHMENT_TIMEOUT_MS to prevent
+ * hanging on slow contact lookups (matches Messages pattern).
  */
 async function enrichMailSenders(
   messages: MailMessage[],
@@ -52,7 +80,12 @@ async function enrichMailSenders(
   const addresses = [...new Set(messages.map((m) => m.sender).filter(Boolean))];
   if (addresses.length === 0) return messages;
 
-  const resolved = await contactResolver.resolveBatch(addresses);
+  const cappedAddresses = addresses.slice(0, MAX_ENRICHMENT_ADDRESSES);
+  const resolved = await withTimeout(
+    contactResolver.resolveBatch(cappedAddresses),
+    ENRICHMENT_TIMEOUT_MS,
+    new Map(),
+  );
   return messages.map((m) => ({
     ...m,
     senderName: resolved.get(m.sender)?.fullName || m.senderName || m.sender,

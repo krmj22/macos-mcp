@@ -301,6 +301,61 @@ describe('CalendarRepository', () => {
         expect.arrayContaining(['--isAllDay', 'true']),
       );
     });
+
+    it('should create event with recurrence parameters', async () => {
+      mockExecuteCli.mockResolvedValue({
+        id: 'recurring-1',
+        title: 'Weekly Meeting',
+        startDate: '2025-11-04T10:00:00+08:00',
+        endDate: '2025-11-04T11:00:00+08:00',
+        calendar: 'Work',
+        isAllDay: false,
+      });
+
+      await repository.createEvent({
+        title: 'Weekly Meeting',
+        startDate: '2025-11-04 10:00:00',
+        endDate: '2025-11-04 11:00:00',
+        recurrence: {
+          frequency: 'weekly',
+          interval: 2,
+          endDate: '2025-12-31',
+          occurrenceCount: 10,
+        },
+      });
+
+      expect(mockExecuteCli).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          '--recurrence', 'weekly',
+          '--recurrenceInterval', '2',
+          '--recurrenceEnd', '2025-12-31',
+          '--recurrenceCount', '10',
+        ]),
+      );
+    });
+
+    it('should create event without recurrence when not specified', async () => {
+      mockExecuteCli.mockResolvedValue({
+        id: 'no-rec',
+        title: 'Single Event',
+        startDate: '2025-11-04T10:00:00+08:00',
+        endDate: '2025-11-04T11:00:00+08:00',
+        calendar: 'Work',
+        isAllDay: false,
+      });
+
+      await repository.createEvent({
+        title: 'Single Event',
+        startDate: '2025-11-04 10:00:00',
+        endDate: '2025-11-04 11:00:00',
+      });
+
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs).not.toContain('--recurrence');
+      expect(callArgs).not.toContain('--recurrenceInterval');
+      expect(callArgs).not.toContain('--recurrenceEnd');
+      expect(callArgs).not.toContain('--recurrenceCount');
+    });
   });
 
   describe('updateEvent', () => {
@@ -356,6 +411,42 @@ describe('CalendarRepository', () => {
       expect(mockExecuteCli).toHaveBeenCalledWith(
         expect.arrayContaining(['--targetCalendar', 'Personal']),
       );
+    });
+
+    it('should update event with recurrence parameters', async () => {
+      mockExecuteCli.mockResolvedValue({
+        id: '1',
+        title: 'Updated',
+        startDate: '2025-11-04T09:00:00+08:00',
+        endDate: '2025-11-04T10:00:00+08:00',
+        calendar: 'Work',
+        isAllDay: false,
+      });
+
+      await repository.updateEvent({
+        id: '1',
+        recurrence: { frequency: 'daily', interval: 1 },
+      });
+
+      expect(mockExecuteCli).toHaveBeenCalledWith(
+        expect.arrayContaining(['--recurrence', 'daily', '--recurrenceInterval', '1']),
+      );
+    });
+
+    it('should update event without recurrence when not specified', async () => {
+      mockExecuteCli.mockResolvedValue({
+        id: '1',
+        title: 'Simple',
+        startDate: '2025-11-04T09:00:00+08:00',
+        endDate: '2025-11-04T10:00:00+08:00',
+        calendar: 'Work',
+        isAllDay: false,
+      });
+
+      await repository.updateEvent({ id: '1', title: 'Simple' });
+
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs).not.toContain('--recurrence');
     });
   });
 

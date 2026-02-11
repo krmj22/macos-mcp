@@ -2,7 +2,6 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type {
-  CalendarToolArgs,
   ListsToolArgs,
   RemindersToolArgs,
 } from '../types/index.js';
@@ -35,6 +34,23 @@ jest.mock('./handlers/index.js', () => ({
   handleUpdateCalendarEvent: jest.fn(),
   handleDeleteCalendarEvent: jest.fn(),
   handleReadCalendars: jest.fn(),
+  handleReadNotes: jest.fn(),
+  handleCreateNote: jest.fn(),
+  handleUpdateNote: jest.fn(),
+  handleDeleteNote: jest.fn(),
+  handleReadNotesFolders: jest.fn(),
+  handleCreateNotesFolder: jest.fn(),
+  handleReadMail: jest.fn(),
+  handleCreateMail: jest.fn(),
+  handleUpdateMail: jest.fn(),
+  handleDeleteMail: jest.fn(),
+  handleReadMessages: jest.fn(),
+  handleCreateMessage: jest.fn(),
+  handleReadContacts: jest.fn(),
+  handleSearchContacts: jest.fn(),
+  handleCreateContact: jest.fn(),
+  handleUpdateContact: jest.fn(),
+  handleDeleteContact: jest.fn(),
 }));
 
 jest.mock('./definitions.js', () => ({
@@ -43,6 +59,11 @@ jest.mock('./definitions.js', () => ({
     { name: 'reminders_lists', description: 'Reminder lists tool' },
     { name: 'calendar_events', description: 'Calendar events tool' },
     { name: 'calendar_calendars', description: 'Calendar collections tool' },
+    { name: 'notes_items', description: 'Notes items tool' },
+    { name: 'notes_folders', description: 'Notes folders tool' },
+    { name: 'mail_messages', description: 'Mail messages tool' },
+    { name: 'messages_chat', description: 'Messages chat tool' },
+    { name: 'contacts_people', description: 'Contacts people tool' },
   ],
 }));
 
@@ -55,6 +76,23 @@ import {
   handleReadCalendars,
   handleReadReminders,
   handleUpdateReminder,
+  handleReadNotes,
+  handleCreateNote,
+  handleUpdateNote,
+  handleDeleteNote,
+  handleReadNotesFolders,
+  handleCreateNotesFolder,
+  handleReadMail,
+  handleCreateMail,
+  handleUpdateMail,
+  handleDeleteMail,
+  handleReadMessages,
+  handleCreateMessage,
+  handleReadContacts,
+  handleSearchContacts,
+  handleCreateContact,
+  handleUpdateContact,
+  handleDeleteContact,
 } from './handlers/index.js';
 
 const mockHandleCreateReminder = handleCreateReminder as jest.MockedFunction<
@@ -84,6 +122,23 @@ const mockHandleDeleteCalendarEvent =
 const mockHandleReadCalendars = handleReadCalendars as jest.MockedFunction<
   typeof handleReadCalendars
 >;
+const mockHandleReadNotes = handleReadNotes as jest.MockedFunction<typeof handleReadNotes>;
+const mockHandleCreateNote = handleCreateNote as jest.MockedFunction<typeof handleCreateNote>;
+const mockHandleUpdateNote = handleUpdateNote as jest.MockedFunction<typeof handleUpdateNote>;
+const mockHandleDeleteNote = handleDeleteNote as jest.MockedFunction<typeof handleDeleteNote>;
+const mockHandleReadNotesFolders = handleReadNotesFolders as jest.MockedFunction<typeof handleReadNotesFolders>;
+const mockHandleCreateNotesFolder = handleCreateNotesFolder as jest.MockedFunction<typeof handleCreateNotesFolder>;
+const mockHandleReadMail = handleReadMail as jest.MockedFunction<typeof handleReadMail>;
+const mockHandleCreateMail = handleCreateMail as jest.MockedFunction<typeof handleCreateMail>;
+const mockHandleUpdateMail = handleUpdateMail as jest.MockedFunction<typeof handleUpdateMail>;
+const mockHandleDeleteMail = handleDeleteMail as jest.MockedFunction<typeof handleDeleteMail>;
+const mockHandleReadMessages = handleReadMessages as jest.MockedFunction<typeof handleReadMessages>;
+const mockHandleCreateMessage = handleCreateMessage as jest.MockedFunction<typeof handleCreateMessage>;
+const mockHandleReadContacts = handleReadContacts as jest.MockedFunction<typeof handleReadContacts>;
+const mockHandleSearchContacts = handleSearchContacts as jest.MockedFunction<typeof handleSearchContacts>;
+const mockHandleCreateContact = handleCreateContact as jest.MockedFunction<typeof handleCreateContact>;
+const mockHandleUpdateContact = handleUpdateContact as jest.MockedFunction<typeof handleUpdateContact>;
+const mockHandleDeleteContact = handleDeleteContact as jest.MockedFunction<typeof handleDeleteContact>;
 
 describe('Tools Index', () => {
   beforeEach(() => {
@@ -100,6 +155,23 @@ describe('Tools Index', () => {
         ['calendar_events', 'read', mockHandleReadCalendarEvents, { action: 'read' as const }],
         ['calendar_events', 'create', mockHandleCreateCalendarEvent, { action: 'create' as const, title: 'Evt', startDate: '2025-11-04 14:00:00', endDate: '2025-11-04 16:00:00' }],
         ['calendar_events', 'delete', mockHandleDeleteCalendarEvent, { action: 'delete' as const, id: 'evt-123' }],
+        ['notes_items', 'read', mockHandleReadNotes, { action: 'read' as const }],
+        ['notes_items', 'create', mockHandleCreateNote, { action: 'create' as const, title: 'Test', body: 'Content' }],
+        ['notes_items', 'update', mockHandleUpdateNote, { action: 'update' as const, id: 'n1', title: 'New' }],
+        ['notes_items', 'delete', mockHandleDeleteNote, { action: 'delete' as const, id: 'n1' }],
+        ['notes_folders', 'read', mockHandleReadNotesFolders, { action: 'read' as const }],
+        ['notes_folders', 'create', mockHandleCreateNotesFolder, { action: 'create' as const, name: 'Work' }],
+        ['mail_messages', 'read', mockHandleReadMail, { action: 'read' as const }],
+        ['mail_messages', 'create', mockHandleCreateMail, { action: 'create' as const, subject: 'Test', body: 'Body', to: ['a@b.com'] }],
+        ['mail_messages', 'update', mockHandleUpdateMail, { action: 'update' as const, id: 'm1', read: true }],
+        ['mail_messages', 'delete', mockHandleDeleteMail, { action: 'delete' as const, id: 'm1' }],
+        ['messages_chat', 'read', mockHandleReadMessages, { action: 'read' as const }],
+        ['messages_chat', 'create', mockHandleCreateMessage, { action: 'create' as const, chatId: 'c1', text: 'Hi' }],
+        ['contacts_people', 'read', mockHandleReadContacts, { action: 'read' as const }],
+        ['contacts_people', 'search', mockHandleSearchContacts, { action: 'search' as const, search: 'John' }],
+        ['contacts_people', 'create', mockHandleCreateContact, { action: 'create' as const, firstName: 'John' }],
+        ['contacts_people', 'update', mockHandleUpdateContact, { action: 'update' as const, id: 'c1', firstName: 'Jane' }],
+        ['contacts_people', 'delete', mockHandleDeleteContact, { action: 'delete' as const, id: 'c1' }],
       ])('routes %s action=%s to correct handler', async (tool, _action, mockHandler, args) => {
         const expectedResult: CallToolResult = {
           content: [{ type: 'text', text: 'Success' }],
@@ -128,6 +200,41 @@ describe('Tools Index', () => {
 
         expect(mockHandleReadReminders).toHaveBeenCalledWith(args);
         expect(result).toEqual(expectedResult);
+      });
+
+      it('should route notes.items alias to notes_items handler', async () => {
+        mockHandleReadNotes.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], isError: false });
+        const result = await handleToolCall('notes.items', { action: 'read' as const });
+        expect(mockHandleReadNotes).toHaveBeenCalled();
+        expect(result.isError).toBe(false);
+      });
+
+      it('should route mail.messages alias to mail_messages handler', async () => {
+        mockHandleReadMail.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], isError: false });
+        const result = await handleToolCall('mail.messages', { action: 'read' as const });
+        expect(mockHandleReadMail).toHaveBeenCalled();
+        expect(result.isError).toBe(false);
+      });
+
+      it('should route messages.chat alias to messages_chat handler', async () => {
+        mockHandleReadMessages.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], isError: false });
+        const result = await handleToolCall('messages.chat', { action: 'read' as const });
+        expect(mockHandleReadMessages).toHaveBeenCalled();
+        expect(result.isError).toBe(false);
+      });
+
+      it('should route contacts.people alias to contacts_people handler', async () => {
+        mockHandleReadContacts.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], isError: false });
+        const result = await handleToolCall('contacts.people', { action: 'read' as const });
+        expect(mockHandleReadContacts).toHaveBeenCalled();
+        expect(result.isError).toBe(false);
+      });
+
+      it('should route notes.folders alias to notes_folders handler', async () => {
+        mockHandleReadNotesFolders.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], isError: false });
+        const result = await handleToolCall('notes.folders', { action: 'read' as const });
+        expect(mockHandleReadNotesFolders).toHaveBeenCalled();
+        expect(result.isError).toBe(false);
       });
     });
 
@@ -194,6 +301,11 @@ describe('Tools Index', () => {
         ['reminders_lists', { action: 'unknown' }, 'Unknown reminders_lists action: unknown'],
         ['calendar_events', { action: 'unknown' }, 'Unknown calendar_events action: unknown'],
         ['calendar_events', undefined, 'No arguments provided'],
+        ['notes_items', { action: 'unknown' }, 'Unknown notes_items action: unknown'],
+        ['notes_folders', { action: 'unknown' }, 'Unknown notes_folders action: unknown'],
+        ['mail_messages', { action: 'unknown' }, 'Unknown mail_messages action: unknown'],
+        ['messages_chat', { action: 'unknown' }, 'Unknown messages_chat action: unknown'],
+        ['contacts_people', { action: 'unknown' }, 'Unknown contacts_people action: unknown'],
       ])('returns error for %s with invalid args: %j', async (tool, args, expectedText) => {
         const result = await handleToolCall(tool, args as unknown as RemindersToolArgs);
         expect(result).toEqual({

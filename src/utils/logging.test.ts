@@ -3,7 +3,7 @@
  * Tests for structured logging utilities
  */
 
-import { logToolError } from './logging.js';
+import { logToolCall, logToolError } from './logging.js';
 
 describe('logToolError', () => {
   let stderrSpy: jest.SpyInstance;
@@ -147,5 +147,86 @@ describe('logToolError', () => {
     expect(output.endsWith('\n')).toBe(true);
     // Should not throw
     JSON.parse(output);
+  });
+});
+
+describe('logToolCall', () => {
+  let stderrSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    stderrSpy = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  it('logs basic tool dispatch', () => {
+    logToolCall('reminders_tasks', 'reminders_tasks', true, 'read', 42);
+
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.level).toBe('info');
+    expect(logEntry.event).toBe('tool_dispatch');
+    expect(logEntry.tool).toBe('reminders_tasks');
+    expect(logEntry.found).toBe(true);
+    expect(logEntry.action).toBe('read');
+    expect(logEntry.durationMs).toBe(42);
+    expect(logEntry.normalizedTool).toBeUndefined();
+  });
+
+  it('includes normalizedTool when different from toolName', () => {
+    logToolCall('reminders.tasks', 'reminders_tasks', true, 'read');
+
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.tool).toBe('reminders.tasks');
+    expect(logEntry.normalizedTool).toBe('reminders_tasks');
+  });
+
+  it('logs warn level for not-found tool', () => {
+    logToolCall('nonexistent_tool', 'nonexistent_tool', false);
+
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.level).toBe('warn');
+    expect(logEntry.found).toBe(false);
+  });
+
+  it('omits optional fields when undefined', () => {
+    logToolCall('reminders_tasks', 'reminders_tasks', true);
+
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.tool).toBe('reminders_tasks');
+    expect(logEntry.found).toBe(true);
+    expect('action' in logEntry).toBe(false);
+    expect('durationMs' in logEntry).toBe(false);
+    expect('isError' in logEntry).toBe(false);
+  });
+
+  it('includes isError field when provided', () => {
+    logToolCall('reminders_tasks', 'reminders_tasks', true, 'read', 100, true);
+
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.isError).toBe(true);
+  });
+
+  it('outputs JSON terminated with newline', () => {
+    logToolCall('notes_items', 'notes_items', true, 'read');
+
+    const output = stderrSpy.mock.calls[0][0] as string;
+    expect(output.endsWith('\n')).toBe(true);
+    // Should not throw — valid JSON
+    JSON.parse(output.trimEnd());
+  });
+
+  it('includes timestamp in ISO format', () => {
+    logToolCall('calendar_events', 'calendar_events', true);
+
+    const logEntry = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logEntry.timestamp).toBeDefined();
+    expect(logEntry.timestamp).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
   });
 });
