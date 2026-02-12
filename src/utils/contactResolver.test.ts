@@ -1,6 +1,10 @@
 /**
  * contactResolver.test.ts
  * Tests for ContactResolverService
+ *
+ * Two mocks needed:
+ * - sqliteContactReader.js: for bulk cache build (resolveHandle/resolveBatch/warmCache)
+ * - jxaExecutor.js: for targeted search (resolveNameToHandles)
  */
 
 import {
@@ -8,7 +12,21 @@ import {
   ContactSearchError,
 } from './contactResolver.js';
 
-// Mock the jxaExecutor module
+// Mock the SQLite contact reader (for bulk cache)
+jest.mock('./sqliteContactReader.js', () => ({
+  fetchAllContacts: jest.fn(),
+  SqliteContactAccessError: class SqliteContactAccessError extends Error {
+    constructor(
+      message: string,
+      public readonly isPermissionError: boolean,
+    ) {
+      super(message);
+      this.name = 'SqliteContactAccessError';
+    }
+  },
+}));
+
+// Mock the jxaExecutor module (for targeted name search)
 jest.mock('./jxaExecutor.js', () => ({
   executeJxaWithRetry: jest.fn(),
   sanitizeForJxa: jest.fn((input: string) => input),
@@ -25,8 +43,12 @@ jest.mock('./jxaExecutor.js', () => ({
   },
 }));
 
+import { fetchAllContacts } from './sqliteContactReader.js';
 import { executeJxaWithRetry } from './jxaExecutor.js';
 
+const mockFetchAllContacts = fetchAllContacts as jest.MockedFunction<
+  typeof fetchAllContacts
+>;
 const mockExecuteJxa = executeJxaWithRetry as jest.MockedFunction<
   typeof executeJxaWithRetry
 >;
@@ -65,7 +87,7 @@ describe('ContactResolverService', () => {
     jest.clearAllMocks();
     // Use a short TTL for testing
     service = new ContactResolverService(100);
-    mockExecuteJxa.mockResolvedValue(mockContacts);
+    mockFetchAllContacts.mockResolvedValue(mockContacts);
   });
 
   describe('normalizePhone', () => {
@@ -136,8 +158,7 @@ describe('ContactResolverService', () => {
     });
 
     it('should match phone by last 10 digits when no exact match exists', async () => {
-      // Override mock to use a contact with only an 11-digit phone
-      mockExecuteJxa.mockResolvedValue([
+      mockFetchAllContacts.mockResolvedValue([
         {
           id: 'contact-intl',
           fullName: 'International User',
@@ -170,26 +191,21 @@ describe('ContactResolverService', () => {
       });
     });
 
-    it('should use 15s timeout and 1 retry for bulk cache build', async () => {
+    it('should use SQLite fetchAllContacts for cache build', async () => {
       await service.resolveHandle('+1 (555) 123-4567');
 
-      // Verify the bulk fetch uses reduced timeout (15s) and retries (1)
-      expect(mockExecuteJxa).toHaveBeenCalledWith(
-        expect.stringContaining('Contacts.people()'),
-        15000,
-        'Contacts',
-        1,
-        1000,
-      );
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
+      // JXA should NOT be called for cache build
+      expect(mockExecuteJxa).not.toHaveBeenCalled();
     });
 
-    it('should only call JXA once for multiple resolves (caching)', async () => {
+    it('should only call fetchAllContacts once for multiple resolves (caching)', async () => {
       await service.resolveHandle('john@example.com');
       await service.resolveHandle('jane@example.com');
       await service.resolveHandle('+1 555 123 4567');
 
-      // JXA should only be called once to build cache
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      // SQLite should only be called once to build cache
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -223,7 +239,7 @@ describe('ContactResolverService', () => {
       expect(results.size).toBe(0);
     });
 
-    it('should only call JXA once for batch resolve', async () => {
+    it('should only call fetchAllContacts once for batch resolve', async () => {
       await service.resolveBatch([
         'john@example.com',
         'jane@example.com',
@@ -231,7 +247,7 @@ describe('ContactResolverService', () => {
         '+44 20 7946 0958',
       ]);
 
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -259,8 +275,8 @@ describe('ContactResolverService', () => {
       expect(results.has('ghost@test.com')).toBe(false);
     });
 
-    it('returns empty map when cache build times out (JXA rejection)', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('timed out'));
+    it('returns empty map when cache build fails (SQLite rejection)', async () => {
+      mockFetchAllContacts.mockRejectedValue(new Error('database error'));
 
       const results = await service.resolveBatch([
         'john.doe@example.com',
@@ -276,14 +292,14 @@ describe('ContactResolverService', () => {
     it('should force cache rebuild after invalidation', async () => {
       // First resolve builds cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Invalidate cache
       service.invalidateCache();
 
       // Next resolve should rebuild cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(2);
     });
 
     it('should clear cache entries', async () => {
@@ -299,36 +315,36 @@ describe('ContactResolverService', () => {
     it('should rebuild cache after TTL expires', async () => {
       // Build cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Wait for TTL to expire (100ms in test)
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Should rebuild cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(2);
     });
 
     it('should not rebuild cache before TTL expires', async () => {
       // Build cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Immediately resolve again (before TTL)
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('concurrent cache builds (coalescing)', () => {
-    it('should coalesce concurrent cache builds into single JXA call', async () => {
-      // Simulate slow JXA call with a deferred promise
-      let resolveJxa: ((value: unknown) => void) | undefined;
-      mockExecuteJxa.mockImplementation(
+    it('should coalesce concurrent cache builds into single SQLite call', async () => {
+      // Simulate slow SQLite call with a deferred promise
+      let resolveSqlite: ((value: unknown[]) => void) | undefined;
+      mockFetchAllContacts.mockImplementation(
         () =>
-          new Promise((resolve) => {
-            resolveJxa = resolve;
-          }),
+          new Promise<unknown[]>((resolve) => {
+            resolveSqlite = resolve;
+          }) as any,
       );
 
       // Start multiple concurrent resolves
@@ -336,32 +352,29 @@ describe('ContactResolverService', () => {
       const promise2 = service.resolveHandle('jane@example.com');
       const promise3 = service.resolveBatch(['+1 555 123 4567']);
 
-      // JXA should only be called once
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      // SQLite should only be called once
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
-      // Resolve the JXA call
-      if (resolveJxa) {
-        resolveJxa(mockContacts);
+      // Resolve the SQLite call
+      if (resolveSqlite) {
+        resolveSqlite(mockContacts);
       }
 
       // All promises should resolve
       await Promise.all([promise1, promise2, promise3]);
 
-      // Still only one JXA call
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      // Still only one SQLite call
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('graceful degradation on permission failure', () => {
     it('should return null on permission error', async () => {
-      const { JxaError: MockJxaError } = jest.requireMock('./jxaExecutor.js');
-      mockExecuteJxa.mockRejectedValue(
-        new MockJxaError(
-          'Permission denied for Contacts',
-          'Contacts',
-          true,
-          'not authorized',
-        ),
+      const { SqliteContactAccessError: MockError } = jest.requireMock(
+        './sqliteContactReader.js',
+      );
+      mockFetchAllContacts.mockRejectedValue(
+        new MockError('Cannot access Contacts database', true),
       );
 
       const result = await service.resolveHandle('john@example.com');
@@ -370,14 +383,11 @@ describe('ContactResolverService', () => {
     });
 
     it('should return empty map on permission error in batch', async () => {
-      const { JxaError: MockJxaError } = jest.requireMock('./jxaExecutor.js');
-      mockExecuteJxa.mockRejectedValue(
-        new MockJxaError(
-          'Permission denied for Contacts',
-          'Contacts',
-          true,
-          'not authorized',
-        ),
+      const { SqliteContactAccessError: MockError } = jest.requireMock(
+        './sqliteContactReader.js',
+      );
+      mockFetchAllContacts.mockRejectedValue(
+        new MockError('Cannot access Contacts database', true),
       );
 
       const results = await service.resolveBatch(['john@example.com']);
@@ -386,27 +396,23 @@ describe('ContactResolverService', () => {
     });
 
     it('should set cache timestamp on permission error to avoid repeated calls', async () => {
-      const { JxaError: MockJxaError } = jest.requireMock('./jxaExecutor.js');
-      const permError = new MockJxaError(
-        'Permission denied for Contacts',
-        'Contacts',
-        true,
-        'not authorized',
+      const { SqliteContactAccessError: MockError } = jest.requireMock(
+        './sqliteContactReader.js',
       );
-      mockExecuteJxa.mockRejectedValue(permError);
+      mockFetchAllContacts.mockRejectedValue(
+        new MockError('Cannot access Contacts database', true),
+      );
 
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
-      // Second call should not trigger JXA again (cache is "valid" but empty)
-      // Note: We need to keep the mock rejection for the second call since
-      // the first call's error handling should have set the cache timestamp
+      // Second call should not trigger SQLite again (cache is "valid" but empty)
       await service.resolveHandle('jane@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
 
     it('should return null on other errors', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('Network error'));
+      mockFetchAllContacts.mockRejectedValue(new Error('Database error'));
 
       const result = await service.resolveHandle('john@example.com');
 
@@ -414,7 +420,7 @@ describe('ContactResolverService', () => {
     });
 
     it('should return empty map on other errors in batch', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('Network error'));
+      mockFetchAllContacts.mockRejectedValue(new Error('Database error'));
 
       const results = await service.resolveBatch(['john@example.com']);
 
@@ -422,15 +428,15 @@ describe('ContactResolverService', () => {
     });
 
     it('should set negative cache on non-permission errors to prevent retry storms', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('JXA timed out'));
+      mockFetchAllContacts.mockRejectedValue(new Error('SQLite error'));
 
-      // First call triggers JXA and gets error
+      // First call triggers SQLite and gets error
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
-      // Second call should NOT retrigger JXA — negative cache with valid timestamp
+      // Second call should NOT retrigger SQLite — negative cache with valid timestamp
       await service.resolveHandle('jane@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Cache should have valid timestamp but zero entries
       expect(service.getCacheSize()).toBe(0);
@@ -441,14 +447,14 @@ describe('ContactResolverService', () => {
       const stderrSpy = jest
         .spyOn(process.stderr, 'write')
         .mockImplementation(() => true);
-      mockExecuteJxa.mockRejectedValue(new Error('JXA timed out'));
+      mockFetchAllContacts.mockRejectedValue(new Error('SQLite error'));
 
       await service.resolveHandle('john@example.com');
 
       expect(stderrSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(stderrSpy.mock.calls[0][0] as string);
       expect(logged.event).toBe('contact_cache_build_failed');
-      expect(logged.error).toBe('JXA timed out');
+      expect(logged.error).toBe('SQLite error');
       expect(logged.level).toBe('warn');
       stderrSpy.mockRestore();
     });
@@ -457,14 +463,11 @@ describe('ContactResolverService', () => {
       const stderrSpy = jest
         .spyOn(process.stderr, 'write')
         .mockImplementation(() => true);
-      const { JxaError: MockJxaError } = jest.requireMock('./jxaExecutor.js');
-      mockExecuteJxa.mockRejectedValue(
-        new MockJxaError(
-          'Permission denied for Contacts',
-          'Contacts',
-          true,
-          'not authorized',
-        ),
+      const { SqliteContactAccessError: MockError } = jest.requireMock(
+        './sqliteContactReader.js',
+      );
+      mockFetchAllContacts.mockRejectedValue(
+        new MockError('Cannot access Contacts database', true),
       );
 
       await service.resolveHandle('john@example.com');
@@ -474,28 +477,28 @@ describe('ContactResolverService', () => {
     });
 
     it('should retry after TTL expires even with negative cache', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('JXA timed out'));
+      mockFetchAllContacts.mockRejectedValue(new Error('SQLite error'));
 
       // First call: fails, sets negative cache
       await service.resolveHandle('john@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Wait for TTL to expire (100ms in test)
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Now mock a successful response
-      mockExecuteJxa.mockResolvedValue(mockContacts);
+      mockFetchAllContacts.mockResolvedValue(mockContacts);
 
-      // Should retrigger JXA after TTL expires
+      // Should retrigger SQLite after TTL expires
       const result = await service.resolveHandle('john.doe@example.com');
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(2);
       expect(result?.fullName).toBe('John Doe');
     });
   });
 
   describe('edge cases', () => {
     it('should handle contacts with empty names', async () => {
-      mockExecuteJxa.mockResolvedValue([
+      mockFetchAllContacts.mockResolvedValue([
         {
           id: 'contact-empty',
           fullName: '',
@@ -517,7 +520,7 @@ describe('ContactResolverService', () => {
     });
 
     it('should handle empty contacts array', async () => {
-      mockExecuteJxa.mockResolvedValue([]);
+      mockFetchAllContacts.mockResolvedValue([]);
 
       const result = await service.resolveHandle('john@example.com');
 
@@ -667,14 +670,15 @@ describe('ContactResolverService', () => {
       expect(result).toBeNull();
     });
 
-    it('should make independent JXA calls for resolveHandle and resolveNameToHandles', async () => {
-      // resolveHandle uses bulk cache, resolveNameToHandles uses targeted search
+    it('should make independent calls for resolveHandle (SQLite) and resolveNameToHandles (JXA)', async () => {
+      // resolveHandle uses SQLite cache, resolveNameToHandles uses JXA targeted search
       await service.resolveHandle('john@example.com');
       mockExecuteJxa.mockResolvedValue([mockContacts[0]]);
       await service.resolveNameToHandles('John');
 
-      // Both should trigger separate JXA calls (different code paths)
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(2);
+      // SQLite called once for cache, JXA called once for targeted search
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
+      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
     });
 
     it.each([
@@ -797,11 +801,11 @@ describe('ContactResolverService', () => {
     });
 
     it('should build cache and log success with entry count and duration', async () => {
-      mockExecuteJxa.mockResolvedValue(mockContacts);
+      mockFetchAllContacts.mockResolvedValue(mockContacts);
 
       await service.warmCache();
 
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
       expect(service.getCacheSize()).toBeGreaterThan(0);
       expect(service.getCacheTimestamp()).toBeGreaterThan(0);
 
@@ -814,22 +818,19 @@ describe('ContactResolverService', () => {
     });
 
     it('should never throw on failure', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('JXA crashed'));
+      mockFetchAllContacts.mockRejectedValue(new Error('SQLite crashed'));
 
       // warmCache should not throw
       await expect(service.warmCache()).resolves.toBeUndefined();
     });
 
     it('should log failure on error', async () => {
-      mockExecuteJxa.mockRejectedValue(new Error('JXA crashed'));
+      mockFetchAllContacts.mockRejectedValue(new Error('SQLite crashed'));
 
       await service.warmCache();
 
-      // doBuildCache logs the cache_build_failed, then warmCache catches and logs warm_failed
-      // But since doBuildCache now sets negative cache instead of throwing,
-      // warmCache will see it as "success" (no throw). Let's verify the buildCache path.
-      // Actually: doBuildCache catches error → sets negative cache → does NOT throw
-      // So warmCache's try block succeeds → logs contact_cache_warmed with 0 entries
+      // doBuildCache logs the cache_build_failed, then warmCache catches and sees no throw
+      // (negative cache set by doBuildCache) — so warmCache logs contact_cache_warmed with 0 entries
       expect(stderrSpy).toHaveBeenCalled();
       const calls = stderrSpy.mock.calls.map((c: [string]) => JSON.parse(c[0]));
       // First: doBuildCache logs contact_cache_build_failed
@@ -847,15 +848,15 @@ describe('ContactResolverService', () => {
     });
 
     it('should not rebuild if cache is already valid', async () => {
-      mockExecuteJxa.mockResolvedValue(mockContacts);
+      mockFetchAllContacts.mockResolvedValue(mockContacts);
 
       // First warm
       await service.warmCache();
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
 
       // Second warm should be a no-op (cache still valid)
       await service.warmCache();
-      expect(mockExecuteJxa).toHaveBeenCalledTimes(1);
+      expect(mockFetchAllContacts).toHaveBeenCalledTimes(1);
     });
   });
 });

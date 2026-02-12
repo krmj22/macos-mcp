@@ -37,8 +37,9 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 - **Mail**: sender emails enriched to contact names
 - **Calendar**: attendee emails enriched to contact names
 - Toggle: `enrichContacts` param (default: true)
-- Engine: `contactResolver.ts` — targeted JXA search for name-to-handles, cached bulk fetch for handle-to-name
-- **Cache warming**: `warmCache()` called at startup, fire-and-forget. Eliminates cold-cache timeout on first request.
+- Engine: `contactResolver.ts` — targeted JXA search for name-to-handles, **SQLite bulk read** for handle-to-name enrichment cache
+- **Bulk cache**: SQLite reads from `~/Library/Application Support/AddressBook/Sources/*/AddressBook-v22.abcddb` (<50ms, was 15s JXA timeout). See ADR-002 in DECISION.md.
+- **Cache warming**: `warmCache()` called at startup, fire-and-forget. Now succeeds in <50ms (was always timing out with JXA).
 - **All enrichment paths** protected by `withTimeout(5000ms)` — Messages, Mail, Calendar
 
 ## Phone Test Results (2026-02-12)

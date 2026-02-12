@@ -3,12 +3,16 @@
  * Contact resolver service with caching and phone/email normalization.
  * Resolves phone numbers and email addresses to contact names.
  *
- * Design: resolveNameToHandles() uses targeted JXA search (people.whose)
- * to avoid the O(n) bulk-fetch timeout with large contact lists (600+).
- * resolveHandle() and resolveBatch() still use the bulk cache for enrichment.
+ * Design:
+ * - Bulk cache (resolveHandle/resolveBatch) uses SQLite reads from
+ *   ~/Library/Application Support/AddressBook/Sources/{id}/AddressBook-v22.abcddb
+ *   for O(1) indexed reads (<50ms). See ADR-002 in DECISION.md.
+ * - resolveNameToHandles() uses targeted JXA search (people.whose)
+ *   for name-to-handle lookups — still fast and indexed.
  */
 
 import { executeJxaWithRetry, sanitizeForJxa } from './jxaExecutor.js';
+import { fetchAllContacts, SqliteContactAccessError } from './sqliteContactReader.js';
 
 /**
  * Resolved contact information
@@ -48,47 +52,6 @@ interface CacheState {
   timestamp: number;
   building: Promise<void> | null; // Lock to prevent duplicate fetches
 }
-
-/**
- * JXA script to fetch all contacts with phones and emails (10K safety limit).
- * Used only for handle-based enrichment (resolveHandle/resolveBatch).
- */
-const BULK_FETCH_CONTACTS_SCRIPT = `
-(() => {
-  const Contacts = Application("Contacts");
-  const people = Contacts.people();
-  const result = [];
-  const limit = Math.min(people.length, 10000);
-  for (let i = 0; i < limit; i++) {
-    const p = people[i];
-    const phones = [];
-    try {
-      const ph = p.phones();
-      for (let j = 0; j < ph.length; j++) {
-        phones.push(ph[j].value());
-      }
-    } catch(e) {}
-    const emails = [];
-    try {
-      const em = p.emails();
-      for (let j = 0; j < em.length; j++) {
-        emails.push(em[j].value());
-      }
-    } catch(e) {}
-    if (phones.length > 0 || emails.length > 0) {
-      result.push({
-        id: p.id(),
-        fullName: p.name() || "",
-        firstName: p.firstName() || "",
-        lastName: p.lastName() || "",
-        phones: phones,
-        emails: emails
-      });
-    }
-  }
-  return JSON.stringify(result);
-})()
-`;
 
 /**
  * Builds a JXA script for targeted contact search by name.
@@ -161,9 +124,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
  * Features:
  * - Normalizes phone numbers (strips formatting, handles +country codes)
  * - Normalizes emails (lowercase, trim)
- * - LRU-style cache with 5-minute TTL for handle-based lookups
+ * - LRU-style cache with 5-minute TTL for handle-based lookups (SQLite-backed)
  * - Targeted JXA search for name-based lookups (avoids O(n) bulk fetch)
- * - Coalesces concurrent cache builds (single JXA call)
+ * - Coalesces concurrent cache builds (single SQLite read)
  * - Graceful degradation on permission failure
  */
 export class ContactResolverService {
@@ -264,19 +227,14 @@ export class ContactResolverService {
 
   /**
    * Actually performs the cache build (internal).
+   * Uses SQLite to read all contacts from AddressBook databases (<50ms).
    * Used only for handle-based enrichment (resolveHandle/resolveBatch).
    */
   private async doBuildCache(): Promise<void> {
     const entries = new Map<string, ResolvedContact>();
 
     try {
-      const contacts = await executeJxaWithRetry<ContactCacheEntry[]>(
-        BULK_FETCH_CONTACTS_SCRIPT.trim(),
-        15000, // 15s timeout — bulk fetch is only for enrichment, not search
-        'Contacts',
-        1,
-        1000,
-      );
+      const contacts = await fetchAllContacts();
 
       for (const contact of contacts) {
         const resolved: ResolvedContact = {
@@ -316,7 +274,7 @@ export class ContactResolverService {
     } catch (error) {
       // Set negative cache for ALL errors to prevent retry storms.
       // Empty entries + valid timestamp means isCacheValid() returns true,
-      // so subsequent requests won't retrigger the slow JXA build until TTL expires.
+      // so subsequent requests won't retrigger the build until TTL expires.
       const timestamp = Date.now();
       this.cache = {
         entries: new Map(),
@@ -326,9 +284,7 @@ export class ContactResolverService {
 
       // Log non-permission errors to stderr for diagnostics
       const isPermissionErr =
-        error instanceof Error &&
-        'isPermissionError' in error &&
-        (error as { isPermissionError: boolean }).isPermissionError === true;
+        error instanceof SqliteContactAccessError && error.isPermissionError;
 
       if (!isPermissionErr) {
         const message = error instanceof Error ? error.message : String(error);
