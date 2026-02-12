@@ -51,7 +51,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 | Messages enrichment returns raw phone numbers | **Bug #90** — cold contact cache timeout | Fixed: cache warming + negative cache + withTimeout |
 | Mail enrichment shows mixed names/emails | Expected — three-layer fallback (Contact name → Mail DB comment → email) | No code change |
 
-## Recent Work (2026-02-09 to 2026-02-10)
+## Recent Work (2026-02-09 to 2026-02-12)
 
 | Commit | Description |
 |--------|-------------|
