@@ -33,7 +33,11 @@ import {
   ReadMailSchema,
   UpdateMailSchema,
 } from '../../validation/schemas.js';
-import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
+import {
+  extractAndValidateArgs,
+  formatListMarkdown,
+  withTimeout,
+} from './shared.js';
 
 interface MailboxItem {
   name: string;
@@ -48,26 +52,6 @@ const MAX_ENRICHMENT_ADDRESSES = 20;
 
 /** Timeout for enrichment operations (ms) */
 const ENRICHMENT_TIMEOUT_MS = 5000;
-
-/**
- * Wraps a promise with a timeout. Returns the result or falls back to the
- * fallback value if the operation exceeds the timeout.
- */
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  fallback: T,
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeoutPromise = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    clearTimeout(timer!);
-  }
-}
 
 /**
  * Enriches mail senders with contact names instead of email addresses.
@@ -85,6 +69,7 @@ async function enrichMailSenders(
     contactResolver.resolveBatch(cappedAddresses),
     ENRICHMENT_TIMEOUT_MS,
     new Map(),
+    'mail_enrichment',
   );
   return messages.map((m) => ({
     ...m,

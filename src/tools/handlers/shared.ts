@@ -113,6 +113,42 @@ export const formatSuccessMessage = (
 };
 
 /**
+ * Wraps a promise with a timeout. Returns the result or falls back to the
+ * fallback value if the operation exceeds the timeout.
+ *
+ * @param promise - The promise to race against the timeout
+ * @param timeoutMs - Timeout in milliseconds
+ * @param fallback - Value returned if the timeout fires
+ * @param label - Optional label for structured stderr logging on timeout
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+  label?: string,
+): Promise<T> {
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve(fallback);
+    }, timeoutMs);
+  });
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    if (timedOut && label) {
+      process.stderr.write(
+        `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'warn', event: 'enrichment_timeout', label, timeoutMs })}\n`,
+      );
+    }
+    return result;
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+/**
  * Formats a delete success message
  */
 export const formatDeleteMessage = (

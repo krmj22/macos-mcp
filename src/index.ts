@@ -14,6 +14,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { type FullServerConfig, loadConfig } from './config/index.js';
 import { createServer } from './server/server.js';
 import type { HttpTransportInstance } from './server/transports/http/index.js';
+import { contactResolver } from './utils/contactResolver.js';
 
 /** Active HTTP transport instance for cleanup */
 let httpTransport: HttpTransportInstance | null = null;
@@ -41,6 +42,11 @@ async function shutdown(): Promise<void> {
 async function main(): Promise<void> {
   const config: FullServerConfig = loadConfig();
   const server = createServer(config);
+
+  // Warm contact cache before connecting transports.
+  // Fire-and-forget: cache builds concurrently, giving maximum head start
+  // before the first enrichment request arrives.
+  void contactResolver.warmCache();
 
   // Register graceful shutdown handlers
   process.on('SIGINT', () => void shutdown());

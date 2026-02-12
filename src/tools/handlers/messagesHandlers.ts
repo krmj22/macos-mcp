@@ -28,7 +28,11 @@ import {
   CreateMessageSchema,
   ReadMessagesSchema,
 } from '../../validation/schemas.js';
-import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
+import {
+  extractAndValidateArgs,
+  formatListMarkdown,
+  withTimeout,
+} from './shared.js';
 
 /**
  * Formats a local Date to 'YYYY-MM-DD HH:mm:ss' for consumption by the existing
@@ -165,26 +169,6 @@ const MAX_ENRICHMENT_HANDLES = 20;
 const ENRICHMENT_TIMEOUT_MS = 5000;
 
 /**
- * Wraps a promise with a timeout. Returns the result or falls back to the
- * fallback value if the operation exceeds the timeout.
- */
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  fallback: T,
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeoutPromise = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    clearTimeout(timer!);
-  }
-}
-
-/**
  * Enriches messages with contact names instead of phone numbers.
  * Only enriches incoming messages (not isFromMe) with known senders.
  * Caps at MAX_ENRICHMENT_HANDLES and ENRICHMENT_TIMEOUT_MS.
@@ -206,6 +190,7 @@ async function enrichMessagesWithContacts(
     contactResolver.resolveBatch(cappedHandles),
     ENRICHMENT_TIMEOUT_MS,
     new Map(),
+    'messages_enrichment',
   );
   return messages.map((m) => ({
     ...m,
@@ -237,6 +222,7 @@ async function enrichSearchMessagesWithContacts(
     contactResolver.resolveBatch(cappedHandles),
     ENRICHMENT_TIMEOUT_MS,
     new Map(),
+    'messages_search_enrichment',
   );
   return messages.map((m) => ({
     ...m,
@@ -280,6 +266,7 @@ async function enrichChatParticipants(chats: ChatItem[]): Promise<ChatItem[]> {
     contactResolver.resolveBatch(cappedHandles),
     ENRICHMENT_TIMEOUT_MS,
     new Map(),
+    'messages_chat_enrichment',
   );
   return chats.map((c) => ({
     ...c,

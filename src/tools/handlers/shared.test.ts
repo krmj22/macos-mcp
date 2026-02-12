@@ -14,6 +14,7 @@ import {
   formatDeleteMessage,
   formatListMarkdown,
   formatSuccessMessage,
+  withTimeout,
 } from './shared.js';
 
 describe('formatListMarkdown', () => {
@@ -73,6 +74,78 @@ describe('formatSuccessMessage', () => {
   it('formats updated action for a reminder (standard prefix)', () => {
     const result = formatSuccessMessage('updated', 'reminder', 'Title', 'id1');
     expect(result).toBe('Successfully updated reminder "Title".\n- ID: id1');
+  });
+});
+
+describe('withTimeout', () => {
+  let stderrSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    stderrSpy = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  it('returns the promise result when it resolves before timeout', async () => {
+    const result = await withTimeout(
+      Promise.resolve('hello'),
+      1000,
+      'fallback',
+    );
+    expect(result).toBe('hello');
+  });
+
+  it('returns fallback when promise exceeds timeout', async () => {
+    const slow = new Promise<string>((resolve) =>
+      setTimeout(() => resolve('slow'), 500),
+    );
+    const result = await withTimeout(slow, 10, 'fallback');
+    expect(result).toBe('fallback');
+  });
+
+  it('does not log to stderr when no label is provided and timeout fires', async () => {
+    const slow = new Promise<string>((resolve) =>
+      setTimeout(() => resolve('slow'), 500),
+    );
+    await withTimeout(slow, 10, 'fallback');
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs structured warning to stderr when label is provided and timeout fires', async () => {
+    const slow = new Promise<Map<string, string>>((resolve) =>
+      setTimeout(() => resolve(new Map([['k', 'v']])), 500),
+    );
+    const fallback = new Map<string, string>();
+    await withTimeout(slow, 10, fallback, 'test_enrichment');
+
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(stderrSpy.mock.calls[0][0] as string);
+    expect(logged.event).toBe('enrichment_timeout');
+    expect(logged.label).toBe('test_enrichment');
+    expect(logged.timeoutMs).toBe(10);
+    expect(logged.level).toBe('warn');
+  });
+
+  it('does not log when promise resolves before timeout even with label', async () => {
+    const result = await withTimeout(
+      Promise.resolve('fast'),
+      1000,
+      'fallback',
+      'test_label',
+    );
+    expect(result).toBe('fast');
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('clears timer after promise resolves to avoid memory leaks', async () => {
+    const clearSpy = jest.spyOn(global, 'clearTimeout');
+    await withTimeout(Promise.resolve('done'), 1000, 'fallback');
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
   });
 });
 

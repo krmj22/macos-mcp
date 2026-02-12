@@ -25,6 +25,7 @@ import {
   formatDeleteMessage,
   formatListMarkdown,
   formatSuccessMessage,
+  withTimeout,
 } from './shared.js';
 
 /**
@@ -40,7 +41,12 @@ async function enrichEventAttendees(
   const emails = [...new Set(events.flatMap((e) => e.attendees || []))];
   if (emails.length === 0) return events;
 
-  const resolved = await contactResolver.resolveBatch(emails);
+  const resolved = await withTimeout(
+    contactResolver.resolveBatch(emails),
+    5000,
+    new Map(),
+    'calendar_enrichment',
+  );
   return events.map((e) => ({
     ...e,
     attendees: e.attendees?.map((a) => resolved.get(a)?.fullName || a),

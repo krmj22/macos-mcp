@@ -314,24 +314,28 @@ export class ContactResolverService {
         building: null,
       };
     } catch (error) {
-      // Graceful degradation: permission errors result in empty cache with valid timestamp
-      // Use duck typing to check for isPermissionError (works with mocks)
+      // Set negative cache for ALL errors to prevent retry storms.
+      // Empty entries + valid timestamp means isCacheValid() returns true,
+      // so subsequent requests won't retrigger the slow JXA build until TTL expires.
+      const timestamp = Date.now();
+      this.cache = {
+        entries: new Map(),
+        timestamp,
+        building: null,
+      };
+
+      // Log non-permission errors to stderr for diagnostics
       const isPermissionErr =
         error instanceof Error &&
         'isPermissionError' in error &&
         (error as { isPermissionError: boolean }).isPermissionError === true;
 
-      if (isPermissionErr) {
-        const timestamp = Date.now();
-        this.cache = {
-          entries: new Map(),
-          timestamp,
-          building: null,
-        };
-        return;
+      if (!isPermissionErr) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(
+          `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'warn', event: 'contact_cache_build_failed', error: message })}\n`,
+        );
       }
-      // Re-throw other errors
-      throw error;
     }
   }
 
@@ -487,6 +491,27 @@ export class ContactResolverService {
     }
 
     return matchedHandles;
+  }
+
+  /**
+   * Warms the contact cache by triggering a background build.
+   * Fire-and-forget: never throws, logs success/failure to stderr.
+   * Call at server startup to avoid cold-cache timeouts on first enrichment request.
+   */
+  async warmCache(): Promise<void> {
+    const start = Date.now();
+    try {
+      await this.buildCache();
+      const durationMs = Date.now() - start;
+      process.stderr.write(
+        `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'info', event: 'contact_cache_warmed', entries: this.cache.entries.size, durationMs })}\n`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'warn', event: 'contact_cache_warm_failed', error: message })}\n`,
+      );
+    }
   }
 
   /**
