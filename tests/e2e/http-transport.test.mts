@@ -484,11 +484,11 @@ describe('Stateless behavior', () => {
 
       // Both should return valid data (not cross-contaminated)
       assert.ok(
-        res1.text.includes('Reminders') || res1.text.includes('No reminders') || res1.text.includes('**'),
+        res1.text.includes('ID:') || res1.text.includes('No reminders') || res1.text.includes('**'),
         `client1 should get structured reminders data, got: ${res1.text.slice(0, 200)}`,
       );
       assert.ok(
-        res2.text.includes('Calendar') || res2.text.includes('Events') || res2.text.includes('No events') || res2.text.includes('**'),
+        res2.text.includes('ID:') || res2.text.includes('No events') || res2.text.includes('**'),
         `client2 should get structured calendar data, got: ${res2.text.slice(0, 200)}`,
       );
     } finally {
