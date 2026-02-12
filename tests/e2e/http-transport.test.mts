@@ -321,7 +321,11 @@ describe('SQLite via HTTP (Mail)', () => {
       'HTTP-Mail',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty inbox — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'HTTP mail inbox should contain ID field');
+    }
     assert.ok(elapsed < 10000, `mail read took ${elapsed}ms (>10s)`);
   });
 
@@ -333,7 +337,11 @@ describe('SQLite via HTTP (Mail)', () => {
       'HTTP-Mail',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages found')) {
+      console.log('  INFO empty mail search — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('Mail matching'), 'HTTP mail search should return structured data');
+    }
     assert.ok(elapsed < 10000, `mail search took ${elapsed}ms (>10s)`);
   });
 });
@@ -359,7 +367,11 @@ describe('Read-only tools over HTTP', () => {
       'HTTP-ReadOnly',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No chats found')) {
+      console.log('  INFO empty state — HTTP messages structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('Chats'), 'HTTP messages should return structured data');
+    }
     assert.ok(elapsed < 10000, `messages read took ${elapsed}ms (>10s)`);
   });
 
@@ -371,7 +383,11 @@ describe('Read-only tools over HTTP', () => {
       'HTTP-ReadOnly',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No events') || text.includes('No calendar')) {
+      console.log('  INFO empty calendar — HTTP structural checks skipped');
+    } else {
+      assert.ok(text.includes('**') || text.includes('ID:'), 'HTTP calendar should return structured data');
+    }
     assert.ok(elapsed < 10000, `calendar read took ${elapsed}ms (>10s)`);
   });
 
@@ -383,7 +399,11 @@ describe('Read-only tools over HTTP', () => {
       'HTTP-ReadOnly',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No contacts')) {
+      console.log('  INFO no matching contacts — HTTP structural checks skipped');
+    } else {
+      assert.ok(text.includes('**') || text.includes('Name:') || text.includes('Kyle'), 'HTTP contacts should return structured data');
+    }
     assert.ok(elapsed < 10000, `contacts search took ${elapsed}ms (>10s)`);
   });
 });
@@ -409,7 +429,11 @@ describe('Enrichment in stateless mode', () => {
       'HTTP-Enrich',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No chats found')) {
+      console.log('  INFO empty state — HTTP enriched messages structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('Chats'), 'HTTP enriched messages should return structured data');
+    }
     // HTTP stateless = cold cache every time. Allow more headroom than stdio.
     assert.ok(elapsed < 30000, `enriched messages took ${elapsed}ms (>30s)`);
   });
@@ -422,7 +446,11 @@ describe('Enrichment in stateless mode', () => {
       'HTTP-Enrich',
       perfLog,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty inbox — HTTP enriched mail structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('**'), 'HTTP enriched mail should return structured data');
+    }
     assert.ok(elapsed < 30000, `enriched mail took ${elapsed}ms (>30s)`);
   });
 });
@@ -455,8 +483,14 @@ describe('Stateless behavior', () => {
       ]);
 
       // Both should return valid data (not cross-contaminated)
-      assert.ok(res1.text.length > 0, 'client1 should get reminders data');
-      assert.ok(res2.text.length > 0, 'client2 should get calendar data');
+      assert.ok(
+        res1.text.includes('Reminders') || res1.text.includes('No reminders') || res1.text.includes('**'),
+        `client1 should get structured reminders data, got: ${res1.text.slice(0, 200)}`,
+      );
+      assert.ok(
+        res2.text.includes('Calendar') || res2.text.includes('Events') || res2.text.includes('No events') || res2.text.includes('**'),
+        `client2 should get structured calendar data, got: ${res2.text.slice(0, 200)}`,
+      );
     } finally {
       await client1.close().catch(() => {});
       await client2.close().catch(() => {});

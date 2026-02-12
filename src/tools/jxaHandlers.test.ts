@@ -643,6 +643,82 @@ describe('Mail Handlers', () => {
       // Should show email address (fallback), not "Too Late" (timed out)
       expect(text).toContain('slow@example.com');
     }, 10000);
+
+    it('shows senderName when enrichment returns empty and senderName is populated', async () => {
+      mockMailListInboxMessages.mockResolvedValue([
+        {
+          id: 'm1',
+          subject: 'Fallback test',
+          sender: 'someone@example.com',
+          senderName: 'Someone Display',
+          dateReceived: '2025-01-01',
+          read: false,
+          mailbox: 'Inbox',
+          account: 'Gmail',
+          preview: 'Preview',
+          toRecipients: [],
+          ccRecipients: [],
+        },
+      ]);
+      // Enrichment returns empty map (no match found)
+      mockResolveBatch.mockResolvedValue(new Map());
+
+      const result = await handleReadMail({ action: 'read' });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      // Should fall back to senderName (3-level: fullName → senderName → sender)
+      expect(text).toContain('Someone Display');
+    });
+
+    it('shows raw email when enrichment returns empty and senderName is empty', async () => {
+      mockMailListInboxMessages.mockResolvedValue([
+        {
+          id: 'm1',
+          subject: 'Raw fallback',
+          sender: 'raw@example.com',
+          senderName: '',
+          dateReceived: '2025-01-01',
+          read: false,
+          mailbox: 'Inbox',
+          account: 'Gmail',
+          preview: 'Preview',
+          toRecipients: [],
+          ccRecipients: [],
+        },
+      ]);
+      mockResolveBatch.mockResolvedValue(new Map());
+
+      const result = await handleReadMail({ action: 'read' });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      // Should fall back to raw email (senderName empty, fullName empty)
+      expect(text).toContain('raw@example.com');
+    });
+
+    it('caps enrichment at MAX_ENRICHMENT_ADDRESSES (20)', async () => {
+      // Create 25 messages with unique senders
+      const messages = Array.from({ length: 25 }, (_, i) => ({
+        id: `m${i}`,
+        subject: `Mail ${i}`,
+        sender: `sender${i}@example.com`,
+        senderName: '',
+        dateReceived: '2025-01-01',
+        read: false,
+        mailbox: 'Inbox',
+        account: 'Gmail',
+        preview: '',
+        toRecipients: [],
+        ccRecipients: [],
+      }));
+      mockMailListInboxMessages.mockResolvedValue(messages);
+      mockResolveBatch.mockResolvedValue(new Map());
+
+      await handleReadMail({ action: 'read' });
+
+      // resolveBatch should receive at most 20 addresses
+      expect(mockResolveBatch).toHaveBeenCalledTimes(1);
+      expect(mockResolveBatch.mock.calls[0][0].length).toBeLessThanOrEqual(20);
+    });
   });
 
   describe('handleCreateMail', () => {
@@ -1292,6 +1368,120 @@ describe('Messages Handlers', () => {
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Alice Wonder');
+    });
+
+    it('falls back to raw handle when chat list enrichment times out', async () => {
+      mockListChats.mockResolvedValue([
+        {
+          id: 'c1',
+          name: '+15559999999',
+          participants: ['+15559999999'],
+          lastMessage: 'Hi',
+          lastDate: '2025-01-01',
+        },
+      ]);
+      // Simulate slow resolveBatch that exceeds the 5s timeout
+      mockResolveBatch.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Map([['+15559999999', { fullName: 'Too Late' }]])), 10000),
+          ),
+      );
+
+      const result = await handleReadMessages({ action: 'read' });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      // Should show raw phone number (timeout fallback), not "Too Late"
+      expect(text).toContain('+15559999999');
+      expect(text).not.toContain('Too Late');
+    }, 10000);
+
+    it('falls back to raw handle when chatId message enrichment times out', async () => {
+      mockReadChatMessages.mockResolvedValue([
+        {
+          id: 'msg1',
+          text: 'Hello',
+          sender: '+15558888888',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+      ]);
+      mockResolveBatch.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Map([['+15558888888', { fullName: 'Too Late' }]])), 10000),
+          ),
+      );
+
+      const result = await handleReadMessages({ action: 'read', chatId: 'c1' });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      expect(text).toContain('+15558888888');
+      expect(text).not.toContain('Too Late');
+    }, 10000);
+
+    it('falls back to raw handle when search message enrichment times out', async () => {
+      mockSearchMessages.mockResolvedValue([
+        {
+          chatId: 'c1',
+          chatName: 'Chat',
+          id: 'msg1',
+          text: 'match',
+          sender: '+15557777777',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+      ]);
+      mockResolveBatch.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(new Map([['+15557777777', { fullName: 'Too Late' }]])), 10000),
+          ),
+      );
+
+      const result = await handleReadMessages({ action: 'read', search: 'match', searchMessages: true });
+      expect(result.isError).toBe(false);
+      const text = getTextContent(result);
+      expect(text).toContain('+15557777777');
+      expect(text).not.toContain('Too Late');
+    }, 10000);
+
+    it('caps enrichment at MAX_ENRICHMENT_HANDLES (20) for messages', async () => {
+      // Create 25 messages from unique non-isFromMe senders
+      const messages = Array.from({ length: 25 }, (_, i) => ({
+        id: `msg${i}`,
+        text: `Message ${i}`,
+        sender: `+1555000${String(i).padStart(4, '0')}`,
+        date: '2025-01-01',
+        isFromMe: false,
+      }));
+      mockReadChatMessages.mockResolvedValue(messages);
+      mockResolveBatch.mockResolvedValue(new Map());
+
+      await handleReadMessages({ action: 'read', chatId: 'c1' });
+
+      expect(mockResolveBatch).toHaveBeenCalledTimes(1);
+      expect(mockResolveBatch.mock.calls[0][0].length).toBeLessThanOrEqual(20);
+    });
+
+    it('only enriches non-isFromMe, non-unknown senders', async () => {
+      mockReadChatMessages.mockResolvedValue([
+        { id: 'msg1', text: 'From me', sender: '+1111', date: '2025-01-01', isFromMe: true },
+        { id: 'msg2', text: 'Unknown', sender: 'unknown', date: '2025-01-01', isFromMe: false },
+        { id: 'msg3', text: 'Real sender', sender: '+15551234567', date: '2025-01-01', isFromMe: false },
+        { id: 'msg4', text: 'Another', sender: '+15559876543', date: '2025-01-01', isFromMe: false },
+      ]);
+      mockResolveBatch.mockResolvedValue(new Map());
+
+      await handleReadMessages({ action: 'read', chatId: 'c1' });
+
+      // Only the two non-isFromMe, non-unknown senders should be enriched
+      expect(mockResolveBatch).toHaveBeenCalledTimes(1);
+      const handles = mockResolveBatch.mock.calls[0][0];
+      expect(handles).toContain('+15551234567');
+      expect(handles).toContain('+15559876543');
+      expect(handles).not.toContain('+1111');
+      expect(handles).not.toContain('unknown');
     });
 
     it('skips enrichment when enrichContacts is false', async () => {

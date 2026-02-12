@@ -235,6 +235,43 @@ describe('ContactResolverService', () => {
     });
   });
 
+  describe('partial enrichment (resolveBatch)', () => {
+    it('returns only matched entries when some handles are unknown', async () => {
+      const results = await service.resolveBatch([
+        'john.doe@example.com', // known
+        '+44 20 7946 0958', // known
+        'unknown1@test.com', // unknown
+        'unknown2@test.com', // unknown
+        '+15550000000', // unknown
+        'nope@test.com', // unknown
+        '+15559999999', // unknown
+        'ghost@test.com', // unknown
+        '+15551111111', // unknown
+        '+15552222222', // unknown
+      ]);
+
+      // Only 2 of 10 should resolve
+      expect(results.size).toBe(2);
+      expect(results.has('john.doe@example.com')).toBe(true);
+      expect(results.has('+44 20 7946 0958')).toBe(true);
+      // Unknown handles should not be in the map
+      expect(results.has('unknown1@test.com')).toBe(false);
+      expect(results.has('ghost@test.com')).toBe(false);
+    });
+
+    it('returns empty map when cache build times out (JXA rejection)', async () => {
+      mockExecuteJxa.mockRejectedValue(new Error('timed out'));
+
+      const results = await service.resolveBatch([
+        'john.doe@example.com',
+        '+44 20 7946 0958',
+      ]);
+
+      // Should degrade gracefully to empty map
+      expect(results.size).toBe(0);
+    });
+  });
+
   describe('invalidateCache', () => {
     it('should force cache rebuild after invalidation', async () => {
       // First resolve builds cache

@@ -108,7 +108,10 @@ describe('Cross-tool Pipelines', () => {
       { action: 'read', contact: 'Kyle', limit: 5, enrichContacts: false },
       'Pipeline',
     );
-    assert.ok(msgText.length > 0, 'should return messages or meaningful message');
+    assert.ok(
+      msgText.includes('Messages from contact') || msgText.includes('No contact') || msgText.includes('No messages'),
+      `should return structured data or meaningful message, got: ${msgText.slice(0, 200)}`,
+    );
     assert.ok(msgElapsed < 20000, `messages contact search took ${msgElapsed}ms`);
   });
 
@@ -128,7 +131,10 @@ describe('Cross-tool Pipelines', () => {
       { action: 'read', contact: 'Kyle', limit: 5, enrichContacts: false },
       'Pipeline',
     );
-    assert.ok(mailText.length > 0, 'should return mail or meaningful message');
+    assert.ok(
+      mailText.includes('Mail from contact') || mailText.includes('No contact') || mailText.includes('No messages'),
+      `should return structured data or meaningful message, got: ${mailText.slice(0, 200)}`,
+    );
     assert.ok(mailElapsed < 20000, `mail contact search took ${mailElapsed}ms`);
   });
 
@@ -154,7 +160,11 @@ describe('Cross-tool Pipelines', () => {
       },
       'Pipeline',
     );
-    assert.ok(text.length > 0, 'should return calendar events or empty message');
+    if (text.includes('No events') || text.includes('No calendar')) {
+      console.log('  INFO empty calendar — structural checks skipped');
+    } else {
+      assert.ok(text.includes('**') || text.includes('ID:'), 'calendar should return structured data');
+    }
     // Calendar enrichment resolves attendee emails to contact names
     // We cannot guarantee attendees exist, but the call must not crash
     assert.ok(elapsed < 30000, `calendar enriched read took ${elapsed}ms`);
@@ -171,7 +181,11 @@ describe('Enrichment Toggles', () => {
       { action: 'read', limit: 3, enrichContacts: false },
       'Enrich',
     );
-    assert.ok(rawText.length > 0, 'raw should return data');
+    if (rawText.includes('No chats found')) {
+      console.log('  INFO empty state — messages raw structural checks skipped');
+    } else {
+      assert.ok(rawText.includes('ID:') || rawText.includes('Chats'), 'raw messages should return structured data');
+    }
     assert.ok(rawElapsed < 2000, `raw took ${rawElapsed}ms`);
 
     const { text: enrichedText, elapsed: enrichedElapsed } = await callTool(
@@ -201,7 +215,11 @@ describe('Enrichment Toggles', () => {
       { action: 'read', limit: 3, enrichContacts: false },
       'Enrich',
     );
-    assert.ok(rawText.length > 0, 'raw mail should return data');
+    if (rawText.includes('No messages')) {
+      console.log('  INFO empty inbox — mail raw structural checks skipped');
+    } else {
+      assert.ok(rawText.includes('ID:') || rawText.includes('**'), 'raw mail should return structured data');
+    }
     assert.ok(rawElapsed < 5000, `raw mail took ${rawElapsed}ms`);
 
     const { text: enrichedText, elapsed: enrichedElapsed } = await callTool(
@@ -252,7 +270,11 @@ describe('Cache & Performance', () => {
       { action: 'read', limit: 10, enrichContacts: false },
       'Cache',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No chats found')) {
+      console.log('  INFO empty state — unknown sender structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('Chats'), 'unknown sender should return structured data');
+    }
     // No error/crash — raw handles are acceptable fallback
     assert.ok(
       !text.toLowerCase().includes('error') || text.toLowerCase().includes('no messages'),

@@ -80,12 +80,13 @@ describe('Mail Reads', () => {
       { action: 'read', limit: 10, enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
-    // Inbox heading present (either messages or "No messages" notice)
-    assert.ok(
-      text.includes('Inbox') || text.includes('No messages'),
-      `unexpected response: ${text.slice(0, 200)}`,
-    );
+    // Either structured message data or explicit empty state
+    if (text.includes('No messages')) {
+      console.log('  INFO empty state — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'response should contain ID field');
+      assert.ok(text.includes('From:') || text.includes('**'), 'response should have structured format');
+    }
     assert.ok(elapsed < 5000, `inbox read took ${elapsed}ms (>5s)`);
   });
 
@@ -120,7 +121,7 @@ describe('Mail Reads', () => {
   let specificMailbox: string | undefined;
   let specificAccount: string | undefined;
 
-  it('read specific mailbox', async () => {
+  it('read specific mailbox', async (t) => {
     // First get a mailbox name from the list
     const { text: listText } = await callTool(
       'mail_messages',
@@ -130,7 +131,7 @@ describe('Mail Reads', () => {
     // Parse first mailbox name from "- **Name** (Account)"
     const mbMatch = listText.match(/- \*\*(.+?)\*\* \((.+?)\)/);
     if (!mbMatch) {
-      console.log('  ⚠ No mailboxes found — skipping specific mailbox test');
+      t.skip('No mailboxes found — mail not configured');
       return;
     }
     specificMailbox = mbMatch[1];
@@ -141,7 +142,11 @@ describe('Mail Reads', () => {
       { action: 'read', mailbox: specificMailbox, limit: 5, enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty mailbox — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'specific mailbox response should contain ID field');
+    }
     assert.ok(elapsed < 5000, `specific mailbox read took ${elapsed}ms (>5s)`);
   });
 
@@ -152,14 +157,18 @@ describe('Mail Reads', () => {
       { action: 'read', search: 'the', limit: 5, enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages found')) {
+      console.log('  INFO empty search results — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'search results should contain ID field');
+    }
     assert.ok(elapsed < 10000, `search took ${elapsed}ms (>10s)`);
   });
 
   // #6: Read by ID — get an ID from inbox first
   let realMessageId: string | undefined;
 
-  it('read single message by ID with full detail', async () => {
+  it('read single message by ID with full detail', async (t) => {
     // Get a real message ID from inbox
     const { text: inboxText } = await callTool(
       'mail_messages',
@@ -167,7 +176,7 @@ describe('Mail Reads', () => {
     );
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
-      console.log('  ⚠ No messages in inbox — skipping read-by-ID test');
+      t.skip('No messages in inbox — cannot test read-by-ID');
       return;
     }
     realMessageId = idMatch[1];
@@ -194,7 +203,12 @@ describe('Mail Reads', () => {
       'Mail Read',
       120000,
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty inbox — enrichment structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'enriched response should contain ID field');
+      assert.ok(text.includes('From:') || text.includes('**'), 'enriched response should have structured format');
+    }
     // Known: bulk contact cache fetch takes ~60s on large contact lists.
     // This is a pre-existing perf issue with resolveBatch() — not a mail bug.
     // Threshold set to 90s to avoid false negatives; tracked separately.
@@ -208,7 +222,11 @@ describe('Mail Reads', () => {
       { action: 'read', limit: 3, enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty inbox — non-enriched structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'non-enriched response should contain ID field');
+    }
     // Without enrichment should be fast (pure SQLite)
     assert.ok(elapsed < 5000, `non-enriched read took ${elapsed}ms (>5s)`);
   });
@@ -220,15 +238,19 @@ describe('Mail Reads', () => {
       { action: 'read', contact: 'Kyle', enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages found') || text.includes('No contact found')) {
+      console.log('  INFO no contact/mail matches — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:') || text.includes('Mail from contact'), 'contact search should return structured data');
+    }
     // Contact lookup + SQLite search
     assert.ok(elapsed < 15000, `contact search took ${elapsed}ms (>15s)`);
   });
 
   // E17: Specific mailbox + account scoping
-  it('specific mailbox + account scoped results', async () => {
+  it('specific mailbox + account scoped results', async (t) => {
     if (!specificMailbox || !specificAccount) {
-      console.log('  ⚠ No mailbox discovered — skipping account-scoped test');
+      t.skip('No mailbox discovered — cannot test account-scoped read');
       return;
     }
     const { text, elapsed } = await callTool(
@@ -242,7 +264,11 @@ describe('Mail Reads', () => {
       },
       'Mail Read',
     );
-    assert.ok(text.length > 0, 'should return data');
+    if (text.includes('No messages')) {
+      console.log('  INFO empty account-scoped mailbox — structural checks skipped');
+    } else {
+      assert.ok(text.includes('ID:'), 'account-scoped response should contain ID field');
+    }
     assert.ok(elapsed < 5000, `account-scoped read took ${elapsed}ms (>5s)`);
   });
 });
@@ -296,7 +322,7 @@ describe('Mail Writes', () => {
   });
 
   // #12 & #13: Mark as read/unread — need a real message ID
-  it('mark as read', async () => {
+  it('mark as read', async (t) => {
     // Get a real message ID
     const { text: inboxText } = await callTool(
       'mail_messages',
@@ -304,7 +330,7 @@ describe('Mail Writes', () => {
     );
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
-      console.log('  ⚠ No messages — skipping mark-read test');
+      t.skip('No messages — cannot test mark-read');
       return;
     }
     const msgId = idMatch[1];
@@ -321,14 +347,14 @@ describe('Mail Writes', () => {
     assert.ok(elapsed < 3000, `mark-read took ${elapsed}ms (>3s)`);
   });
 
-  it('mark as unread', async () => {
+  it('mark as unread', async (t) => {
     const { text: inboxText } = await callTool(
       'mail_messages',
       { action: 'read', limit: 1, enrichContacts: false },
     );
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
-      console.log('  ⚠ No messages — skipping mark-unread test');
+      t.skip('No messages — cannot test mark-unread');
       return;
     }
     const msgId = idMatch[1];
@@ -348,7 +374,7 @@ describe('Mail Writes', () => {
   // #14: Delete message — we search for our test drafts to clean up
   // Note: JXA-created drafts don't appear instantly in SQLite, so we
   // use a search-based approach to find and delete test drafts.
-  it('delete draft (cleanup)', async () => {
+  it('delete draft (cleanup)', async (t) => {
     // Search for our E2E test drafts
     const { text: searchText } = await callTool(
       'mail_messages',
@@ -356,7 +382,7 @@ describe('Mail Writes', () => {
     );
     const idMatches = [...searchText.matchAll(/ID:\s*(\d+)/g)];
     if (idMatches.length === 0) {
-      console.log('  ⚠ No E2E drafts found in SQLite (may not have synced yet) — skipping delete');
+      t.skip('E2E drafts not visible in SQLite — JXA→SQLite sync delay');
       return;
     }
 
