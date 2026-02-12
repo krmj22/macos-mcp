@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-11 (Production readiness issues #80-#89 resolved, #86 deferred)
+Last updated: 2026-02-12 (HTTP transport E2E tests added)
 
 ## Overview
 
@@ -10,7 +10,9 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 
 - **Source**: ~10k LOC TypeScript across `src/`
 - **Tests**: 800 unit tests, 34 test files, all passing
-- **E2E**: 124 tests across 7 suites — serial runner (#81 fixed), 2 send skipped
+- **E2E**: 149 tests across 8 suites — serial runner (#81 fixed), 2 send skipped
+  - 124 stdio transport tests (7 suites)
+  - 25 HTTP transport tests (1 suite) — validates full Claude iOS/web path
 - **Build**: TypeScript + Swift binary via `pnpm build`
 - **Transport**: stdio (default) or HTTP (Cloudflare Tunnel to `mcp.kyleos.ai`)
 
@@ -124,8 +126,10 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 | Messages | `messages.test.mts` | 17/19 | PASS (2 send skipped) |
 | Contacts | `contacts.test.mts` | 14/14 | PASS |
 | Cross-tool | `cross-tool.test.mts` | 13/13 | PASS |
+| HTTP transport | `http-transport.test.mts` | 25/25 | PASS |
 
 Run with `pnpm test:e2e:all` (uses `--test-concurrency=1` to prevent JXA contention, fixes #81).
+HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 48470).
 
 ### Functional E2E Baselines (`pnpm test:e2e`) — 2026-02-11 (pre-release)
 
