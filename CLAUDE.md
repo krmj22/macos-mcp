@@ -168,7 +168,7 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 ## Testing Strategy
 
-**Philosophy: Vibecoding Protocol**
+**Philosophy: AI-First Testing Protocol**
 1.  **Safety Gates > Coverage %**: High coverage is a side effect of good testing, not the goal. We use 95% thresholds to force the AI to consider edge cases, but we trust E2E tests for actual reliability.
 2.  **Protocol**:
     - **Step 1**: Write the feature (AI).
