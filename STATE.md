@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-12 (HTTP transport E2E tests added)
+Last updated: 2026-02-12 (Contact cache warming + enrichment fix #90)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 800 unit tests, 34 test files, all passing
+- **Tests**: 824 unit tests, 34 test files, all passing
 - **E2E**: 149 tests across 8 suites — serial runner (#81 fixed), 2 send skipped
   - 124 stdio transport tests (7 suites)
   - 25 HTTP transport tests (1 suite) — validates full Claude iOS/web path
@@ -38,6 +38,18 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 - **Calendar**: attendee emails enriched to contact names
 - Toggle: `enrichContacts` param (default: true)
 - Engine: `contactResolver.ts` — targeted JXA search for name-to-handles, cached bulk fetch for handle-to-name
+- **Cache warming**: `warmCache()` called at startup, fire-and-forget. Eliminates cold-cache timeout on first request.
+- **All enrichment paths** protected by `withTimeout(5000ms)` — Messages, Mail, Calendar
+
+## Phone Test Results (2026-02-12)
+
+Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 test cases, 23 pass, 3 warnings, 0 failures.
+
+| Finding | Verdict | Action |
+|---------|---------|--------|
+| Notes body/title merging | Not a bug — Apple Notes derives title from first paragraph | No code change |
+| Messages enrichment returns raw phone numbers | **Bug #90** — cold contact cache timeout | Fixed: cache warming + negative cache + withTimeout |
+| Mail enrichment shows mixed names/emails | Expected — three-layer fallback (Contact name → Mail DB comment → email) | No code change |
 
 ## Recent Work (2026-02-09 to 2026-02-10)
 
@@ -61,7 +73,7 @@ Cross-tool intelligence layer resolves raw phone numbers and emails to contact n
 
 ## Unit Test Assessment
 
-800 tests across 34 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **96.15%/81.33%/98.73%/96.56%**. All above thresholds. `pnpm test --coverage` exits 0.
+824 tests across 34 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.1%/81.1%/97.8%/95.4%**. All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
@@ -160,6 +172,7 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 | #87 | P2 | **CLOSED** — Functions 93→95% (actual 98.73%), branches 80% rationale documented |
 | #88 | P3 | **CLOSED** — README HTTP transport / remote access section |
 | #89 | P3 | **CLOSED** — `node dist/index.js --check` preflight validation |
+| #90 | P1 | **CLOSED** — Contact cache warming + negative cache + withTimeout on all enrichment paths |
 
 ### Deferred
 
