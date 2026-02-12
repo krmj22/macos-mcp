@@ -166,14 +166,23 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 **Apple timestamp**: nanoseconds since 2001-01-01. Convert with `datetime(date/1000000000 + strftime('%s','2001-01-01'), 'unixepoch', 'localtime')`
 
-## Testing
+## Testing Strategy
 
-- **Unit**: Jest with ts-jest ESM preset, all OS calls mocked. Coverage thresholds in `jest.config.mjs` (95%/80%/95%/95% stmts/branches/funcs/lines)
-- **E2E**: `pnpm test:e2e` — node:test suite, real MCP client via stdio, creates/reads/deletes actual items
-  - Tests use `[E2E-TEST]` prefix for cleanup identification
-  - Separate from Jest to avoid coverage threshold conflicts
-- Mock CLI: `src/utils/__mocks__/cliExecutor.ts`
-- Mock JXA: `src/tools/jxaHandlers.test.ts`
+**Philosophy: Vibecoding Protocol**
+1.  **Safety Gates > Coverage %**: High coverage is a side effect of good testing, not the goal. We use 95% thresholds to force the AI to consider edge cases, but we trust E2E tests for actual reliability.
+2.  **Protocol**:
+    - **Step 1**: Write the feature (AI).
+    - **Step 2**: Run `pnpm test --coverage`.
+    - **Step 3**: If coverage drops, the AI *must* write tests for the uncovered branches. This finds hidden bugs (null checks, error handling).
+3.  **Real Data is King**: Mocks are for speed; E2E tests against real macOS apps are for truth. If it passes unit tests but fails on a real Mac, the test was wrong.
+
+**Implementation**
+- **Unit**: Jest with ts-jest ESM preset. Coverage thresholds in `jest.config.mjs` (95%/80%/95%/95% stmts/branches/funcs/lines).
+- **E2E**: `pnpm test:e2e` — node:test suite, real MCP client via stdio, creates/reads/deletes actual items.
+  - Tests use `[E2E-TEST]` prefix for cleanup identification.
+  - Separate from Jest to avoid coverage threshold conflicts.
+- **Mock CLI**: `src/utils/__mocks__/cliExecutor.ts`
+- **Mock JXA**: `src/tools/jxaHandlers.test.ts`
 
 ## Commits
 
