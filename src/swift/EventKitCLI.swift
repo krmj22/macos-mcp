@@ -620,9 +620,12 @@ extension EKEvent {
             recurrence = RecurrenceJSON(frequency: freq, interval: rule.interval, endDate: endDateStr, occurrenceCount: occCount)
         }
 
-        // Extract attendee emails (EKParticipant.url is "mailto:email@example.com")
-        let attendeeEmails: [String]? = self.attendees?.map { participant in
-            participant.url.absoluteString.replacingOccurrences(of: "mailto:", with: "")
+        // Extract attendee emails — only mailto: URLs are real emails.
+        // CalDAV principals (iCloud, Google) use opaque path URLs, not useful for enrichment.
+        let attendeeEmails: [String]? = self.attendees?.compactMap { participant in
+            let urlStr = participant.url.absoluteString
+            guard urlStr.hasPrefix("mailto:") else { return nil }
+            return urlStr.replacingOccurrences(of: "mailto:", with: "")
         }
 
         return EventJSON(
