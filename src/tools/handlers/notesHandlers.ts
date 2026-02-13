@@ -123,8 +123,9 @@ const UPDATE_NOTE_SCRIPT = `
   const notes = Notes.notes.whose({id: "{{id}}"})();
   if (notes.length === 0) throw new Error("Note not found");
   const n = notes[0];
-  if ("{{hasName}}" === "true") n.name = "{{newName}}";
+  const titleToSet = "{{hasName}}" === "true" ? "{{newName}}" : n.name();
   if ("{{hasBody}}" === "true") n.body = "{{newBody}}";
+  n.name = titleToSet;
   %%moveToFolder%%
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
@@ -136,11 +137,12 @@ const APPEND_NOTE_SCRIPT = `
   const notes = Notes.notes.whose({id: "{{id}}"})();
   if (notes.length === 0) throw new Error("Note not found");
   const n = notes[0];
-  if ("{{hasName}}" === "true") n.name = "{{newName}}";
+  const titleToSet = "{{hasName}}" === "true" ? "{{newName}}" : n.name();
   const existing = n.plaintext();
   const combined = existing + "\\n" + "{{newBody}}";
   if (combined.length > {{maxBodyLength}}) throw new Error("Combined note body exceeds {{maxBodyLength}} characters (existing: " + existing.length + " + new: " + "{{newBody}}".length + " = " + combined.length + ")");
   n.body = combined;
+  n.name = titleToSet;
   %%moveToFolder%%
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
 })()
