@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-12 (Contact cache warming + enrichment fix #90)
+Last updated: 2026-02-12 (Calendar attendee extraction from Swift binary)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 824 unit tests, 34 test files, all passing
+- **Tests**: 855 unit tests, 35 test files, all passing
 - **E2E**: 149 tests across 8 suites — serial runner (#81 fixed), 2 send skipped
   - 124 stdio transport tests (7 suites)
   - 25 HTTP transport tests (1 suite) — validates full Claude iOS/web path
@@ -22,7 +22,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 |------|---------|---------|------------|
 | `reminders_tasks` | EventKit/Swift | read, create, update, delete | ALL PASS (<1s) |
 | `reminders_lists` | EventKit/Swift | read, create, update, delete | ALL PASS (<400ms) |
-| `calendar_events` | EventKit/Swift | read, create, update, delete | 21/21 — #73 CLOSED, verified 646ms |
+| `calendar_events` | EventKit/Swift | read, create, update, delete | 21/21 — #73 CLOSED, verified 646ms. Attendee emails extracted from EKParticipant (`7ca8c5d`). |
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
 | `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
@@ -56,6 +56,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 | Commit | Description |
 |--------|-------------|
+| `7ca8c5d` | **feat(calendar)**: extract attendee emails from EKEvent in Swift binary |
 | `be122e7` | **fix(calendar)**: bound findEventById to 4-year date range (fixes #73) |
 | `1c61735` | **fix(notes)**: prevent double-escaping in move-to-folder (fixes #74) |
 | `b5c1430` | **fix(contacts)**: use whose() predicate for search (fixes #77) |
@@ -74,7 +75,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 ## Unit Test Assessment
 
-824 tests across 34 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.1%/81.1%/97.8%/95.4%**. All above thresholds. `pnpm test --coverage` exits 0.
+855 tests across 35 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.3%/81.7%/97.8%/95.6%**. All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
