@@ -35,15 +35,30 @@ class CalendarRepository {
     return executeCli<EventsReadResult>(args);
   }
 
+  private formatDate(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00`;
+  }
+
+  private defaultStartDate(): string {
+    const now = new Date();
+    return this.formatDate(
+      new Date(now.getFullYear() - 2, now.getMonth(), now.getDate()),
+    );
+  }
+
+  private defaultEndDate(): string {
+    const now = new Date();
+    return this.formatDate(
+      new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()),
+    );
+  }
+
   async findEventById(id: string): Promise<CalendarEvent> {
     // EventKit requires bounded date range — distantPast/distantFuture returns 0 events
-    const now = new Date();
-    const twoYearsBack = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
-    const twoYearsForward = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 00:00:00`;
-
-    const { events } = await this.readEvents(fmt(twoYearsBack), fmt(twoYearsForward));
+    const { events } = await this.readEvents(
+      this.defaultStartDate(),
+      this.defaultEndDate(),
+    );
     const event = events.find((e) => e.id === id);
     if (!event) {
       throw new Error(`Event with ID '${id}' not found.`);
@@ -64,9 +79,12 @@ class CalendarRepository {
       search?: string;
     } = {},
   ): Promise<CalendarEvent[]> {
+    // EventKit requires bounded date range — distantPast/distantFuture returns 0 events
+    const startDate = filters.startDate ?? this.defaultStartDate();
+    const endDate = filters.endDate ?? this.defaultEndDate();
     const { events } = await this.readEvents(
-      filters.startDate,
-      filters.endDate,
+      startDate,
+      endDate,
       filters.calendarName,
       filters.search,
     );

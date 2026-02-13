@@ -90,7 +90,7 @@ describe('CalendarRepository', () => {
   });
 
   describe('findEvents', () => {
-    it('should return all events when no filters provided', async () => {
+    it('should return all events when no filters provided (with default ±2yr bounds)', async () => {
       const mockEvents: Partial<CalendarEvent>[] = [
         {
           id: '1',
@@ -109,7 +109,11 @@ describe('CalendarRepository', () => {
 
       const result = await repository.findEvents();
 
-      expect(mockExecuteCli).toHaveBeenCalledWith(['--action', 'read-events']);
+      // findEvents now defaults to ±2 years (EventKit returns 0 for unbounded)
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs.slice(0, 2)).toEqual(['--action', 'read-events']);
+      expect(callArgs).toContain('--startDate');
+      expect(callArgs).toContain('--endDate');
       expect(result).toHaveLength(1);
     });
 
@@ -132,12 +136,14 @@ describe('CalendarRepository', () => {
 
       await repository.findEvents({ calendarName: 'Work' });
 
-      expect(mockExecuteCli).toHaveBeenCalledWith([
-        '--action',
-        'read-events',
-        '--filterCalendar',
-        'Work',
-      ]);
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs).toContain('--action');
+      expect(callArgs).toContain('read-events');
+      expect(callArgs).toContain('--filterCalendar');
+      expect(callArgs).toContain('Work');
+      // Default date bounds always present
+      expect(callArgs).toContain('--startDate');
+      expect(callArgs).toContain('--endDate');
     });
 
     it('should filter events by date range', async () => {
@@ -169,12 +175,14 @@ describe('CalendarRepository', () => {
 
       await repository.findEvents({ search: 'meeting' });
 
-      expect(mockExecuteCli).toHaveBeenCalledWith([
-        '--action',
-        'read-events',
-        '--search',
-        'meeting',
-      ]);
+      const callArgs = mockExecuteCli.mock.calls[0][0] as string[];
+      expect(callArgs).toContain('--action');
+      expect(callArgs).toContain('read-events');
+      expect(callArgs).toContain('--search');
+      expect(callArgs).toContain('meeting');
+      // Default date bounds always present
+      expect(callArgs).toContain('--startDate');
+      expect(callArgs).toContain('--endDate');
     });
   });
 
