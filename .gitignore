@@ -187,3 +187,6 @@ macos-mcp.config.json
 
 # AI tool configs
 .gemini/
+
+# Plan scratchpads
+2026-*.txt

@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-12 (Calendar attendee extraction from Swift binary)
+Last updated: 2026-02-13 (Notes list/search/title fixes)
 
 ## Overview
 
@@ -24,7 +24,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 | `reminders_lists` | EventKit/Swift | read, create, update, delete | ALL PASS (<400ms) |
 | `calendar_events` | EventKit/Swift | read, create, update, delete | 21/21 — #73 CLOSED, verified 646ms. Attendee emails extracted from EKParticipant (`7ca8c5d`). |
 | `calendar_calendars` | EventKit/Swift | read | PASS (461ms) |
-| `notes_items` | JXA | read, create, update, delete, append | 17/17 — #74 CLOSED (1.9s), #78 CLOSED (973ms) |
+| `notes_items` | JXA | read, create, update, delete, append | 40/40 — list uses folder iteration (was O(n) timeout), Recently Deleted filtered, title preserved after append |
 | `notes_folders` | JXA | read, create | ALL PASS (<500ms, no delete via API) |
 | `mail_messages` | SQLite + JXA | read, create (draft), update, delete | SQLite reads <40ms, Gmail labels supported (all mailboxes), JXA writes only (#76 FIXED) |
 | `messages_chat` | SQLite + JXA | read, create (send) | 13/13 — #75 CLOSED (5.3s, was 60s+) |
@@ -48,7 +48,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 | Finding | Verdict | Action |
 |---------|---------|--------|
-| Notes body/title merging | Not a bug — Apple Notes derives title from first paragraph | No code change |
+| Notes body/title merging | Apple re-derives n.name() from body on n.body assignment | Fixed: save and re-set name after body update (`45f8eb4`) |
 | Messages enrichment returns raw phone numbers | **Bug #90** — cold contact cache timeout | Fixed: cache warming + negative cache + withTimeout |
 | Mail enrichment shows mixed names/emails | Expected — three-layer fallback (Contact name → Mail DB comment → email) | No code change |
 
@@ -56,6 +56,8 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 | Commit | Description |
 |--------|-------------|
+| `45f8eb4` | **fix(notes)**: preserve title after body update/append — Apple re-derives n.name() from body |
+| `9795e76` | **fix(notes)**: folder-based list (was O(n) timeout) + filter Recently Deleted from list/search |
 | `ff2dd8c` | **fix(calendar)**: default findEvents to ±2yr date bounds (same class as #73) |
 | `900fd6d` | **fix(calendar)**: filter non-mailto attendee URLs (CalDAV principals) |
 | `7ca8c5d` | **feat(calendar)**: extract attendee emails from EKEvent in Swift binary |
@@ -124,7 +126,7 @@ Branches stays at 80%: many uncovered branches are defensive paths (empty catch,
 |------|---------|------|--------|-------------|------------|
 | Reminders | EventKit/Swift | 42-203ms | 339ms | 981ms (cold), 338ms | N/A |
 | Calendar | EventKit/Swift | 34-72ms | 51ms | 646ms (#73 fixed) | 59-67ms |
-| Notes | JXA | 146-583ms | 973ms (#78 fixed) | 2.0s | N/A |
+| Notes | JXA | 146-583ms | 973ms (#78 fixed) | 4.7s (folder iteration, was timeout) | N/A |
 | Mail | SQLite + JXA | 563ms-2.5s (writes) | <10ms (#76 fixed) | <40ms (#76 fixed) | N/A (SQLite has sender) |
 | Messages | SQLite | N/A (read-only) | 135ms | 5.3s (#75 fixed) | 5.3s (#75 fixed) |
 | Contacts | JXA | 161-955ms | 570ms (#77 fixed) | 6.4s (slow) | N/A |
@@ -137,7 +139,7 @@ Key finding: **`whose()` JXA predicates are fast (indexed), JS iteration over co
 |-------|------|-------|--------|
 | Functional (golden path) | `functional.test.mts` | 19/19 | PASS |
 | Calendar | `calendar.test.mts` | 20/20 | PASS |
-| Notes | `notes.test.mts` | 21/21 | PASS |
+| Notes | `notes.test.mts` | 40/40 | PASS (folder list + Recently Deleted filter + title preservation) |
 | Mail | `mail.test.mts` | 18/18 | PASS |
 | Messages | `messages.test.mts` | 17/19 | PASS (2 send skipped) |
 | Contacts | `contacts.test.mts` | 14/14 | PASS |
@@ -155,7 +157,7 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 |-------|-------|--------|------|--------|--------|
 | Reminders CRUD | 5 | 1632ms | 487ms | 404ms | 74ms |
 | Calendar CRUD | 4 | 1047ms | 698ms | 94ms | 62ms |
-| Notes CRUD + Search | 4 | 2772ms | 369ms | 3225ms | 280ms |
+| Notes CRUD + Search | 4 | 1307ms | 1270ms | 4475ms | 407ms |
 | Mail read + search | 2 | — | 37ms | 11ms | — |
 | Messages read | 2 | — | 372ms | — | — |
 | Messages enriched | — | — | 5141ms | — | — |
@@ -191,7 +193,8 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 - **Calendar recurring delete**: Only removes single occurrence
 - **Mail create**: Creates draft only (user must click Send)
 - **Contacts update**: Basic fields only (name, org, jobTitle, note)
-- **JXA `collection.method()` is O(n)**: Always use `whose()` predicates for search/filter, never JS iteration
+- **Notes title**: Apple re-derives `n.name()` from body content on every `n.body =` — update/append scripts re-set name after body assignment to preserve it
+- **JXA `collection.method()` is O(n)**: Always use `whose()` predicates for search/filter, never JS iteration. Notes list uses folder iteration instead of `Notes.notes()`
 - **EventKit date range limit**: `predicateForEvents` cannot span >4 years. Both `findEventById` and `findEvents` default to ±2 years.
 - **Contact enrichment at scale**: Per-handle JXA lookups don't scale beyond ~10 participants
 
