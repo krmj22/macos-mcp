@@ -36,21 +36,27 @@ interface NoteItem {
 const LIST_NOTES_SCRIPT = `
 (() => {
   const Notes = Application("Notes");
-  const notes = Notes.notes();
+  const folders = Notes.folders();
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  const end = Math.min(notes.length, offset + limit);
-  for (let i = offset; i < end; i++) {
-    const n = notes[i];
-    result.push({
-      id: n.id(),
-      name: n.name(),
-      body: "",
-      folder: n.container().name(),
-      creationDate: n.creationDate().toISOString(),
-      modificationDate: n.modificationDate().toISOString()
-    });
+  let skipped = 0;
+  for (let fi = 0; fi < folders.length && result.length < limit; fi++) {
+    const f = folders[fi];
+    if (f.name() === "Recently Deleted") continue;
+    const notes = f.notes();
+    for (let ni = 0; ni < notes.length && result.length < limit; ni++) {
+      if (skipped < offset) { skipped++; continue; }
+      const n = notes[ni];
+      result.push({
+        id: n.id(),
+        name: n.name(),
+        body: "",
+        folder: f.name(),
+        creationDate: n.creationDate().toISOString(),
+        modificationDate: n.modificationDate().toISOString()
+      });
+    }
   }
   return JSON.stringify(result);
 })()
@@ -60,14 +66,16 @@ const SEARCH_NOTES_SCRIPT = `
 (() => {
   const Notes = Application("Notes");
   const term = "{{search}}";
-  // Two-pass: whose() for title matches (indexed, fast), then plaintext() only on matches
+  // whose() for title matches (indexed, fast), then plaintext() only on matches
   const titleMatches = Notes.notes.whose({name: {_contains: term}})();
   const result = [];
   const offset = {{offset}};
   const limit = {{limit}};
-  const end = Math.min(titleMatches.length, offset + limit);
-  for (let i = offset; i < end; i++) {
+  let skipped = 0;
+  for (let i = 0; i < titleMatches.length && result.length < limit; i++) {
     const n = titleMatches[i];
+    if (n.container().name() === "Recently Deleted") continue;
+    if (skipped < offset) { skipped++; continue; }
     result.push({
       id: n.id(),
       name: n.name(),
