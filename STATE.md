@@ -56,6 +56,8 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 | Commit | Description |
 |--------|-------------|
+| `ff2dd8c` | **fix(calendar)**: default findEvents to ±2yr date bounds (same class as #73) |
+| `900fd6d` | **fix(calendar)**: filter non-mailto attendee URLs (CalDAV principals) |
 | `7ca8c5d` | **feat(calendar)**: extract attendee emails from EKEvent in Swift binary |
 | `be122e7` | **fix(calendar)**: bound findEventById to 4-year date range (fixes #73) |
 | `1c61735` | **fix(notes)**: prevent double-escaping in move-to-folder (fixes #74) |
@@ -190,7 +192,7 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 - **Mail create**: Creates draft only (user must click Send)
 - **Contacts update**: Basic fields only (name, org, jobTitle, note)
 - **JXA `collection.method()` is O(n)**: Always use `whose()` predicates for search/filter, never JS iteration
-- **EventKit date range limit**: `predicateForEvents` cannot span >4 years
+- **EventKit date range limit**: `predicateForEvents` cannot span >4 years. Both `findEventById` and `findEvents` default to ±2 years.
 - **Contact enrichment at scale**: Per-handle JXA lookups don't scale beyond ~10 participants
 
 ## Infrastructure
