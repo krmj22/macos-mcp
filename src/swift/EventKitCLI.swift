@@ -11,7 +11,7 @@ struct DeleteListResult: Codable { let title: String; let deleted = true }
 struct ReminderJSON: Codable { let id: String, title: String, isCompleted: Bool, list: String, notes: String?, url: String?, dueDate: String? }
 struct ListJSON: Codable { let id: String, title: String }
 struct RecurrenceJSON: Codable { let frequency: String, interval: Int, endDate: String?, occurrenceCount: Int? }
-struct EventJSON: Codable { let id: String, title: String, calendar: String, startDate: String, endDate: String, notes: String?, location: String?, url: String?, isAllDay: Bool, recurrence: RecurrenceJSON? }
+struct EventJSON: Codable { let id: String, title: String, calendar: String, startDate: String, endDate: String, notes: String?, location: String?, url: String?, isAllDay: Bool, recurrence: RecurrenceJSON?, attendees: [String]? }
 struct CalendarJSON: Codable { let id: String, title: String }
 struct EventsReadResult: Codable { let calendars: [CalendarJSON]; let events: [EventJSON] }
 
@@ -620,6 +620,11 @@ extension EKEvent {
             recurrence = RecurrenceJSON(frequency: freq, interval: rule.interval, endDate: endDateStr, occurrenceCount: occCount)
         }
 
+        // Extract attendee emails (EKParticipant.url is "mailto:email@example.com")
+        let attendeeEmails: [String]? = self.attendees?.map { participant in
+            participant.url.absoluteString.replacingOccurrences(of: "mailto:", with: "")
+        }
+
         return EventJSON(
             id: self.eventIdentifier,
             title: self.title,
@@ -630,7 +635,8 @@ extension EKEvent {
             location: self.location,
             url: self.url?.absoluteString,
             isAllDay: self.isAllDay,
-            recurrence: recurrence
+            recurrence: recurrence,
+            attendees: attendeeEmails
         )
     }
 }
