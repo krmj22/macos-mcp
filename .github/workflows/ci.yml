@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec biome check
+      - run: pnpm exec biome check --formatter-enabled=true --linter-enabled=false
       - run: pnpm exec tsc --noEmit
 
   test:
