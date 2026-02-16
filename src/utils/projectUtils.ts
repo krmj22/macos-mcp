@@ -70,7 +70,7 @@ function isCorrectProjectRoot(dir: string): boolean {
   try {
     const packageContent = fs.readFileSync(packageJsonPath, 'utf8');
     const packageData = JSON.parse(packageContent);
-    return packageData.name === 'macos-mcp';
+    return packageData.name === 'mcp-macos';
   } catch {
     return false;
   }

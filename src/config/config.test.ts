@@ -242,7 +242,7 @@ describe('Configuration System', () => {
       fs.mkdirSync(testProjectRoot, { recursive: true });
       fs.writeFileSync(
         packageJsonPath,
-        JSON.stringify({ name: 'macos-mcp', version: '2.0.0' }),
+        JSON.stringify({ name: 'mcp-macos', version: '2.0.0' }),
       );
 
       // Remove any existing config file
@@ -281,7 +281,7 @@ describe('Configuration System', () => {
     it('should load default configuration', () => {
       const config = loadConfig();
 
-      expect(config.name).toBe('macos-mcp');
+      expect(config.name).toBe('mcp-macos');
       expect(config.version).toBeDefined();
       expect(config.transport).toBe('stdio');
     });
@@ -289,7 +289,7 @@ describe('Configuration System', () => {
     it('should auto-inject name and version from package.json', () => {
       const config = loadConfig();
 
-      expect(config.name).toBe('macos-mcp');
+      expect(config.name).toBe('mcp-macos');
       expect(config.version).toBe('2.0.0');
     });
 
