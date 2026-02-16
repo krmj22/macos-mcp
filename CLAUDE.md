@@ -37,7 +37,7 @@ See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, an
 
 JXA `c.messages()` throws "Can't convert types". All message reads use SQLite at `~/Library/Messages/chat.db` (JXA read paths removed in `cee2366`). Requires **Full Disk Access** for the process reading the database:
 - **stdio transport**: Grant Full Disk Access to your terminal app (Terminal, iTerm2, etc.)
-- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **actual node binary** (not a version manager shim). See `docs/CLOUDFLARE_SETUP.md` Step 10 for detailed instructions including troubleshooting.
+- **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **actual node binary** (not a version manager shim). See `docs/CLOUDFLARE_SETUP.md` Step 11 for detailed instructions including troubleshooting.
 
 **Quick FDA setup commands:**
 ```bash
@@ -91,7 +91,7 @@ MCP_TRANSPORT=http MCP_HTTP_ENABLED=true node dist/index.js
 | `MCP_HTTP_ENABLED` | `false` | Enable HTTP transport |
 | `MCP_HTTP_PORT` | `3847` | HTTP server port |
 
-**Important:** When running via HTTP transport as a LaunchAgent, the Messages tool requires Full Disk Access granted to the actual node binary (not a shim). See `docs/CLOUDFLARE_SETUP.md` Step 10 for setup and troubleshooting.
+**Important:** When running via HTTP transport as a LaunchAgent, the Messages tool requires Full Disk Access granted to the actual node binary (not a shim). See `docs/CLOUDFLARE_SETUP.md` Step 11 for setup and troubleshooting.
 
 ## Architecture
 

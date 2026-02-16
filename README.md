@@ -85,15 +85,23 @@ Apple separates Reminders and Calendar permissions into *write-only* and *full-a
 
 If a permission failure occurs, the Node.js layer automatically runs a minimal AppleScript to surface the dialog and retries.
 
-### JXA (Notes, Mail, Messages)
+### JXA (Notes, Mail, Contacts)
 
 JXA-based tools require macOS Automation permissions. On first use, macOS will prompt you to allow `osascript` to control each app. Grant access via **System Settings > Privacy & Security > Automation**.
 
-**Verification command:**
+> **Headless / LaunchAgent:** Automation permission dialogs **cannot appear** through a LaunchAgent, SSH session, or any non-GUI context. You must grant them once from a local graphical Terminal session (physical access or Screen Sharing). See [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md) Step 10 for the full procedure. Once granted, permissions persist across reboots.
+
+**Verify all Automation permissions:**
 
 ```bash
-pnpm test -- src/swift/Info.plist.test.ts
+/usr/bin/osascript -l JavaScript -e 'Application("Contacts").people().length'
+/usr/bin/osascript -l JavaScript -e 'Application("Calendar").calendars().length'
+/usr/bin/osascript -l JavaScript -e 'Application("Reminders").defaultList().name()'
+/usr/bin/osascript -l JavaScript -e 'Application("Mail").inbox().messages().length'
+/usr/bin/osascript -l JavaScript -e 'Application("Notes").notes().length'
 ```
+
+Each command should return a value without errors or hanging. A hang means the permission dialog is trying (and failing) to appear.
 
 ### Full Disk Access (Messages)
 

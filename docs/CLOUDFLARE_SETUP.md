@@ -324,14 +324,86 @@ tail -f /tmp/macos-mcp.log
 tail -f /tmp/cloudflared.log
 ```
 
-## Step 10: Grant Full Disk Access for Messages
+## Step 10: Grant Automation Permissions (Contacts, Calendar, Reminders, Mail, Notes)
+
+macOS Automation permissions require an **interactive GUI prompt** — the user must click "Allow" in a system dialog. These prompts **cannot appear** through a LaunchAgent, SSH session, or any non-GUI context. You must grant them once via a local graphical session before the LaunchAgent can use JXA-based tools.
+
+**This is a one-time setup.** Once granted, Automation permissions persist across reboots and LaunchAgent restarts until manually revoked in System Settings.
+
+### 10.1: Stop the LaunchAgent
+
+Prevent the LaunchAgent from competing for permission prompts:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.macos-mcp.server.plist
+```
+
+### 10.2: Grant Permissions via Local GUI Terminal
+
+You **must** run these commands from a Terminal window on the Mac's graphical desktop — either physically at the machine or via Screen Sharing / VNC. SSH sessions cannot display GUI permission dialogs.
+
+**Connect via Screen Sharing from another Mac:**
+```bash
+# Enable Screen Sharing on the server Mac (if not already enabled)
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+# From your client Mac, connect:
+open vnc://your-mac-hostname.local
+```
+
+**Run each command in Terminal on the remote desktop.** Click "Allow" on every macOS permission dialog that appears:
+
+```bash
+# Contacts (JXA Automation)
+/usr/bin/osascript -l JavaScript -e 'Application("Contacts").people().length'
+
+# Calendar (JXA Automation)
+/usr/bin/osascript -l JavaScript -e 'Application("Calendar").calendars().length'
+
+# Reminders (JXA Automation)
+/usr/bin/osascript -l JavaScript -e 'Application("Reminders").defaultList().name()'
+
+# Mail (JXA Automation)
+/usr/bin/osascript -l JavaScript -e 'Application("Mail").inbox().messages().length'
+
+# Notes (JXA Automation)
+/usr/bin/osascript -l JavaScript -e 'Application("Notes").notes().length'
+```
+
+Each command should return a number or string (not an error). If a command hangs without showing a dialog, the terminal process may not be able to trigger prompts — check System Settings > Privacy & Security > Automation manually.
+
+### 10.3: Verify with Preflight Check
+
+```bash
+cd /path/to/macos-mcp
+node dist/index.js --check
+```
+
+All checks should show `[PASS]`.
+
+### 10.4: Reload the LaunchAgent
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.macos-mcp.server.plist
+```
+
+### 10.5: When Permissions Need Re-granting
+
+Automation permissions are tied to the **calling binary**. You may need to repeat this step if:
+- You upgrade or reinstall your terminal app
+- You reset privacy permissions via `tccutil reset AppleEvents`
+- macOS prompts again after a major OS update
+
+You do **not** need to repeat this for Node.js upgrades, LaunchAgent restarts, or reboots.
+
+## Step 11: Grant Full Disk Access for Messages
 
 The Messages tool relies on direct SQLite access to `~/Library/Messages/chat.db` because JXA message reading is broken on macOS Sonoma and later (throws "Can't convert types"). macOS restricts access to this database behind **Full Disk Access**.
 
 - **stdio transport**: Grant Full Disk Access to your **terminal app** (Terminal, iTerm2, etc.)
 - **HTTP transport (LaunchAgent)**: Grant Full Disk Access to the **node binary itself** since there is no terminal app in the process chain
 
-### 10.1: Find Your Actual Node Binary Path
+### 11.1: Find Your Actual Node Binary Path
 
 Version managers (Volta, nvm, fnm) use shims or symlinks that point to a launcher, not the real node binary. You must add the **actual binary**, not the shim.
 
@@ -354,7 +426,7 @@ Expected output by version manager:
 
 The path must match the `ProgramArguments` in your LaunchAgent plist from Step 9.
 
-### 10.2: Grant Full Disk Access
+### 11.2: Grant Full Disk Access
 
 There are two methods. **Method A (drag-and-drop)** is more reliable because the Finder file picker in System Settings sometimes fails to show binaries in hidden directories (paths starting with `.`).
 
@@ -380,13 +452,13 @@ Then:
 1. Open **System Settings** > **Privacy & Security** > **Full Disk Access**
 2. Click the **+** button (you may need to unlock with your password)
 3. Press **Cmd+Shift+G** to open the "Go to Folder" dialog
-4. Paste the full path to your node binary (from Step 10.1)
+4. Paste the full path to your node binary (from Step 11.1)
 5. Click **Open** to add it
 6. Ensure the toggle next to the node entry is **enabled**
 
 > **Tip:** If the Go to Folder dialog doesn't show the binary or the list appears empty after adding, use Method A instead.
 
-### 10.3: Restart the LaunchAgent
+### 11.3: Restart the LaunchAgent
 
 Full Disk Access changes require a process restart to take effect:
 
@@ -395,7 +467,7 @@ launchctl unload ~/Library/LaunchAgents/com.macos-mcp.server.plist
 launchctl load ~/Library/LaunchAgents/com.macos-mcp.server.plist
 ```
 
-### 10.4: Verify Messages Access
+### 11.4: Verify Messages Access
 
 ```bash
 # Quick test: can the current node binary read the Messages database?
@@ -414,19 +486,19 @@ try {
 
 If you see "Access denied", see the troubleshooting section below.
 
-### 10.5: Troubleshooting Full Disk Access
+### 11.5: Troubleshooting Full Disk Access
 
 **Binary doesn't appear in the list after adding:**
-- The Finder file picker in System Settings can fail to display binaries in hidden directories. Use the drag-and-drop method (Method A in Step 10.2) instead.
+- The Finder file picker in System Settings can fail to display binaries in hidden directories. Use the drag-and-drop method (Method A in Step 11.2) instead.
 - Verify the file exists: `ls -la "$(node -e "console.log(process.execPath)")"` -- it should show a real file, not a broken symlink.
 
 **Added the binary but Messages still don't work:**
 - You may have added the shim instead of the actual binary. Run `node -e "console.log(process.execPath)"` and compare with what's in the FDA list. Volta's `~/.volta/bin/node` is a shim -- you need the resolved path under `~/.volta/tools/image/node/`.
-- Restart the LaunchAgent after granting access (Step 10.3). FDA changes only apply to newly started processes.
+- Restart the LaunchAgent after granting access (Step 11.3). FDA changes only apply to newly started processes.
 
 **Node version changed after upgrading:**
 - Version managers install new binaries when you upgrade Node.js. The old binary path in the FDA list becomes stale.
-- After upgrading, re-run Step 10.1 to get the new path, then repeat Steps 10.2-10.4.
+- After upgrading, re-run Step 11.1 to get the new path, then repeat Steps 11.2-11.4.
 - Also update the `ProgramArguments` in your LaunchAgent plist if it uses the full versioned path.
 
 **Helper commands for diagnosing FDA issues:**
@@ -445,7 +517,7 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
 node -e "require('fs').accessSync(require('os').homedir()+'/Library/Messages/chat.db'); console.log('OK')"
 ```
 
-## Step 11: Register in Claude iOS/Desktop
+## Step 12: Register in Claude iOS/Desktop
 
 ### Claude iOS
 
@@ -538,24 +610,24 @@ The Messages tool is the most common source of issues when running via HTTP tran
 - Error logs show `SQLITE_CANTOPEN` or permission denied for `chat.db`
 
 **Fix:**
-1. Ensure you added the **actual node binary**, not a shim (see Step 10.1)
-2. Use the drag-and-drop method if the file picker didn't work (see Step 10.2, Method A)
-3. Restart the LaunchAgent after granting access (Step 10.3)
-4. Verify with the test command in Step 10.4
+1. Ensure you added the **actual node binary**, not a shim (see Step 11.1)
+2. Use the drag-and-drop method if the file picker didn't work (see Step 11.2, Method A)
+3. Restart the LaunchAgent after granting access (Step 11.3)
+4. Verify with the test command in Step 11.4
 
 **Checking logs for Messages errors:**
 ```bash
 grep -i "messages\|chat.db\|sqlite" /tmp/macos-mcp.error.log
 ```
 
-See Step 10.5 for additional troubleshooting.
+See Step 11.5 for additional troubleshooting.
 
 ### Permission Issues
 
 Several tools require specific macOS permissions. When running as a LaunchAgent (HTTP transport), permissions must be granted to the **node binary** rather than a terminal app since there is no terminal in the process chain.
 
 **For Messages (Full Disk Access):**
-See Step 10 for detailed instructions including troubleshooting.
+See Step 11 for detailed instructions including troubleshooting.
 
 **For other tools (Automation permissions):**
 1. Go to **System Settings** > **Privacy & Security** > **Automation**
