@@ -2,6 +2,22 @@
 
 Reference this document when making any decision — architecture, bug triage, feature scope, testing, documentation. If a choice doesn't serve the intent, it's the wrong choice.
 
+## What This Looks Like
+
+Kyle is grabbing coffee downtown. He pulls out his phone, opens Claude, and types: *"What's my afternoon look like? Anything I should prep for?"*
+
+Claude checks his Calendar and finds a 2pm with Sarah Chen — a product review. It pulls the last few emails between them and sees she sent a deck yesterday with questions about the Q3 roadmap. There's also an overdue reminder: "Review competitive analysis doc." Claude puts it together:
+
+> You have a product review with Sarah Chen at 2pm. She sent you a deck yesterday with three open questions about the Q3 roadmap — looks like she's expecting answers. You also have an overdue reminder to review the competitive analysis doc, which is probably relevant. Want me to pull up her questions?
+
+Kyle replies: *"Yeah, pull those out and make me a prep note. And remind me to review it at 1:30."*
+
+Claude reads the email body, extracts the three questions, creates a note titled "Product Review Prep — Sarah 2pm" with the questions and bullet points for each, and sets a reminder for 1:30pm. Done in seconds, from a phone, while he's in line for coffee.
+
+That's the product. Not a demo, not a toy — a genuine extension of what Claude can do when it has real access to real data on a real Mac. The six tools (Calendar, Mail, Contacts, Notes, Reminders, Messages) aren't interesting individually. They're interesting because they work together, reliably, on actual user data, and they make Claude meaningfully more useful in daily life.
+
+Everything in this document — the architecture, the testing philosophy, the quality bar — exists to make that interaction work every time.
+
 ## What We're Building
 
 An MCP server that gives Claude genuine, reliable access to a user's macOS personal data — Reminders, Calendar, Notes, Mail, Messages, and Contacts. Six apps, done well.
