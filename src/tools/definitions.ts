@@ -253,7 +253,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         enrichContacts: {
           type: 'boolean',
           description:
-            'Resolve attendee email addresses to contact names (default true). Set to false to show raw email addresses.',
+            'Reserved for future use. Attendee names are provided directly by EventKit.',
           default: true,
         },
       },

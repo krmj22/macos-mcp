@@ -5,12 +5,10 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type {
-  CalendarEvent,
   CalendarsToolArgs,
   CalendarToolArgs,
 } from '../../types/index.js';
 import { calendarRepository } from '../../utils/calendarRepository.js';
-import { contactResolver } from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import { formatMultilineNotes } from '../../utils/helpers.js';
 import {
@@ -25,33 +23,7 @@ import {
   formatDeleteMessage,
   formatListMarkdown,
   formatSuccessMessage,
-  withTimeout,
 } from './shared.js';
-
-/**
- * Enriches event attendees by resolving email addresses to contact names.
- * Unknown attendees gracefully fall back to their raw email addresses.
- *
- * @param events - Array of calendar events to enrich
- * @returns Events with attendee emails replaced by contact names where available
- */
-async function enrichEventAttendees(
-  events: CalendarEvent[],
-): Promise<CalendarEvent[]> {
-  const emails = [...new Set(events.flatMap((e) => e.attendees || []))];
-  if (emails.length === 0) return events;
-
-  const resolved = await withTimeout(
-    contactResolver.resolveBatch(emails),
-    5000,
-    new Map(),
-    'calendar_enrichment',
-  );
-  return events.map((e) => ({
-    ...e,
-    attendees: e.attendees?.map((a) => resolved.get(a)?.fullName || a),
-  }));
-}
 
 /**
  * Formats a calendar event as a markdown list item
@@ -176,26 +148,16 @@ export const handleReadCalendarEvents = async (
     );
 
     if (validatedArgs.id) {
-      let event = await calendarRepository.findEventById(validatedArgs.id);
-      // Enrich single event attendees if enabled (default: true)
-      if (validatedArgs.enrichContacts !== false) {
-        const enriched = await enrichEventAttendees([event]);
-        event = enriched[0];
-      }
+      const event = await calendarRepository.findEventById(validatedArgs.id);
       return formatEventMarkdown(event).join('\n');
     }
 
-    let events = await calendarRepository.findEvents({
+    const events = await calendarRepository.findEvents({
       startDate: validatedArgs.startDate,
       endDate: validatedArgs.endDate,
       calendarName: validatedArgs.filterCalendar,
       search: validatedArgs.search,
     });
-
-    // Enrich attendees with contact names if enabled (default: true)
-    if (validatedArgs.enrichContacts !== false) {
-      events = await enrichEventAttendees(events);
-    }
 
     return formatListMarkdown(
       'Calendar Events',

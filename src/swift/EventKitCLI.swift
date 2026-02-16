@@ -620,12 +620,16 @@ extension EKEvent {
             recurrence = RecurrenceJSON(frequency: freq, interval: rule.interval, endDate: endDateStr, occurrenceCount: occCount)
         }
 
-        // Extract attendee emails — only mailto: URLs are real emails.
-        // CalDAV principals (iCloud, Google) use opaque path URLs, not useful for enrichment.
-        let attendeeEmails: [String]? = self.attendees?.compactMap { participant in
+        // Extract attendee display names — what Calendar.app shows.
+        // Prefer EKParticipant.name (works for iCloud, Google, Exchange).
+        // Fall back to mailto: email if name is nil.
+        let attendeeNames: [String]? = self.attendees?.compactMap { participant in
+            if let name = participant.name { return name }
             let urlStr = participant.url.absoluteString
-            guard urlStr.hasPrefix("mailto:") else { return nil }
-            return urlStr.replacingOccurrences(of: "mailto:", with: "")
+            if urlStr.hasPrefix("mailto:") {
+                return urlStr.replacingOccurrences(of: "mailto:", with: "")
+            }
+            return nil
         }
 
         return EventJSON(
@@ -639,7 +643,7 @@ extension EKEvent {
             url: self.url?.absoluteString,
             isAllDay: self.isAllDay,
             recurrence: recurrence,
-            attendees: attendeeEmails
+            attendees: attendeeNames
         )
     }
 }

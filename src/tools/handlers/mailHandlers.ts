@@ -399,7 +399,7 @@ export async function handleCreateMail(
   const msg = Mail.OutgoingMessage({
     subject: "${sanitizeForJxa(subject)}",
     content: "${sanitizeForJxa(body)}",
-    visible: true
+    visible: false
   });
   Mail.outgoingMessages.push(msg);
   ${recipientLines.join('\n  ')}

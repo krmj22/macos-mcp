@@ -443,7 +443,7 @@ describe('Tool Handlers', () => {
       expect(mockCalendarRepository.findAllCalendars).not.toHaveBeenCalled();
     });
 
-    it('should enrich attendees with contact names by default', async () => {
+    it('should display attendee names from EventKit', async () => {
       const mockEvents = [
         {
           id: 'evt-1',
@@ -452,55 +452,15 @@ describe('Tool Handlers', () => {
           startDate: '2025-11-15T09:00:00Z',
           endDate: '2025-11-15T10:00:00Z',
           isAllDay: false,
-          attendees: ['john@example.com', 'jane@example.com'],
+          attendees: ['John Smith', 'Jane Doe'],
         },
       ];
       mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
-
-      // Mock contact resolver to return a contact name for one attendee
-      mockContactResolver.resolveBatch.mockResolvedValue(
-        new Map([
-          [
-            'john@example.com',
-            { id: 'c1', fullName: 'John Smith', firstName: 'John' },
-          ],
-        ]),
-      );
 
       const result = await handleReadCalendarEvents({ action: 'read' });
       const content = _getTextContent(result.content);
 
-      expect(content).toContain('- Attendees: John Smith, jane@example.com');
-      expect(mockContactResolver.resolveBatch).toHaveBeenCalledWith([
-        'john@example.com',
-        'jane@example.com',
-      ]);
-    });
-
-    it('should show raw emails when enrichContacts is false', async () => {
-      const mockEvents = [
-        {
-          id: 'evt-1',
-          title: 'Team Meeting',
-          calendar: 'Work',
-          startDate: '2025-11-15T09:00:00Z',
-          endDate: '2025-11-15T10:00:00Z',
-          isAllDay: false,
-          attendees: ['john@example.com', 'jane@example.com'],
-        },
-      ];
-      mockCalendarRepository.findEvents.mockResolvedValue(mockEvents);
-
-      const result = await handleReadCalendarEvents({
-        action: 'read',
-        enrichContacts: false,
-      });
-      const content = _getTextContent(result.content);
-
-      expect(content).toContain(
-        '- Attendees: john@example.com, jane@example.com',
-      );
-      expect(mockContactResolver.resolveBatch).not.toHaveBeenCalled();
+      expect(content).toContain('- Attendees: John Smith, Jane Doe');
     });
 
     it('should handle events without attendees gracefully', async () => {
