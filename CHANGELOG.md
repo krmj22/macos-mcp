@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/krmj22/macos-mcp/compare/v2.0.0...v2.0.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* use package root for Swift build paths (not cwd) ([a32b54b](https://github.com/krmj22/macos-mcp/commit/a32b54bd3b6e5eb6e3db5b14420cb43c5fc42831))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
