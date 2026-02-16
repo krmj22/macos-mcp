@@ -76,12 +76,12 @@ When evaluating any piece of work, ask: **"Does this actually do what the user n
 ## Scope
 
 **In scope (these 6, done well):**
-- Reminders (EventKit)
-- Calendar (EventKit)
-- Notes (JXA)
-- Mail (SQLite reads, JXA writes)
-- Messages (SQLite reads, JXA sends)
-- Contacts (JXA)
+- Reminders
+- Calendar
+- Notes
+- Mail
+- Messages
+- Contacts
 
 **Out of scope:**
 - Other Apple apps (Finder, Safari, Photos, Shortcuts, etc.)
