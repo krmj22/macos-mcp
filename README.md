@@ -8,12 +8,25 @@ Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunne
 
 ## Quick Start
 
+### Install from npm
+
+```bash
+npm install -g mcp-macos
+```
+
+### Or build from source
+
 ```bash
 git clone https://github.com/krmj22/macos-mcp.git
 cd macos-mcp
 pnpm install
 pnpm build
-node dist/index.js --check
+```
+
+### Verify setup
+
+```bash
+node dist/index.js --check   # or: macos-mcp --check (if installed globally)
 ```
 
 The preflight check validates macOS version, Node.js, EventKit binary, Full Disk Access, and JXA automation permissions.
@@ -55,8 +68,8 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "macos-mcp": {
-      "command": "node",
-      "args": ["/path/to/macos-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["mcp-macos"]
     }
   }
 }
@@ -70,8 +83,8 @@ Add to your `claude_desktop_config.json`:
     {
       "mcpServers": {
         "macos-mcp": {
-          "command": "node",
-          "args": ["/path/to/macos-mcp/dist/index.js"]
+          "command": "npx",
+          "args": ["mcp-macos"]
         }
       }
     }
@@ -85,8 +98,8 @@ Add a `.mcp.json` to your project root:
 {
   "mcpServers": {
     "macos-mcp": {
-      "command": "node",
-      "args": ["/path/to/macos-mcp/dist/index.js"]
+      "command": "npx",
+      "args": ["mcp-macos"]
     }
   }
 }
@@ -157,7 +170,7 @@ List all note folders.
 ```
 Show my inbox.
 Read the email from John about the project.
-Send an email to alice@example.com about the meeting.
+Draft an email to alice@example.com about the meeting.
 Reply to the last email from Bob.
 ```
 

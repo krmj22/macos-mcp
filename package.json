@@ -1,5 +1,5 @@
 {
-  "name": "macos-mcp",
+  "name": "mcp-macos",
   "version": "2.0.0",
   "description": "MCP server that provides native integration with Apple Reminders, Calendar, Notes, Mail, and Messages on macOS.",
   "author": "Kyle Jensen",
@@ -13,7 +13,11 @@
     "dist/**/*.d.ts",
     "!dist/**/*.test.*",
     "!dist/test-setup.*",
-    "bin",
+    "bin/run.cjs",
+    "bin/dev.cjs",
+    "src/swift/EventKitCLI.swift",
+    "src/swift/Info.plist",
+    "scripts/build-swift.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -41,7 +45,7 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "bin": {
-    "macos-mcp": "./bin/run.cjs"
+    "mcp-macos": "./bin/run.cjs"
   },
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
@@ -55,6 +59,7 @@
     "test:e2e:http": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/http-transport.test.mts",
     "test:e2e:all": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/*.test.mts",
     "lint": "pnpm exec biome check --write --unsafe && pnpm exec tsc --noEmit --project tsconfig.json",
+    "postinstall": "node -e \"process.platform === 'darwin' && require('child_process').execSync('node scripts/build-swift.mjs', {stdio: 'inherit'})\"",
     "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
