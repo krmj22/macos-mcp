@@ -26,7 +26,10 @@ async function main() {
   }
 
   // Use package root (not cwd) so this works during npm postinstall
-  const packageRoot = path.resolve(new URL('.', import.meta.url).pathname, '..');
+  const packageRoot = path.resolve(
+    new URL('.', import.meta.url).pathname,
+    '..',
+  );
   const scriptDir = path.resolve(packageRoot, 'src', 'swift');
   const sourceFile = path.join(scriptDir, 'EventKitCLI.swift');
   const infoPlistFile = path.join(scriptDir, 'Info.plist');
