@@ -2,7 +2,7 @@
 
 > Based on [FradSer/mcp-server-apple-events](https://github.com/FradSer/mcp-server-apple-events)
 
-A Model Context Protocol (MCP) server for native macOS app integration: **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts**.
+A Model Context Protocol (MCP) server that gives Claude genuine access to your macOS personal data — **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts**. Six apps, working together: ask Claude about tomorrow's meeting and it pulls the calendar event, finds related emails, and creates a prep note — from your phone, your desktop, or the web.
 
 Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunnel.
 
@@ -30,7 +30,7 @@ The preflight check validates macOS version, Node.js, EventKit binary, Full Disk
 | `calendar_calendars` | Calendar | EventKit | read |
 | `notes_items` | Notes | JXA | read, create, update, delete |
 | `notes_folders` | Notes | JXA | read, create |
-| `mail_messages` | Mail | JXA | read, create, update, delete |
+| `mail_messages` | Mail | SQLite + JXA | read, create, update, delete |
 | `messages_chat` | Messages | SQLite + JXA | read, create |
 | `contacts_people` | Contacts | JXA | read, search, create, update, delete |
 
@@ -98,7 +98,7 @@ On first use, macOS will prompt you to allow access for each app. Click **Allow*
 
 - **Reminders & Calendar** — EventKit permission dialogs appear automatically.
 - **Notes, Mail, Contacts** — Automation permission dialogs appear when `osascript` first controls each app. Grant access via **System Settings > Privacy & Security > Automation**.
-- **Messages** — Requires **Full Disk Access** for your terminal app (Terminal, iTerm2, etc.) since message reads use SQLite.
+- **Messages & Mail** — Require **Full Disk Access** for your terminal app (Terminal, iTerm2, etc.) since both read SQLite databases directly.
 
 Run `node dist/index.js --check` to verify all permissions are granted. See [Troubleshooting](#troubleshooting) if anything fails.
 
@@ -177,7 +177,7 @@ Send "On my way!" to the group chat.
 | Reminders | Full Access | Privacy & Security > Reminders |
 | Calendar | Full Access | Privacy & Security > Calendars |
 | Notes | Automation | Privacy & Security > Automation > Notes |
-| Mail | Automation | Privacy & Security > Automation > Mail |
+| Mail | Automation + Full Disk Access | Both locations |
 | Messages | Automation + Full Disk Access | Both locations |
 | Contacts | Automation | Privacy & Security > Automation > Contacts |
 
@@ -221,9 +221,9 @@ JXA-based tools require macOS Automation permissions. On first use, macOS will p
 
 Each command should return a value without errors or hanging. A hang means the permission dialog is trying (and failing) to appear.
 
-### Full Disk Access (Messages)
+### Full Disk Access (Messages & Mail)
 
-The Messages tool reads `~/Library/Messages/chat.db` via SQLite (JXA message reading is broken on macOS Sonoma+). This database is protected by **Full Disk Access (FDA)**.
+The Messages and Mail tools read SQLite databases directly (`~/Library/Messages/chat.db` and `~/Library/Mail/V10/MailData/Envelope Index`). These databases are protected by **Full Disk Access (FDA)**.
 
 - **stdio transport**: Grant FDA to your terminal app (Terminal, iTerm2, etc.)
 - **HTTP transport / LaunchAgent**: Grant FDA to the **actual node binary**, not a version manager shim
@@ -304,7 +304,7 @@ The server uses two bridging strategies to communicate with Apple apps:
 
 - **EventKit (Swift binary)** — Reminders and Calendar. A compiled Swift CLI binary performs EventKit operations and returns JSON.
 - **JXA (JavaScript for Automation)** — Notes, Mail, Contacts. Scripts run via `osascript -l JavaScript` with template-based parameter interpolation.
-- **SQLite** — Messages reads use `~/Library/Messages/chat.db` directly (JXA message reading is broken on macOS Sonoma+). Sends still use JXA.
+- **SQLite** — Messages reads (`~/Library/Messages/chat.db`) and Mail reads (`~/Library/Mail/V10/MailData/Envelope Index`). JXA message reading is broken on macOS Sonoma+; JXA mail reading is too slow for real inboxes. Writes still use JXA.
 
 ### HTTP Transport Configuration
 
