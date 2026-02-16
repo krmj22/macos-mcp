@@ -24,6 +24,7 @@ import {
   type MailMessage,
   SqliteMailAccessError,
   searchBySenderEmails,
+  searchBySenderName,
   searchMessages,
 } from '../../utils/sqliteMailReader.js';
 import { formatTimezoneInfo, getSystemTimezone } from '../../utils/timezone.js';
@@ -221,36 +222,41 @@ export async function handleReadMail(
       const offset = validated.offset ?? 0;
       const paginationMeta = { limit, offset };
 
-      // Find emails from a contact by name (reverse lookup)
+      // Find mail from a contact by name
+      // 1. Try resolving contact → emails → search by email
+      // 2. Fall back to searching Mail's sender display names directly
       if (validated.contact) {
-        let handles: Awaited<
-          ReturnType<typeof contactResolver.resolveNameToHandles>
-        >;
+        let messages: MailMessage[] = [];
+
+        // Try contact email lookup first
         try {
-          handles = await contactResolver.resolveNameToHandles(
+          const handles = await contactResolver.resolveNameToHandles(
             validated.contact,
           );
+          if (handles && handles.emails.length > 0) {
+            messages = await searchBySenderEmails(handles.emails, limit);
+          }
         } catch (error) {
           if (error instanceof ContactSearchError) {
-            return error.isTimeout
-              ? `Contact search timed out for "${validated.contact}". The Contacts app may be slow to respond. Please try again.`
-              : `Contact search failed for "${validated.contact}": ${error.message}`;
+            // Contact lookup failed, fall through to name search
+          } else {
+            throw error;
           }
-          throw error;
-        }
-        if (!handles || handles.emails.length === 0) {
-          return `No contact found matching "${validated.contact}", or the contact has no email addresses associated.`;
         }
 
-        let messages = await searchBySenderEmails(handles.emails, limit);
+        // Fall back to searching by sender display name in Mail DB
+        if (messages.length === 0) {
+          messages = await searchBySenderName(validated.contact, limit);
+        }
+
         if (validated.enrichContacts !== false) {
           messages = await enrichMailSenders(messages);
         }
         return formatListMarkdown(
-          `Mail from contact "${validated.contact}"`,
+          `Mail from "${validated.contact}"`,
           messages,
           formatMailMarkdown,
-          `No messages found from contact "${validated.contact}".`,
+          `No messages found from "${validated.contact}".`,
           { pagination: paginationMeta, includeTimezone: true },
         );
       }

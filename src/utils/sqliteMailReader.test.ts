@@ -19,6 +19,7 @@ import {
   parseMailboxUrl,
   SqliteMailAccessError,
   searchBySenderEmails,
+  searchBySenderName,
   searchMessages,
 } from './sqliteMailReader.js';
 
@@ -340,6 +341,33 @@ describe('searchBySenderEmails', () => {
     expect(sqlQuery[3]).toContain("a.address LIKE '%a@test.com%'");
     expect(sqlQuery[3]).toContain("a.address LIKE '%b@test.com%'");
     expect(sqlQuery[3]).toContain(' OR ');
+  });
+});
+
+describe('searchBySenderName', () => {
+  it('returns messages matching sender display name', async () => {
+    const row = makeRawMailRow({
+      ROWID: 1,
+      address: 'karen@seatow.com',
+      comment: 'Karen Schrader | Sea Tow Hampton Roads',
+    });
+    mockSqliteSuccess([row]);
+
+    const results = await searchBySenderName('Karen', 10);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].senderName).toBe(
+      'Karen Schrader | Sea Tow Hampton Roads',
+    );
+  });
+
+  it('searches the addresses.comment field', async () => {
+    mockSqliteSuccess([]);
+
+    await searchBySenderName('Karen Schrader', 10);
+
+    const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
+    expect(sqlQuery[3]).toContain("a.comment LIKE '%Karen Schrader%'");
   });
 });
 

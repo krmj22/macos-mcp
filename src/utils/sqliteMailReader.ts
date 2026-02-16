@@ -298,6 +298,28 @@ export async function searchBySenderEmails(
 }
 
 /**
+ * Searches messages by sender display name (addresses.comment field).
+ * Fallback when contact has no email or email-based search returns 0.
+ * Excludes Trash/Junk/Sent/Drafts.
+ */
+export async function searchBySenderName(
+  name: string,
+  limit: number,
+): Promise<MailMessage[]> {
+  const escaped = escapeSql(name);
+  const query = `
+    ${BASE_SELECT}
+    WHERE m.deleted = 0
+    ${SKIP_MAILBOXES}
+    AND a.comment LIKE '%${escaped}%'
+    ORDER BY m.date_received DESC
+    LIMIT ${limit}
+  `;
+  const output = await runSqlite(query);
+  return parseSqliteJson<RawMailRow>(output).map(mapMailRow);
+}
+
+/**
  * Gets a single message by ROWID with full recipient info.
  */
 export async function getMessageById(
