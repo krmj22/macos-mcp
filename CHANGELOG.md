@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/krmj22/macos-mcp/compare/v2.0.1...v2.0.2) (2026-02-16)
+
+
+### Bug Fixes
+
+* **config:** update stale package name in project root detection ([8438cbe](https://github.com/krmj22/macos-mcp/commit/8438cbe299e6157b193ecadeae10f735c902e4b2))
+
 ## [2.0.1](https://github.com/krmj22/macos-mcp/compare/v2.0.0...v2.0.1) (2026-02-16)
 
 
