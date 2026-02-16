@@ -8,10 +8,10 @@
  * Requires: pnpm build first.
  */
 
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 
 const PREFIX = '[E2E-TEST]';
 let client: Client;
@@ -28,7 +28,9 @@ async function callTool(
   timeout = 60000,
 ) {
   const start = performance.now();
-  const result = await client.callTool({ name, arguments: args }, undefined, { timeout });
+  const result = await client.callTool({ name, arguments: args }, undefined, {
+    timeout,
+  });
   const elapsed = Math.round(performance.now() - start);
   const text =
     (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
@@ -60,10 +62,12 @@ after(async () => {
   console.log(
     `║ ${'Suite'.padEnd(maxSuite)}  ${'Step'.padEnd(maxStep)}  ${'Time'.padStart(7)} ║`,
   );
-  console.log(`║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`);
+  console.log(
+    `║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`,
+  );
   for (const e of perfLog) {
     console.log(
-      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(e.ms + 'ms').padStart(7)} ║`,
+      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(`${e.ms}ms`).padStart(7)} ║`,
     );
   }
   console.log('╚══════════════════════════════════════════════════════════╝');
@@ -85,7 +89,10 @@ describe('Mail Reads', () => {
       console.log('  INFO empty state — structural checks skipped');
     } else {
       assert.ok(text.includes('ID:'), 'response should contain ID field');
-      assert.ok(text.includes('From:') || text.includes('**'), 'response should have structured format');
+      assert.ok(
+        text.includes('From:') || text.includes('**'),
+        'response should have structured format',
+      );
     }
     assert.ok(elapsed < 5000, `inbox read took ${elapsed}ms (>5s)`);
   });
@@ -139,13 +146,21 @@ describe('Mail Reads', () => {
 
     const { text, elapsed } = await callTool(
       'mail_messages',
-      { action: 'read', mailbox: specificMailbox, limit: 5, enrichContacts: false },
+      {
+        action: 'read',
+        mailbox: specificMailbox,
+        limit: 5,
+        enrichContacts: false,
+      },
       'Mail Read',
     );
     if (text.includes('No messages')) {
       console.log('  INFO empty mailbox — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:'), 'specific mailbox response should contain ID field');
+      assert.ok(
+        text.includes('ID:'),
+        'specific mailbox response should contain ID field',
+      );
     }
     assert.ok(elapsed < 5000, `specific mailbox read took ${elapsed}ms (>5s)`);
   });
@@ -170,10 +185,11 @@ describe('Mail Reads', () => {
 
   it('read single message by ID with full detail', async (t) => {
     // Get a real message ID from inbox
-    const { text: inboxText } = await callTool(
-      'mail_messages',
-      { action: 'read', limit: 1, enrichContacts: false },
-    );
+    const { text: inboxText } = await callTool('mail_messages', {
+      action: 'read',
+      limit: 1,
+      enrichContacts: false,
+    });
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
       t.skip('No messages in inbox — cannot test read-by-ID');
@@ -186,7 +202,10 @@ describe('Mail Reads', () => {
       { action: 'read', id: realMessageId, enrichContacts: false },
       'Mail Read',
     );
-    assert.ok(text.includes('Mail:'), `expected mail detail, got: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Mail:'),
+      `expected mail detail, got: ${text.slice(0, 200)}`,
+    );
     assert.ok(text.includes('From:'), 'should include From field');
     assert.ok(text.includes('To:'), 'should include To field');
     assert.ok(text.includes('Content:'), 'should include Content section');
@@ -206,8 +225,14 @@ describe('Mail Reads', () => {
     if (text.includes('No messages')) {
       console.log('  INFO empty inbox — enrichment structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:'), 'enriched response should contain ID field');
-      assert.ok(text.includes('From:') || text.includes('**'), 'enriched response should have structured format');
+      assert.ok(
+        text.includes('ID:'),
+        'enriched response should contain ID field',
+      );
+      assert.ok(
+        text.includes('From:') || text.includes('**'),
+        'enriched response should have structured format',
+      );
     }
     // Known: bulk contact cache fetch takes ~60s on large contact lists.
     // This is a pre-existing perf issue with resolveBatch() — not a mail bug.
@@ -223,9 +248,14 @@ describe('Mail Reads', () => {
       'Mail Read',
     );
     if (text.includes('No messages')) {
-      console.log('  INFO empty inbox — non-enriched structural checks skipped');
+      console.log(
+        '  INFO empty inbox — non-enriched structural checks skipped',
+      );
     } else {
-      assert.ok(text.includes('ID:'), 'non-enriched response should contain ID field');
+      assert.ok(
+        text.includes('ID:'),
+        'non-enriched response should contain ID field',
+      );
     }
     // Without enrichment should be fast (pure SQLite)
     assert.ok(elapsed < 5000, `non-enriched read took ${elapsed}ms (>5s)`);
@@ -238,10 +268,16 @@ describe('Mail Reads', () => {
       { action: 'read', contact: 'Kyle', enrichContacts: false },
       'Mail Read',
     );
-    if (text.includes('No messages found') || text.includes('No contact found')) {
+    if (
+      text.includes('No messages found') ||
+      text.includes('No contact found')
+    ) {
       console.log('  INFO no contact/mail matches — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Mail from contact'), 'contact search should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Mail from contact'),
+        'contact search should return structured data',
+      );
     }
     // Contact lookup + SQLite search
     assert.ok(elapsed < 15000, `contact search took ${elapsed}ms (>15s)`);
@@ -265,9 +301,14 @@ describe('Mail Reads', () => {
       'Mail Read',
     );
     if (text.includes('No messages')) {
-      console.log('  INFO empty account-scoped mailbox — structural checks skipped');
+      console.log(
+        '  INFO empty account-scoped mailbox — structural checks skipped',
+      );
     } else {
-      assert.ok(text.includes('ID:'), 'account-scoped response should contain ID field');
+      assert.ok(
+        text.includes('ID:'),
+        'account-scoped response should contain ID field',
+      );
     }
     assert.ok(elapsed < 5000, `account-scoped read took ${elapsed}ms (>5s)`);
   });
@@ -324,10 +365,11 @@ describe('Mail Writes', () => {
   // #12 & #13: Mark as read/unread — need a real message ID
   it('mark as read', async (t) => {
     // Get a real message ID
-    const { text: inboxText } = await callTool(
-      'mail_messages',
-      { action: 'read', limit: 1, enrichContacts: false },
-    );
+    const { text: inboxText } = await callTool('mail_messages', {
+      action: 'read',
+      limit: 1,
+      enrichContacts: false,
+    });
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
       t.skip('No messages — cannot test mark-read');
@@ -348,10 +390,11 @@ describe('Mail Writes', () => {
   });
 
   it('mark as unread', async (t) => {
-    const { text: inboxText } = await callTool(
-      'mail_messages',
-      { action: 'read', limit: 1, enrichContacts: false },
-    );
+    const { text: inboxText } = await callTool('mail_messages', {
+      action: 'read',
+      limit: 1,
+      enrichContacts: false,
+    });
     const idMatch = inboxText.match(/ID:\s*(\d+)/);
     if (!idMatch) {
       t.skip('No messages — cannot test mark-unread');
@@ -376,10 +419,12 @@ describe('Mail Writes', () => {
   // use a search-based approach to find and delete test drafts.
   it('delete draft (cleanup)', async (t) => {
     // Search for our E2E test drafts
-    const { text: searchText } = await callTool(
-      'mail_messages',
-      { action: 'read', search: PREFIX, limit: 10, enrichContacts: false },
-    );
+    const { text: searchText } = await callTool('mail_messages', {
+      action: 'read',
+      search: PREFIX,
+      limit: 10,
+      enrichContacts: false,
+    });
     const idMatches = [...searchText.matchAll(/ID:\s*(\d+)/g)];
     if (idMatches.length === 0) {
       t.skip('E2E drafts not visible in SQLite — JXA→SQLite sync delay');
@@ -409,7 +454,12 @@ describe('Mail Edge Cases', () => {
   it('search with no results returns empty state', async () => {
     const { text, elapsed } = await callTool(
       'mail_messages',
-      { action: 'read', search: 'xyzzy_nonexistent_e2e_' + Date.now(), limit: 5, enrichContacts: false },
+      {
+        action: 'read',
+        search: `xyzzy_nonexistent_e2e_${Date.now()}`,
+        limit: 5,
+        enrichContacts: false,
+      },
       'Mail Edge',
     );
     assert.ok(

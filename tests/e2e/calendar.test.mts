@@ -6,10 +6,10 @@
  * Requires: pnpm build first.
  */
 
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 
 const PREFIX = '[E2E-TEST]';
 let client: Client;
@@ -91,10 +91,12 @@ after(async () => {
   console.log(
     `║ ${'Suite'.padEnd(maxSuite)}  ${'Step'.padEnd(maxStep)}  ${'Time'.padStart(7)} ║`,
   );
-  console.log(`║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`);
+  console.log(
+    `║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`,
+  );
   for (const e of perfLog) {
     console.log(
-      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(e.ms + 'ms').padStart(7)} ║`,
+      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(`${e.ms}ms`).padStart(7)} ║`,
     );
   }
   console.log('╚══════════════════════════════════════════════════════════╝');
@@ -110,7 +112,10 @@ describe('Calendar List', () => {
       { action: 'read' },
       'List',
     );
-    assert.ok(text.includes('Calendars'), `expected calendar list, got: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Calendars'),
+      `expected calendar list, got: ${text.slice(0, 200)}`,
+    );
     assert.ok(elapsed < 2000, `list took ${elapsed}ms (>2s)`);
   });
 });
@@ -131,7 +136,10 @@ describe('Calendar CRUD', () => {
       { action: 'create', title, startDate: fmt(start), endDate: fmt(end) },
       'CRUD',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     eventId = extractId(text)!;
     assert.ok(eventId, 'should extract an id');
     cleanupIds.push(eventId);
@@ -209,7 +217,10 @@ describe('Calendar CRUD', () => {
       { action: 'read', id: eventId, enrichContacts: false },
       'CRUD',
     );
-    assert.ok(readText.includes('Updated Meeting'), 'updated title should appear');
+    assert.ok(
+      readText.includes('Updated Meeting'),
+      'updated title should appear',
+    );
   });
 
   it('11. delete event → success, not found on re-read', async () => {
@@ -218,7 +229,10 @@ describe('Calendar CRUD', () => {
       { action: 'delete', id: eventId },
       'CRUD',
     );
-    assert.ok(text.includes('Successfully deleted'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully deleted'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     assert.ok(elapsed < 3000, `delete took ${elapsed}ms (>3s)`);
 
     // Remove from cleanup since already deleted
@@ -231,10 +245,7 @@ describe('Calendar CRUD', () => {
       { action: 'read', id: eventId, enrichContacts: false },
       'CRUD',
     );
-    assert.ok(
-      !readText.includes(title),
-      'deleted event should not appear',
-    );
+    assert.ok(!readText.includes(title), 'deleted event should not appear');
   });
 });
 
@@ -250,9 +261,15 @@ describe('Calendar Filter', () => {
       'Filter',
     );
     // Extract first writable calendar name (skip Holidays/Birthdays which are read-only)
-    const calNames = [...calText.matchAll(/- (.+?) \(ID: /g)].map(m => m[1]);
-    const calName = calNames.find(n => !n.includes('Holiday') && !n.includes('Birthdays')) ?? calNames[0];
-    assert.ok(calName, `should find at least one calendar, got: ${calText.slice(0, 200)}`);
+    const calNames = [...calText.matchAll(/- (.+?) \(ID: /g)].map((m) => m[1]);
+    const calName =
+      calNames.find(
+        (n) => !n.includes('Holiday') && !n.includes('Birthdays'),
+      ) ?? calNames[0];
+    assert.ok(
+      calName,
+      `should find at least one calendar, got: ${calText.slice(0, 200)}`,
+    );
 
     const { text, elapsed } = await callTool(
       'calendar_events',
@@ -277,8 +294,11 @@ describe('Calendar Specific', () => {
       { action: 'read' },
       'Specific',
     );
-    const calNames = [...calText.matchAll(/- (.+?) \(ID: /g)].map(m => m[1]);
-    const calName = calNames.find(n => !n.includes('Holiday') && !n.includes('Birthdays')) ?? calNames[0];
+    const calNames = [...calText.matchAll(/- (.+?) \(ID: /g)].map((m) => m[1]);
+    const calName =
+      calNames.find(
+        (n) => !n.includes('Holiday') && !n.includes('Birthdays'),
+      ) ?? calNames[0];
     assert.ok(calName, 'need a calendar name');
 
     const title = `${PREFIX} Specific Cal ${Date.now()}`;
@@ -297,7 +317,10 @@ describe('Calendar Specific', () => {
       },
       'Specific',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     eventId = extractId(text)!;
     assert.ok(eventId, 'should extract an id');
     cleanupIds.push(eventId);
@@ -309,7 +332,10 @@ describe('Calendar Specific', () => {
       { action: 'read', id: eventId, enrichContacts: false },
       'Specific',
     );
-    assert.ok(readText.includes(calName), `event should be in calendar "${calName}"`);
+    assert.ok(
+      readText.includes(calName),
+      `event should be in calendar "${calName}"`,
+    );
   });
 });
 
@@ -333,7 +359,10 @@ describe('Calendar All-Day', () => {
       },
       'AllDay',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     const id = extractId(text)!;
     assert.ok(id, 'should extract an id');
     cleanupIds.push(id);
@@ -364,7 +393,10 @@ describe('Calendar Recurring', () => {
       },
       'Recurring',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     recurringId = extractId(text)!;
     assert.ok(recurringId, 'should extract an id');
     cleanupIds.push(recurringId);
@@ -380,7 +412,8 @@ describe('Calendar Recurring', () => {
     assert.ok(text.includes(title), 'should find recurring event');
     // Check for recurrence indication
     assert.ok(
-      text.toLowerCase().includes('recur') || text.toLowerCase().includes('weekly'),
+      text.toLowerCase().includes('recur') ||
+        text.toLowerCase().includes('weekly'),
       `recurring event should show recurrence info, got: ${text.slice(0, 500)}`,
     );
     assert.ok(elapsed < 2000, `read took ${elapsed}ms (>2s)`);
@@ -449,7 +482,10 @@ describe('Calendar Edge Cases', () => {
       },
       'Edge',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     const id = extractId(text)!;
     assert.ok(id, 'should extract an id');
     cleanupIds.push(id);
@@ -476,7 +512,10 @@ describe('Calendar Edge Cases', () => {
       },
       'Edge',
     );
-    assert.ok(text.includes('Successfully created'), `unexpected: ${text.slice(0, 200)}`);
+    assert.ok(
+      text.includes('Successfully created'),
+      `unexpected: ${text.slice(0, 200)}`,
+    );
     const id = extractId(text)!;
     assert.ok(id, 'should extract an id');
     cleanupIds.push(id);
@@ -487,8 +526,14 @@ describe('Calendar Edge Cases', () => {
       { action: 'read', id, enrichContacts: false },
       'Edge',
     );
-    assert.ok(readText.includes(location), `location should persist, got: ${readText.slice(0, 500)}`);
-    assert.ok(readText.includes('example.com'), `URL should persist, got: ${readText.slice(0, 500)}`);
+    assert.ok(
+      readText.includes(location),
+      `location should persist, got: ${readText.slice(0, 500)}`,
+    );
+    assert.ok(
+      readText.includes('example.com'),
+      `URL should persist, got: ${readText.slice(0, 500)}`,
+    );
     assert.ok(elapsed < 2000, `re-read took ${elapsed}ms (>2s)`);
   });
 

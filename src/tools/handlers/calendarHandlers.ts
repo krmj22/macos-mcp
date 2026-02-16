@@ -4,10 +4,7 @@
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type {
-  CalendarsToolArgs,
-  CalendarToolArgs,
-} from '../../types/index.js';
+import type { CalendarsToolArgs, CalendarToolArgs } from '../../types/index.js';
 import { calendarRepository } from '../../utils/calendarRepository.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import { formatMultilineNotes } from '../../utils/helpers.js';

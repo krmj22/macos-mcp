@@ -8,10 +8,10 @@
  * Requires: pnpm build first.
  */
 
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 
 const PREFIX = '[E2E-TEST]';
 let client: Client;
@@ -26,7 +26,9 @@ async function callTool(
   timeout = 120000,
 ) {
   const start = performance.now();
-  const result = await client.callTool({ name, arguments: args }, undefined, { timeout });
+  const result = await client.callTool({ name, arguments: args }, undefined, {
+    timeout,
+  });
   const elapsed = Math.round(performance.now() - start);
   const text =
     (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
@@ -71,21 +73,31 @@ after(async () => {
   await client.close();
 
   // Print performance summary
-  console.log('\n╔══════════════════════════════════════════════════════════════════╗');
-  console.log('║              CROSS-TOOL E2E PERFORMANCE SUMMARY                ║');
-  console.log('╠══════════════════════════════════════════════════════════════════╣');
+  console.log(
+    '\n╔══════════════════════════════════════════════════════════════════╗',
+  );
+  console.log(
+    '║              CROSS-TOOL E2E PERFORMANCE SUMMARY                ║',
+  );
+  console.log(
+    '╠══════════════════════════════════════════════════════════════════╣',
+  );
   const maxSuite = Math.max(...perfLog.map((e) => e.suite.length), 12);
   const maxStep = Math.max(...perfLog.map((e) => e.step.length), 20);
   console.log(
     `║ ${'Suite'.padEnd(maxSuite)}  ${'Step'.padEnd(maxStep)}  ${'Time'.padStart(7)} ║`,
   );
-  console.log(`║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`);
+  console.log(
+    `║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`,
+  );
   for (const e of perfLog) {
     console.log(
-      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(e.ms + 'ms').padStart(7)} ║`,
+      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(`${e.ms}ms`).padStart(7)} ║`,
     );
   }
-  console.log('╚══════════════════════════════════════════════════════════════════╝');
+  console.log(
+    '╚══════════════════════════════════════════════════════════════════╝',
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -100,7 +112,10 @@ describe('Cross-tool Pipelines', () => {
       'Pipeline',
     );
     assert.ok(contactText.length > 0, 'should find contact');
-    assert.ok(contactElapsed < 15000, `contact search took ${contactElapsed}ms`);
+    assert.ok(
+      contactElapsed < 15000,
+      `contact search took ${contactElapsed}ms`,
+    );
 
     // Step B: Use contact param to find their messages
     const { text: msgText, elapsed: msgElapsed } = await callTool(
@@ -109,10 +124,15 @@ describe('Cross-tool Pipelines', () => {
       'Pipeline',
     );
     assert.ok(
-      msgText.includes('Messages from contact') || msgText.includes('No contact') || msgText.includes('No messages'),
+      msgText.includes('Messages from contact') ||
+        msgText.includes('No contact') ||
+        msgText.includes('No messages'),
       `should return structured data or meaningful message, got: ${msgText.slice(0, 200)}`,
     );
-    assert.ok(msgElapsed < 20000, `messages contact search took ${msgElapsed}ms`);
+    assert.ok(
+      msgElapsed < 20000,
+      `messages contact search took ${msgElapsed}ms`,
+    );
   });
 
   // ---------------------------------------------------------------------------
@@ -132,7 +152,9 @@ describe('Cross-tool Pipelines', () => {
       'Pipeline',
     );
     assert.ok(
-      mailText.includes('Mail from contact') || mailText.includes('No contact') || mailText.includes('No messages'),
+      mailText.includes('Mail from contact') ||
+        mailText.includes('No contact') ||
+        mailText.includes('No messages'),
       `should return structured data or meaningful message, got: ${mailText.slice(0, 200)}`,
     );
     assert.ok(mailElapsed < 20000, `mail contact search took ${mailElapsed}ms`);
@@ -163,7 +185,10 @@ describe('Cross-tool Pipelines', () => {
     if (text.includes('No events') || text.includes('No calendar')) {
       console.log('  INFO empty calendar — structural checks skipped');
     } else {
-      assert.ok(text.includes('**') || text.includes('ID:'), 'calendar should return structured data');
+      assert.ok(
+        text.includes('**') || text.includes('ID:'),
+        'calendar should return structured data',
+      );
     }
     // Calendar enrichment resolves attendee emails to contact names
     // We cannot guarantee attendees exist, but the call must not crash
@@ -182,9 +207,14 @@ describe('Enrichment Toggles', () => {
       'Enrich',
     );
     if (rawText.includes('No chats found')) {
-      console.log('  INFO empty state — messages raw structural checks skipped');
+      console.log(
+        '  INFO empty state — messages raw structural checks skipped',
+      );
     } else {
-      assert.ok(rawText.includes('ID:') || rawText.includes('Chats'), 'raw messages should return structured data');
+      assert.ok(
+        rawText.includes('ID:') || rawText.includes('Chats'),
+        'raw messages should return structured data',
+      );
     }
     assert.ok(rawElapsed < 2000, `raw took ${rawElapsed}ms`);
 
@@ -218,7 +248,10 @@ describe('Enrichment Toggles', () => {
     if (rawText.includes('No messages')) {
       console.log('  INFO empty inbox — mail raw structural checks skipped');
     } else {
-      assert.ok(rawText.includes('ID:') || rawText.includes('**'), 'raw mail should return structured data');
+      assert.ok(
+        rawText.includes('ID:') || rawText.includes('**'),
+        'raw mail should return structured data',
+      );
     }
     assert.ok(rawElapsed < 5000, `raw mail took ${rawElapsed}ms`);
 
@@ -228,7 +261,10 @@ describe('Enrichment Toggles', () => {
       'Enrich',
     );
     assert.ok(enrichedText.length > 0, 'enriched mail should return data');
-    assert.ok(enrichedElapsed < 90000, `enriched mail took ${enrichedElapsed}ms`);
+    assert.ok(
+      enrichedElapsed < 90000,
+      `enriched mail took ${enrichedElapsed}ms`,
+    );
   });
 });
 
@@ -271,13 +307,19 @@ describe('Cache & Performance', () => {
       'Cache',
     );
     if (text.includes('No chats found')) {
-      console.log('  INFO empty state — unknown sender structural checks skipped');
+      console.log(
+        '  INFO empty state — unknown sender structural checks skipped',
+      );
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'unknown sender should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'unknown sender should return structured data',
+      );
     }
     // No error/crash — raw handles are acceptable fallback
     assert.ok(
-      !text.toLowerCase().includes('error') || text.toLowerCase().includes('no messages'),
+      !text.toLowerCase().includes('error') ||
+        text.toLowerCase().includes('no messages'),
       'should not contain errors',
     );
     assert.ok(elapsed < 2000, `unknown sender read took ${elapsed}ms`);
@@ -364,7 +406,8 @@ describe('Contact Lifecycle', () => {
       'Lifecycle',
     );
     assert.ok(
-      createText.includes('Successfully created') || createText.includes('created'),
+      createText.includes('Successfully created') ||
+        createText.includes('created'),
       `create failed: ${createText.slice(0, 200)}`,
     );
     const contactId = extractId(createText)!;
@@ -391,7 +434,8 @@ describe('Contact Lifecycle', () => {
       'Lifecycle',
     );
     assert.ok(
-      deleteText.includes('Successfully deleted') || deleteText.includes('deleted'),
+      deleteText.includes('Successfully deleted') ||
+        deleteText.includes('deleted'),
       `delete failed: ${deleteText.slice(0, 200)}`,
     );
     assert.ok(deleteElapsed < 3000, `delete took ${deleteElapsed}ms`);
@@ -436,7 +480,9 @@ describe('Cross-tool Edge Cases', () => {
     // with multiple phone numbers. This test verifies the system does not crash
     // and returns data. For full verification, create a contact with multiple phones
     // and check the read output.
-    console.log('  NOTE: Multi-phone resolution verified structurally (no crash, data returned)');
+    console.log(
+      '  NOTE: Multi-phone resolution verified structurally (no crash, data returned)',
+    );
   });
 
   // E11: Contact with multiple emails — all resolve to same name
@@ -449,7 +495,9 @@ describe('Cross-tool Edge Cases', () => {
     );
     assert.ok(text.length > 0, 'should return contact data');
     assert.ok(elapsed < 15000, `multi-email search took ${elapsed}ms`);
-    console.log('  NOTE: Multi-email resolution verified structurally (no crash, data returned)');
+    console.log(
+      '  NOTE: Multi-email resolution verified structurally (no crash, data returned)',
+    );
   });
 
   // E12: Phone normalization
@@ -490,7 +538,9 @@ describe('Cross-tool Edge Cases', () => {
     });
     const idx = createdContactIds.indexOf(contactId!);
     if (idx !== -1) createdContactIds.splice(idx, 1);
-    console.log('  NOTE: Phone normalization verified at storage level. Cross-handle matching depends on enrichment cache which normalizes at resolve time.');
+    console.log(
+      '  NOTE: Phone normalization verified at storage level. Cross-handle matching depends on enrichment cache which normalizes at resolve time.',
+    );
   });
 
   // E13: Resolver timeout — graceful degradation
@@ -498,7 +548,12 @@ describe('Cross-tool Edge Cases', () => {
     // Search for a nonexistent contact name — should get a clean error
     const { text, elapsed } = await callTool(
       'messages_chat',
-      { action: 'read', contact: 'ZZZZZ_NonexistentPerson_E2E_99999', limit: 3, enrichContacts: false },
+      {
+        action: 'read',
+        contact: 'ZZZZZ_NonexistentPerson_E2E_99999',
+        limit: 3,
+        enrichContacts: false,
+      },
       'Edge',
     );
     assert.ok(text.length > 0, 'should return a response (error or empty)');

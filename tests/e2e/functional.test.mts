@@ -258,7 +258,10 @@ describe('Mail read + search', () => {
       console.log('  INFO empty inbox — structural checks skipped');
     } else {
       assert.ok(text.includes('ID:'), 'mail inbox should contain ID field');
-      assert.ok(text.includes('From:') || text.includes('**'), 'mail inbox should have structured format');
+      assert.ok(
+        text.includes('From:') || text.includes('**'),
+        'mail inbox should have structured format',
+      );
     }
     // #76 fix: SQLite reads should be <1s (was 60s timeout with JXA)
     assert.ok(
@@ -276,7 +279,10 @@ describe('Mail read + search', () => {
     if (text.includes('No messages found')) {
       console.log('  INFO no mail search results — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Mail matching'), 'mail search should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Mail matching'),
+        'mail search should return structured data',
+      );
     }
     // Pure SQLite search should be fast — enrichment tested separately
     assert.ok(elapsed < 5000, `mail search took ${elapsed}ms (>5s)`);
@@ -296,7 +302,10 @@ describe('Messages read', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO empty state — messages structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'messages should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'messages should return structured data',
+      );
     }
     assert.ok(elapsed < 5000, `messages read took ${elapsed}ms (>5s)`);
   });
@@ -308,9 +317,14 @@ describe('Messages read', () => {
       'Messages',
     );
     if (text.includes('No chats found')) {
-      console.log('  INFO empty state — enriched messages structural checks skipped');
+      console.log(
+        '  INFO empty state — enriched messages structural checks skipped',
+      );
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'enriched messages should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'enriched messages should return structured data',
+      );
     }
     // Enrichment adds contact lookup overhead
     assert.ok(
@@ -333,7 +347,10 @@ describe('Contacts read + search', () => {
     if (text.includes('No contacts')) {
       console.log('  INFO empty contacts — structural checks skipped');
     } else {
-      assert.ok(text.includes('Name:') || text.includes('**'), 'contacts should return structured data');
+      assert.ok(
+        text.includes('Name:') || text.includes('**'),
+        'contacts should return structured data',
+      );
     }
     assert.ok(elapsed < 10000, `contacts read took ${elapsed}ms (>10s)`);
   });
@@ -347,7 +364,10 @@ describe('Contacts read + search', () => {
     if (text.includes('No contacts')) {
       console.log('  INFO no matching contacts — structural checks skipped');
     } else {
-      assert.ok(text.includes('Name:') || text.includes('**') || text.includes('Kyle'), 'contacts search should return structured data');
+      assert.ok(
+        text.includes('Name:') || text.includes('**') || text.includes('Kyle'),
+        'contacts search should return structured data',
+      );
     }
     // #77 fix: whose() predicate should be <2s (was 60s timeout)
     assert.ok(

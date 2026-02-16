@@ -5,10 +5,10 @@
  * Requires: pnpm build first.
  */
 
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 
 const PREFIX = '[E2E-TEST]';
 let client: Client;
@@ -80,7 +80,7 @@ after(async () => {
   );
   for (const e of perfLog) {
     console.log(
-      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(e.ms + 'ms').padStart(7)} ║`,
+      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(`${e.ms}ms`).padStart(7)} ║`,
     );
   }
   console.log('╚══════════════════════════════════════════════════════════╝');
@@ -200,10 +200,7 @@ describe('Contacts CRUD', () => {
     );
     assert.ok(text.includes('555-0199'), 'should contain phone');
     assert.ok(text.includes('123 Test St'), 'should contain street');
-    assert.ok(
-      text.includes('E2E test contact'),
-      'should contain note',
-    );
+    assert.ok(text.includes('E2E test contact'), 'should contain note');
     assert.ok(elapsed < 3000, `read took ${elapsed}ms (>3s)`);
   });
 
@@ -231,7 +228,10 @@ describe('Contacts CRUD', () => {
       { action: 'read', id: fullId },
       'Main',
     );
-    assert.ok(readText.includes('E2ETestUpdated'), 'updated name should persist');
+    assert.ok(
+      readText.includes('E2ETestUpdated'),
+      'updated name should persist',
+    );
     assert.ok(readText.includes('UpdatedCorp'), 'updated org should persist');
   });
 
@@ -242,10 +242,7 @@ describe('Contacts CRUD', () => {
       { action: 'search', search: 'E2ETest' },
       'Main',
     );
-    assert.ok(
-      text.includes('E2ETest'),
-      'search should find created contacts',
-    );
+    assert.ok(text.includes('E2ETest'), 'search should find created contacts');
     assert.ok(elapsed < 5000, `search took ${elapsed}ms (>5s)`);
   });
 
@@ -366,7 +363,9 @@ describe('Contacts Edge Cases', () => {
       'Edge',
     );
     assert.ok(
-      readText.includes("O'Brien") || readText.includes('O&#39;Brien') || readText.includes('O\\\'Brien'),
+      readText.includes("O'Brien") ||
+        readText.includes('O&#39;Brien') ||
+        readText.includes("O\\'Brien"),
       `should contain apostrophe name, got: ${readText.slice(0, 300)}`,
     );
     assert.ok(

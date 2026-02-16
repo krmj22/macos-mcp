@@ -358,6 +358,5 @@ describe('Contacts Handlers', () => {
       expect(result.isError).toBe(true);
       expect(getTextContent(result)).toContain('Contact not found');
     });
-
   });
 });

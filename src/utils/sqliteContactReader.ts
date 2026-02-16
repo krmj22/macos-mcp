@@ -19,7 +19,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { readdirSync, existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -94,7 +94,11 @@ export function resetDbPathCache(): void {
 
 // --- SQLite execution ---
 
-function runSqlite(dbPath: string, query: string, timeoutMs = 15000): Promise<string> {
+function runSqlite(
+  dbPath: string,
+  query: string,
+  timeoutMs = 15000,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       '/usr/bin/sqlite3',
@@ -195,7 +199,9 @@ export function buildFullName(
  * Fetches all contacts from a single source database.
  * Returns a Map keyed by ZUNIQUEID for easy merging.
  */
-async function fetchFromSource(dbPath: string): Promise<Map<string, ContactEntry>> {
+async function fetchFromSource(
+  dbPath: string,
+): Promise<Map<string, ContactEntry>> {
   const [emailOutput, phoneOutput] = await Promise.all([
     runSqlite(dbPath, CONTACTS_WITH_EMAILS_QUERY),
     runSqlite(dbPath, CONTACTS_WITH_PHONES_QUERY),
@@ -211,7 +217,11 @@ async function fetchFromSource(dbPath: string): Promise<Map<string, ContactEntry
     if (!entry) {
       entry = {
         id: row.ZUNIQUEID,
-        fullName: buildFullName(row.ZFIRSTNAME, row.ZLASTNAME, row.ZORGANIZATION),
+        fullName: buildFullName(
+          row.ZFIRSTNAME,
+          row.ZLASTNAME,
+          row.ZORGANIZATION,
+        ),
         firstName: row.ZFIRSTNAME || '',
         lastName: row.ZLASTNAME || '',
         phones: [],
@@ -229,7 +239,11 @@ async function fetchFromSource(dbPath: string): Promise<Map<string, ContactEntry
     if (!entry) {
       entry = {
         id: row.ZUNIQUEID,
-        fullName: buildFullName(row.ZFIRSTNAME, row.ZLASTNAME, row.ZORGANIZATION),
+        fullName: buildFullName(
+          row.ZFIRSTNAME,
+          row.ZLASTNAME,
+          row.ZORGANIZATION,
+        ),
         firstName: row.ZFIRSTNAME || '',
         lastName: row.ZLASTNAME || '',
         phones: [],
@@ -275,7 +289,10 @@ export async function fetchAllContacts(): Promise<ContactEntry[]> {
         // If already present from another source, same contact — skip (dedup by ZUNIQUEID)
       }
     } else {
-      lastError = result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+      lastError =
+        result.reason instanceof Error
+          ? result.reason
+          : new Error(String(result.reason));
       process.stderr.write(
         `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'warn', event: 'contact_source_failed', dbPath: dbPaths[i], error: lastError.message })}\n`,
       );

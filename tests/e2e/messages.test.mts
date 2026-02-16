@@ -8,12 +8,12 @@
  * Requires: pnpm build first.
  */
 
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert';
 
-const PREFIX = '[E2E-TEST]';
+const _PREFIX = '[E2E-TEST]';
 let client: Client;
 let transport: StdioClientTransport;
 
@@ -57,21 +57,31 @@ after(async () => {
   await client.close();
 
   // Print performance summary
-  console.log('\n╔══════════════════════════════════════════════════════════════════╗');
-  console.log('║              MESSAGES E2E PERFORMANCE SUMMARY                   ║');
-  console.log('╠══════════════════════════════════════════════════════════════════╣');
+  console.log(
+    '\n╔══════════════════════════════════════════════════════════════════╗',
+  );
+  console.log(
+    '║              MESSAGES E2E PERFORMANCE SUMMARY                   ║',
+  );
+  console.log(
+    '╠══════════════════════════════════════════════════════════════════╣',
+  );
   const maxSuite = Math.max(...perfLog.map((e) => e.suite.length), 12);
   const maxStep = Math.max(...perfLog.map((e) => e.step.length), 20);
   console.log(
     `║ ${'Suite'.padEnd(maxSuite)}  ${'Step'.padEnd(maxStep)}  ${'Time'.padStart(7)} ║`,
   );
-  console.log(`║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`);
+  console.log(
+    `║ ${'─'.repeat(maxSuite)}  ${'─'.repeat(maxStep)}  ${'─'.repeat(7)} ║`,
+  );
   for (const e of perfLog) {
     console.log(
-      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(e.ms + 'ms').padStart(7)} ║`,
+      `║ ${e.suite.padEnd(maxSuite)}  ${e.step.padEnd(maxStep)}  ${String(`${e.ms}ms`).padStart(7)} ║`,
     );
   }
-  console.log('╚══════════════════════════════════════════════════════════════════╝');
+  console.log(
+    '╚══════════════════════════════════════════════════════════════════╝',
+  );
 });
 
 // Shared state across tests — populated by test 1, used by later tests
@@ -93,10 +103,16 @@ describe('Messages — Main Tests', () => {
       console.log('  INFO empty state — structural checks skipped');
     } else {
       assert.ok(text.includes('ID:'), 'response should contain ID field');
-      assert.ok(text.includes('Participants') || text.includes('**'), 'response should have structured format');
+      assert.ok(
+        text.includes('Participants') || text.includes('**'),
+        'response should have structured format',
+      );
     }
     // First call has cold start overhead — allow 2000ms
-    assert.ok(elapsed < 2000, `list chats took ${elapsed}ms (>2000ms threshold)`);
+    assert.ok(
+      elapsed < 2000,
+      `list chats took ${elapsed}ms (>2000ms threshold)`,
+    );
 
     // Extract a chatId for later tests — guids can be iMessage;-;, SMS;-;, or any;-;
     const chatIdMatch = text.match(/ID:\s*(\S+;-;\S+)/);
@@ -108,7 +124,10 @@ describe('Messages — Main Tests', () => {
     if (participantMatch) {
       firstParticipantName = participantMatch[1].split(',')[0].trim();
     }
-    assert.ok(firstChatId, `should find at least one chatId, got text: ${text.slice(0, 300)}`);
+    assert.ok(
+      firstChatId,
+      `should find at least one chatId, got text: ${text.slice(0, 300)}`,
+    );
   });
 
   // Test 2: Pagination
@@ -121,11 +140,17 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO empty state — pagination structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:'), 'paginated response should contain ID field');
+      assert.ok(
+        text.includes('ID:'),
+        'paginated response should contain ID field',
+      );
     }
     // Count chat entries — each chat has an "ID:" line
     const chatCount = (text.match(/ID:\s*\S+;-;\S+/g) || []).length;
-    assert.ok(chatCount <= 5, `pagination returned ${chatCount} chats (expected ≤5)`);
+    assert.ok(
+      chatCount <= 5,
+      `pagination returned ${chatCount} chats (expected ≤5)`,
+    );
     assert.ok(elapsed < 1000, `pagination took ${elapsed}ms (>1000ms)`);
   });
 
@@ -140,7 +165,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No messages')) {
       console.log('  INFO empty chat — structural checks skipped');
     } else {
-      assert.ok(text.includes('**') && text.includes('['), 'chat messages should have sender and date format');
+      assert.ok(
+        text.includes('**') && text.includes('['),
+        'chat messages should have sender and date format',
+      );
     }
     assert.ok(elapsed < 1000, `read chat took ${elapsed}ms (>1000ms)`);
   });
@@ -159,7 +187,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO no matching chats — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats matching'), 'search should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats matching'),
+        'search should return structured data',
+      );
     }
     assert.ok(elapsed < 2000, `search took ${elapsed}ms (>2000ms)`);
   });
@@ -168,15 +199,27 @@ describe('Messages — Main Tests', () => {
   it('5. Search message content → searchMessages: true finds text across chats', async () => {
     const { text, elapsed } = await callTool(
       'messages_chat',
-      { action: 'read', search: 'the', searchMessages: true, limit: 5, enrichContacts: false },
+      {
+        action: 'read',
+        search: 'the',
+        searchMessages: true,
+        limit: 5,
+        enrichContacts: false,
+      },
       'Messages',
     );
     if (text.includes('No messages found')) {
       console.log('  INFO no matching messages — structural checks skipped');
     } else {
-      assert.ok(text.includes('Messages matching') || text.includes('**'), 'message search should return structured data');
+      assert.ok(
+        text.includes('Messages matching') || text.includes('**'),
+        'message search should return structured data',
+      );
     }
-    assert.ok(elapsed < 2000, `message content search took ${elapsed}ms (>2000ms)`);
+    assert.ok(
+      elapsed < 2000,
+      `message content search took ${elapsed}ms (>2000ms)`,
+    );
   });
 
   // Test 6: Find by contact name
@@ -188,8 +231,10 @@ describe('Messages — Main Tests', () => {
     );
     // May return messages or an error if contact not found — both handled gracefully
     assert.ok(
-      text.includes('Messages from contact') || text.includes('No contact') ||
-      text.includes('No messages') || text.includes('Contact search'),
+      text.includes('Messages from contact') ||
+        text.includes('No contact') ||
+        text.includes('No messages') ||
+        text.includes('Contact search'),
       `should return structured data or meaningful message, got: ${text.slice(0, 200)}`,
     );
     // Contact resolver uses JXA lookup which can be slow (known: #77 context)
@@ -197,7 +242,7 @@ describe('Messages — Main Tests', () => {
   });
 
   // Test 7: dateRange: today
-  it('7. dateRange: today → only today\'s chats', async () => {
+  it("7. dateRange: today → only today's chats", async () => {
     const { text, elapsed } = await callTool(
       'messages_chat',
       { action: 'read', dateRange: 'today', enrichContacts: false },
@@ -206,7 +251,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO no chats today — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'today filter should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'today filter should return structured data',
+      );
     }
     assert.ok(elapsed < 1000, `today filter took ${elapsed}ms (>1000ms)`);
   });
@@ -221,7 +269,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO no chats in last 7 days — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'last_7_days filter should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'last_7_days filter should return structured data',
+      );
     }
     assert.ok(elapsed < 1000, `last_7_days filter took ${elapsed}ms (>1000ms)`);
   });
@@ -243,7 +294,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO no chats in date range — structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'custom date range should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'custom date range should return structured data',
+      );
     }
     assert.ok(elapsed < 1000, `custom date range took ${elapsed}ms (>1000ms)`);
   });
@@ -258,7 +312,10 @@ describe('Messages — Main Tests', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO empty state — enrichment structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'enriched response should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'enriched response should return structured data',
+      );
     }
     // Enrichment adds contact lookup — allow more time
     assert.ok(elapsed < 15000, `enrichment took ${elapsed}ms (>15000ms)`);
@@ -277,9 +334,14 @@ describe('Messages — Main Tests', () => {
       'Messages',
     );
     if (rawText.includes('No chats found')) {
-      console.log('  INFO empty state — enrichment OFF structural checks skipped');
+      console.log(
+        '  INFO empty state — enrichment OFF structural checks skipped',
+      );
     } else {
-      assert.ok(rawText.includes('ID:') || rawText.includes('Chats'), 'raw response should return structured data');
+      assert.ok(
+        rawText.includes('ID:') || rawText.includes('Chats'),
+        'raw response should return structured data',
+      );
     }
     // Raw should not have enriched names (or at least be different from enriched)
     // This is a soft check — if no contacts match, both may be identical
@@ -287,14 +349,22 @@ describe('Messages — Main Tests', () => {
   });
 
   // Test 12: Send to chatId — SKIPPED (sends real message)
-  it('12. Send to chatId → SKIPPED (would send real iMessage)', { skip: 'Sends real message — DO NOT run in automated tests' }, async () => {
-    // Would be: callTool('messages_chat', { action: 'create', text: 'E2E test', chatId: firstChatId })
-  });
+  it(
+    '12. Send to chatId → SKIPPED (would send real iMessage)',
+    { skip: 'Sends real message — DO NOT run in automated tests' },
+    async () => {
+      // Would be: callTool('messages_chat', { action: 'create', text: 'E2E test', chatId: firstChatId })
+    },
+  );
 
   // Test 13: Send to phone — SKIPPED (sends real message)
-  it('13. Send to phone → SKIPPED (would send real iMessage)', { skip: 'Sends real message — DO NOT run in automated tests' }, async () => {
-    // Would be: callTool('messages_chat', { action: 'create', text: 'E2E test', to: '+15551234567' })
-  });
+  it(
+    '13. Send to phone → SKIPPED (would send real iMessage)',
+    { skip: 'Sends real message — DO NOT run in automated tests' },
+    async () => {
+      // Would be: callTool('messages_chat', { action: 'create', text: 'E2E test', to: '+15551234567' })
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -306,7 +376,12 @@ describe('Messages — Edge Cases', () => {
     // Search for a common word that would appear in message content but not chat names
     const { text, elapsed } = await callTool(
       'messages_chat',
-      { action: 'read', search: 'the', searchMessages: false, enrichContacts: false },
+      {
+        action: 'read',
+        search: 'the',
+        searchMessages: false,
+        enrichContacts: false,
+      },
       'Edge',
     );
     // This should return chats where "the" appears in participant name/chat name
@@ -322,12 +397,18 @@ describe('Messages — Edge Cases', () => {
   it('E15. Contact with no phone numbers → appropriate error/empty result', async () => {
     const { text, elapsed } = await callTool(
       'messages_chat',
-      { action: 'read', contact: 'zzzznonexistentperson99999', enrichContacts: false },
+      {
+        action: 'read',
+        contact: 'zzzznonexistentperson99999',
+        enrichContacts: false,
+      },
       'Edge',
     );
     // Should get a meaningful error or empty result, not a crash
     assert.ok(
-      text.includes('No contact') || text.includes('No messages') || text.includes('Contact search'),
+      text.includes('No contact') ||
+        text.includes('No messages') ||
+        text.includes('Contact search'),
       `should return meaningful error, got: ${text.slice(0, 200)}`,
     );
     assert.ok(elapsed < 5000, `no-contact lookup took ${elapsed}ms (>5000ms)`);
@@ -397,7 +478,10 @@ describe('Messages — Edge Cases', () => {
     if (text.includes('No chats found')) {
       console.log('  INFO empty state — attachment structural checks skipped');
     } else {
-      assert.ok(text.includes('ID:') || text.includes('Chats'), 'attachment check should return structured data');
+      assert.ok(
+        text.includes('ID:') || text.includes('Chats'),
+        'attachment check should return structured data',
+      );
     }
     // If any attachment-only messages exist, they should show [Attachment]
     // This is a non-crashing verification — we can't guarantee attachments exist
@@ -415,15 +499,23 @@ describe('Messages — Edge Cases', () => {
       'Edge',
     );
     if (text.includes('No messages')) {
-      console.log('  INFO empty chat — attributedBody structural checks skipped');
+      console.log(
+        '  INFO empty chat — attributedBody structural checks skipped',
+      );
     } else {
-      assert.ok(text.includes('**') && text.includes('['), 'attributedBody messages should have sender and date format');
+      assert.ok(
+        text.includes('**') && text.includes('['),
+        'attributedBody messages should have sender and date format',
+      );
     }
     // Verify no raw hex blobs leak through
     assert.ok(
       !text.includes('62706c69'), // bplist hex prefix
       'should not contain raw hex attributedBody data',
     );
-    assert.ok(elapsed < 1000, `attributedBody check took ${elapsed}ms (>1000ms)`);
+    assert.ok(
+      elapsed < 1000,
+      `attributedBody check took ${elapsed}ms (>1000ms)`,
+    );
   });
 });

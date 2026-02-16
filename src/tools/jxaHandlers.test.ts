@@ -1384,7 +1384,11 @@ describe('Messages Handlers', () => {
       mockResolveBatch.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve(new Map([['+15559999999', { fullName: 'Too Late' }]])), 10000),
+            setTimeout(
+              () =>
+                resolve(new Map([['+15559999999', { fullName: 'Too Late' }]])),
+              10000,
+            ),
           ),
       );
 
@@ -1409,7 +1413,11 @@ describe('Messages Handlers', () => {
       mockResolveBatch.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve(new Map([['+15558888888', { fullName: 'Too Late' }]])), 10000),
+            setTimeout(
+              () =>
+                resolve(new Map([['+15558888888', { fullName: 'Too Late' }]])),
+              10000,
+            ),
           ),
       );
 
@@ -1435,11 +1443,19 @@ describe('Messages Handlers', () => {
       mockResolveBatch.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve(new Map([['+15557777777', { fullName: 'Too Late' }]])), 10000),
+            setTimeout(
+              () =>
+                resolve(new Map([['+15557777777', { fullName: 'Too Late' }]])),
+              10000,
+            ),
           ),
       );
 
-      const result = await handleReadMessages({ action: 'read', search: 'match', searchMessages: true });
+      const result = await handleReadMessages({
+        action: 'read',
+        search: 'match',
+        searchMessages: true,
+      });
       expect(result.isError).toBe(false);
       const text = getTextContent(result);
       expect(text).toContain('+15557777777');
@@ -1466,10 +1482,34 @@ describe('Messages Handlers', () => {
 
     it('only enriches non-isFromMe, non-unknown senders', async () => {
       mockReadChatMessages.mockResolvedValue([
-        { id: 'msg1', text: 'From me', sender: '+1111', date: '2025-01-01', isFromMe: true },
-        { id: 'msg2', text: 'Unknown', sender: 'unknown', date: '2025-01-01', isFromMe: false },
-        { id: 'msg3', text: 'Real sender', sender: '+15551234567', date: '2025-01-01', isFromMe: false },
-        { id: 'msg4', text: 'Another', sender: '+15559876543', date: '2025-01-01', isFromMe: false },
+        {
+          id: 'msg1',
+          text: 'From me',
+          sender: '+1111',
+          date: '2025-01-01',
+          isFromMe: true,
+        },
+        {
+          id: 'msg2',
+          text: 'Unknown',
+          sender: 'unknown',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+        {
+          id: 'msg3',
+          text: 'Real sender',
+          sender: '+15551234567',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
+        {
+          id: 'msg4',
+          text: 'Another',
+          sender: '+15559876543',
+          date: '2025-01-01',
+          isFromMe: false,
+        },
       ]);
       mockResolveBatch.mockResolvedValue(new Map());
 

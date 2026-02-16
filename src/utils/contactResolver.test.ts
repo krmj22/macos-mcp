@@ -43,8 +43,8 @@ jest.mock('./jxaExecutor.js', () => ({
   },
 }));
 
-import { fetchAllContacts } from './sqliteContactReader.js';
 import { executeJxaWithRetry } from './jxaExecutor.js';
+import { fetchAllContacts } from './sqliteContactReader.js';
 
 const mockFetchAllContacts = fetchAllContacts as jest.MockedFunction<
   typeof fetchAllContacts

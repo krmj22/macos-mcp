@@ -10,7 +10,7 @@ jest.mock('node:child_process');
 jest.mock('node:fs');
 
 import { execFile } from 'node:child_process';
-import { readdirSync, existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import {
   buildFullName,
   fetchAllContacts,
@@ -84,14 +84,16 @@ function mockSourceDirs(dirNames: string[]) {
 
 // --- Fixtures ---
 
-function makeEmailRow(overrides: Partial<{
-  Z_PK: number;
-  ZFIRSTNAME: string | null;
-  ZLASTNAME: string | null;
-  ZORGANIZATION: string | null;
-  ZUNIQUEID: string;
-  email: string;
-}> = {}) {
+function makeEmailRow(
+  overrides: Partial<{
+    Z_PK: number;
+    ZFIRSTNAME: string | null;
+    ZLASTNAME: string | null;
+    ZORGANIZATION: string | null;
+    ZUNIQUEID: string;
+    email: string;
+  }> = {},
+) {
   return {
     Z_PK: 1,
     ZFIRSTNAME: 'John',
@@ -103,14 +105,16 @@ function makeEmailRow(overrides: Partial<{
   };
 }
 
-function makePhoneRow(overrides: Partial<{
-  Z_PK: number;
-  ZFIRSTNAME: string | null;
-  ZLASTNAME: string | null;
-  ZORGANIZATION: string | null;
-  ZUNIQUEID: string;
-  phone: string;
-}> = {}) {
+function makePhoneRow(
+  overrides: Partial<{
+    Z_PK: number;
+    ZFIRSTNAME: string | null;
+    ZLASTNAME: string | null;
+    ZORGANIZATION: string | null;
+    ZUNIQUEID: string;
+    phone: string;
+  }> = {},
+) {
   return {
     Z_PK: 1,
     ZFIRSTNAME: 'John',
@@ -187,8 +191,30 @@ describe('findContactDatabases', () => {
       return false;
     });
     mockReaddirSync.mockReturnValue([
-      { name: 'source-1', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isFIFO: () => false, isSocket: () => false, isSymbolicLink: () => false, path: '', parentPath: '' },
-      { name: 'source-2', isDirectory: () => true, isFile: () => false, isBlockDevice: () => false, isCharacterDevice: () => false, isFIFO: () => false, isSocket: () => false, isSymbolicLink: () => false, path: '', parentPath: '' },
+      {
+        name: 'source-1',
+        isDirectory: () => true,
+        isFile: () => false,
+        isBlockDevice: () => false,
+        isCharacterDevice: () => false,
+        isFIFO: () => false,
+        isSocket: () => false,
+        isSymbolicLink: () => false,
+        path: '',
+        parentPath: '',
+      },
+      {
+        name: 'source-2',
+        isDirectory: () => true,
+        isFile: () => false,
+        isBlockDevice: () => false,
+        isCharacterDevice: () => false,
+        isFIFO: () => false,
+        isSocket: () => false,
+        isSymbolicLink: () => false,
+        path: '',
+        parentPath: '',
+      },
     ] as any);
 
     const result = findContactDatabases();
@@ -273,10 +299,34 @@ describe('fetchAllContacts', () => {
   it('merges contacts from multiple source databases', async () => {
     mockSourceDirs(['source-1', 'source-2']);
 
-    const source1Emails = [makeEmailRow({ ZUNIQUEID: 'U1', ZFIRSTNAME: 'Alice', email: 'alice@example.com' })];
-    const source1Phones = [makePhoneRow({ ZUNIQUEID: 'U1', ZFIRSTNAME: 'Alice', phone: '+15551111111' })];
-    const source2Emails = [makeEmailRow({ ZUNIQUEID: 'U2', ZFIRSTNAME: 'Bob', email: 'bob@example.com' })];
-    const source2Phones = [makePhoneRow({ ZUNIQUEID: 'U2', ZFIRSTNAME: 'Bob', phone: '+15552222222' })];
+    const source1Emails = [
+      makeEmailRow({
+        ZUNIQUEID: 'U1',
+        ZFIRSTNAME: 'Alice',
+        email: 'alice@example.com',
+      }),
+    ];
+    const source1Phones = [
+      makePhoneRow({
+        ZUNIQUEID: 'U1',
+        ZFIRSTNAME: 'Alice',
+        phone: '+15551111111',
+      }),
+    ];
+    const source2Emails = [
+      makeEmailRow({
+        ZUNIQUEID: 'U2',
+        ZFIRSTNAME: 'Bob',
+        email: 'bob@example.com',
+      }),
+    ];
+    const source2Phones = [
+      makePhoneRow({
+        ZUNIQUEID: 'U2',
+        ZFIRSTNAME: 'Bob',
+        phone: '+15552222222',
+      }),
+    ];
 
     mockSqliteResponses([
       [source1Emails, source1Phones],
@@ -361,7 +411,11 @@ describe('fetchAllContacts', () => {
       ) => void;
       const dbPathArg = (args[1] as string[])[2];
       if (dbPathArg.includes('source-2')) {
-        cb(new Error('database disk image is malformed'), '', 'database disk image is malformed');
+        cb(
+          new Error('database disk image is malformed'),
+          '',
+          'database disk image is malformed',
+        );
       } else {
         const isPhone = callIndex % 2 === 1;
         const data = isPhone
@@ -437,9 +491,18 @@ describe('fetchAllContacts', () => {
   it('queries all sources in parallel', async () => {
     mockSourceDirs(['source-1', 'source-2', 'source-3']);
     mockSqliteResponses([
-      [[makeEmailRow({ ZUNIQUEID: 'U1' })], [makePhoneRow({ ZUNIQUEID: 'U1' })]],
-      [[makeEmailRow({ ZUNIQUEID: 'U2' })], [makePhoneRow({ ZUNIQUEID: 'U2' })]],
-      [[makeEmailRow({ ZUNIQUEID: 'U3' })], [makePhoneRow({ ZUNIQUEID: 'U3' })]],
+      [
+        [makeEmailRow({ ZUNIQUEID: 'U1' })],
+        [makePhoneRow({ ZUNIQUEID: 'U1' })],
+      ],
+      [
+        [makeEmailRow({ ZUNIQUEID: 'U2' })],
+        [makePhoneRow({ ZUNIQUEID: 'U2' })],
+      ],
+      [
+        [makeEmailRow({ ZUNIQUEID: 'U3' })],
+        [makePhoneRow({ ZUNIQUEID: 'U3' })],
+      ],
     ]);
 
     const contacts = await fetchAllContacts();

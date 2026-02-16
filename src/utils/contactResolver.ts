@@ -12,7 +12,10 @@
  */
 
 import { executeJxaWithRetry, sanitizeForJxa } from './jxaExecutor.js';
-import { fetchAllContacts, SqliteContactAccessError } from './sqliteContactReader.js';
+import {
+  fetchAllContacts,
+  SqliteContactAccessError,
+} from './sqliteContactReader.js';
 
 /**
  * Resolved contact information
