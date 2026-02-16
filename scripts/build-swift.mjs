@@ -25,10 +25,12 @@ async function main() {
     process.exit(1);
   }
 
-  const scriptDir = path.resolve(process.cwd(), 'src', 'swift');
+  // Use package root (not cwd) so this works during npm postinstall
+  const packageRoot = path.resolve(new URL('.', import.meta.url).pathname, '..');
+  const scriptDir = path.resolve(packageRoot, 'src', 'swift');
   const sourceFile = path.join(scriptDir, 'EventKitCLI.swift');
   const infoPlistFile = path.join(scriptDir, 'Info.plist');
-  const binDir = path.resolve(process.cwd(), 'bin');
+  const binDir = path.resolve(packageRoot, 'bin');
   const outputFile = path.join(binDir, 'EventKitCLI');
 
   try {
