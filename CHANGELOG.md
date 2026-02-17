@@ -1,3 +1,10 @@
+## [2.0.4](https://github.com/krmj22/macos-mcp/compare/v2.0.3...v2.0.4) (2026-02-17)
+
+
+### Bug Fixes
+
+* **notes:** convert plain text body to HTML to preserve newlines ([#96](https://github.com/krmj22/macos-mcp/issues/96)) ([15ca2c0](https://github.com/krmj22/macos-mcp/commit/15ca2c0746c2211186b597defd10d5dd52d48734)), closes [#95](https://github.com/krmj22/macos-mcp/issues/95)
+
 ## [2.0.3](https://github.com/krmj22/macos-mcp/compare/v2.0.2...v2.0.3) (2026-02-17)
 
 
