@@ -6,11 +6,13 @@ A Model Context Protocol (MCP) server that gives Claude genuine access to your m
 
 Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunnel.
 
-### One prompt. Three apps. Real data.
+<div align="center">
+<h3>One prompt. Three apps. Real data.</h3>
 
-https://github.com/user-attachments/assets/30210ff4-4599-466a-a1bb-3d21ad4ab0c7
+<img src="https://github.com/user-attachments/assets/125eef94-f5db-4330-ae83-5208cb9c542f" alt="Demo: Claude reading iMessages, searching Mail, and pulling Contacts from an iPhone" width="350" />
 
-> *Claude reading iMessages, searching Mail, and pulling Contacts — from an iPhone, via Cloudflare Tunnel to a Mac Mini.*
+<em>Claude reading iMessages, searching Mail, and pulling Contacts — from an iPhone, via Cloudflare Tunnel to a Mac Mini.</em>
+</div>
 
 ## Quick Start
 
