@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/krmj22/macos-mcp/compare/v2.0.4...v2.1.0) (2026-02-17)
+
+
+### Features
+
+* **notes:** convert markdown body to Apple Notes rich text HTML ([#98](https://github.com/krmj22/macos-mcp/issues/98)) ([b3037f1](https://github.com/krmj22/macos-mcp/commit/b3037f15b1940416175f07e93a244501e7897305)), closes [#97](https://github.com/krmj22/macos-mcp/issues/97) [#97](https://github.com/krmj22/macos-mcp/issues/97)
+
 ## [2.0.4](https://github.com/krmj22/macos-mcp/compare/v2.0.3...v2.0.4) (2026-02-17)
 
 
