@@ -297,7 +297,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'notes_items',
     description:
-      'Manages Apple Notes. IMPORTANT: Apple Notes uses plain text, NOT markdown — do not send markdown formatting (no **, ##, -, etc.). Title max 200 chars, body max 2000 chars (total after append). Common actions: (1) "Find my note about X" → read with search param (searches title and body). (2) "Create a note" → create with title and body (plain text only). (3) "Move note to folder X" → update with id and targetFolder param. (4) "Edit my note" → update with id, and new title/body. (5) "Add to my note" → update with id, body, and append=true (appends body to existing content without needing to read first). To append to a note by name, this is a 2-call workflow (there is no way to update by name directly): first search with { action: "read", search: "note name" } to get the note ID, then update with { action: "update", id: "...", body: "new content", append: true }. Delete moves notes to Recently Deleted. Use folder param on read to filter by folder, or on create to place in a specific folder (defaults to "Notes"). Note: updating body (with or without append) replaces rich text formatting with plain text. Title note: Apple Notes derives the displayed title from body content — this tool preserves the original title after body updates/appends. Paginated: use limit (default 50, max 200) and offset.',
+      'Manages Apple Notes. Markdown in body is auto-converted to rich text (headings, bold, italic, lists, etc.). Plain text also works. Title max 200 chars, body max 2000 chars (total after append). Common actions: (1) "Find my note about X" → read with search param (searches title and body). (2) "Create a note" → create with title and body. (3) "Move note to folder X" → update with id and targetFolder param. (4) "Edit my note" → update with id, and new title/body. (5) "Add to my note" → update with id, body, and append=true (appends body to existing content without needing to read first). To append to a note by name, this is a 2-call workflow (there is no way to update by name directly): first search with { action: "read", search: "note name" } to get the note ID, then update with { action: "update", id: "...", body: "new content", append: true }. Delete moves notes to Recently Deleted. Use folder param on read to filter by folder, or on create to place in a specific folder (defaults to "Notes"). Title note: Apple Notes derives the displayed title from body content — this tool preserves the original title after body updates/appends. Paginated: use limit (default 50, max 200) and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -319,7 +319,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         body: {
           type: 'string',
           description:
-            'The body content of the note (plain text only, max 2000 chars). Do NOT use markdown formatting — Apple Notes does not render it.',
+            'The body content of the note (max 2000 chars). Supports markdown: headings (#), bold (**), italic (*), lists (-, 1.), code (`), strikethrough (~~). Auto-converted to rich text. Plain text also works.',
         },
         folder: {
           type: 'string',
@@ -334,7 +334,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         append: {
           type: 'boolean',
           description:
-            'When true, appends body content to the existing note instead of replacing it (for update action). Eliminates the need for a read-then-update round trip. The 2000 char limit applies to the final combined length. Note: appending converts existing rich text formatting to plain text.',
+            'When true, appends body content to the existing note instead of replacing it (for update action). Eliminates the need for a read-then-update round trip. The 2000 char limit applies to the final combined length.',
         },
         search: {
           type: 'string',
