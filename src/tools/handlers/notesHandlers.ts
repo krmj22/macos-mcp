@@ -23,18 +23,124 @@ import {
 import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
 
 /**
- * Converts plain text to HTML for Apple Notes' body property.
- * Apple Notes stores body as HTML — assigning plain text collapses newlines.
- * This converts \n to <br> (which Apple normalizes to <div> elements)
- * and escapes HTML entities to prevent injection.
+ * Escapes HTML entities in text content.
  */
-export function plainTextToHtml(text: string): string {
-  if (!text) return '';
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\r\n|\r|\n/g, '<br>');
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Applies inline markdown formatting to text.
+ * Must be called AFTER escapeHtml() — markdown chars (*, _, ~, `) are unaffected by entity escaping.
+ */
+function processInline(text: string): string {
+  return (
+    text
+      // Bold: **text** or __text__ (process before italic)
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/__(.+?)__/g, '<b>$1</b>')
+      // Italic: *text* or _text_
+      .replace(/\*(.+?)\*/g, '<i>$1</i>')
+      .replace(/_(.+?)_/g, '<i>$1</i>')
+      // Strikethrough: ~~text~~
+      .replace(/~~(.+?)~~/g, '<s>$1</s>')
+      // Inline code: `text`
+      .replace(/`(.+?)`/g, '<tt>$1</tt>')
+  );
+}
+
+/**
+ * Converts markdown text to HTML for Apple Notes' body property.
+ * Superset of the old plainTextToHtml — plain text without markdown passes through
+ * unchanged (with newlines converted to <br> and HTML entities escaped).
+ *
+ * Supports: headings (#, ##, ###), bold, italic, strikethrough, inline code,
+ * unordered lists (-, *, +), ordered lists (1.).
+ */
+export function markdownToHtml(text: string): string {
+  if (!text) return '';
+
+  const lines = text.split(/\r\n|\r|\n/);
+  const output: string[] = [];
+  let currentListType: 'ul' | 'ol' | null = null;
+
+  function flushList(): void {
+    if (currentListType) {
+      output.push(`</${currentListType}>`);
+      currentListType = null;
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Blank line
+    if (line.trim() === '') {
+      flushList();
+      output.push('<br>');
+      continue;
+    }
+
+    // Headings: # text, ## text, ### text
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const content = processInline(escapeHtml(headingMatch[2]));
+      output.push(`<h${level}>${content}</h${level}>`);
+      continue;
+    }
+
+    // Unordered list: - text, * text, + text
+    const ulMatch = line.match(/^[-*+]\s+(.+)$/);
+    if (ulMatch) {
+      if (currentListType !== 'ul') {
+        flushList();
+        output.push('<ul>');
+        currentListType = 'ul';
+      }
+      output.push(`<li>${processInline(escapeHtml(ulMatch[1]))}</li>`);
+      continue;
+    }
+
+    // Ordered list: 1. text
+    const olMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (currentListType !== 'ol') {
+        flushList();
+        output.push('<ol>');
+        currentListType = 'ol';
+      }
+      output.push(`<li>${processInline(escapeHtml(olMatch[1]))}</li>`);
+      continue;
+    }
+
+    // Regular text line
+    flushList();
+    // Add <br> between consecutive regular text lines
+    if (output.length > 0) {
+      const last = output[output.length - 1];
+      // Only add <br> if previous output was also a regular text line (not a block element)
+      if (
+        last &&
+        !last.startsWith('<h') &&
+        !last.startsWith('</') &&
+        !last.startsWith('<ul') &&
+        !last.startsWith('<ol') &&
+        !last.startsWith('<li') &&
+        last !== '<br>'
+      ) {
+        output.push('<br>');
+      }
+    }
+    output.push(processInline(escapeHtml(line)));
+  }
+
+  flushList();
+  return output.join('');
 }
 
 interface NoteItem {
@@ -334,7 +440,7 @@ export async function handleCreateNote(
     const validated = extractAndValidateArgs(args, CreateNoteSchema);
     const script = buildScript(CREATE_NOTE_SCRIPT, {
       title: validated.title,
-      body: plainTextToHtml(validated.body ?? ''),
+      body: markdownToHtml(validated.body ?? ''),
       folder: validated.folder ?? 'Notes',
     });
     const result = await executeJxa<{ id: string; name: string }>(
@@ -365,12 +471,12 @@ export async function handleUpdateNote(
     };
 
     if (useAppend) {
-      scriptParams.newBody = plainTextToHtml(validated.body ?? '');
+      scriptParams.newBody = markdownToHtml(validated.body ?? '');
       scriptParams.rawNewBodyLength = String((validated.body ?? '').length);
       scriptParams.maxBodyLength = String(VALIDATION.MAX_NOTE_LENGTH);
     } else {
       scriptParams.hasBody = validated.body !== undefined ? 'true' : 'false';
-      scriptParams.newBody = plainTextToHtml(validated.body ?? '');
+      scriptParams.newBody = markdownToHtml(validated.body ?? '');
     }
 
     // Build script with data fields (sanitized by buildScript)

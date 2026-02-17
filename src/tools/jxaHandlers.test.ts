@@ -142,7 +142,7 @@ describe('Notes Handlers', () => {
   let handleCreateNotesFolder: typeof import('./handlers/notesHandlers.js').handleCreateNotesFolder;
   let handleCreateNote: typeof import('./handlers/notesHandlers.js').handleCreateNote;
   let handleDeleteNote: typeof import('./handlers/notesHandlers.js').handleDeleteNote;
-  let plainTextToHtml: typeof import('./handlers/notesHandlers.js').plainTextToHtml;
+  let markdownToHtml: typeof import('./handlers/notesHandlers.js').markdownToHtml;
 
   beforeAll(async () => {
     const mod = await import('./handlers/notesHandlers.js');
@@ -152,49 +152,194 @@ describe('Notes Handlers', () => {
     handleCreateNotesFolder = mod.handleCreateNotesFolder;
     handleCreateNote = mod.handleCreateNote;
     handleDeleteNote = mod.handleDeleteNote;
-    plainTextToHtml = mod.plainTextToHtml;
+    markdownToHtml = mod.markdownToHtml;
   });
 
-  describe('plainTextToHtml', () => {
-    it('converts newlines to <br> tags', () => {
-      expect(plainTextToHtml('Line 1\nLine 2\nLine 3')).toBe(
+  describe('markdownToHtml', () => {
+    // Backward compatibility (plain text passthrough)
+    it('converts newlines to <br> between text lines', () => {
+      expect(markdownToHtml('Line 1\nLine 2\nLine 3')).toBe(
         'Line 1<br>Line 2<br>Line 3',
       );
     });
 
     it('handles Windows-style line endings', () => {
-      expect(plainTextToHtml('Line 1\r\nLine 2\r\nLine 3')).toBe(
+      expect(markdownToHtml('Line 1\r\nLine 2\r\nLine 3')).toBe(
         'Line 1<br>Line 2<br>Line 3',
       );
     });
 
     it('handles bare carriage returns', () => {
-      expect(plainTextToHtml('Line 1\rLine 2')).toBe('Line 1<br>Line 2');
+      expect(markdownToHtml('Line 1\rLine 2')).toBe('Line 1<br>Line 2');
     });
 
     it('escapes HTML entities', () => {
-      expect(plainTextToHtml('a & b < c > d')).toBe('a &amp; b &lt; c &gt; d');
+      expect(markdownToHtml('a & b < c > d')).toBe('a &amp; b &lt; c &gt; d');
     });
 
     it('escapes entities AND converts newlines together', () => {
-      expect(plainTextToHtml('A & B\nC < D')).toBe('A &amp; B<br>C &lt; D');
+      expect(markdownToHtml('A & B\nC < D')).toBe('A &amp; B<br>C &lt; D');
     });
 
     it('returns empty string for empty input', () => {
-      expect(plainTextToHtml('')).toBe('');
+      expect(markdownToHtml('')).toBe('');
     });
 
     it('returns empty string for falsy input', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(plainTextToHtml(undefined as any)).toBe('');
+      // biome-ignore lint: test edge case
+      expect(markdownToHtml(undefined as any)).toBe('');
     });
 
     it('passes through plain text without newlines unchanged', () => {
-      expect(plainTextToHtml('Hello world')).toBe('Hello world');
+      expect(markdownToHtml('Hello world')).toBe('Hello world');
     });
 
-    it('handles consecutive newlines (blank lines)', () => {
-      expect(plainTextToHtml('A\n\n\nB')).toBe('A<br><br><br>B');
+    it('handles consecutive blank lines', () => {
+      const result = markdownToHtml('A\n\n\nB');
+      expect(result).toContain('<br>');
+      expect(result).toContain('A');
+      expect(result).toContain('B');
+    });
+
+    // Headings
+    it('converts # to <h1>', () => {
+      expect(markdownToHtml('# Hello')).toBe('<h1>Hello</h1>');
+    });
+
+    it('converts ## to <h2>', () => {
+      expect(markdownToHtml('## Sub heading')).toBe('<h2>Sub heading</h2>');
+    });
+
+    it('converts ### to <h3>', () => {
+      expect(markdownToHtml('### Third level')).toBe('<h3>Third level</h3>');
+    });
+
+    it('applies inline formatting within headings', () => {
+      expect(markdownToHtml('# **Bold** heading')).toBe(
+        '<h1><b>Bold</b> heading</h1>',
+      );
+    });
+
+    it('does not treat # mid-line as heading', () => {
+      const result = markdownToHtml('Not a # heading');
+      expect(result).not.toContain('<h1>');
+      expect(result).toContain('Not a # heading');
+    });
+
+    // Inline formatting
+    it('converts **bold** to <b>', () => {
+      expect(markdownToHtml('This is **bold** text')).toBe(
+        'This is <b>bold</b> text',
+      );
+    });
+
+    it('converts __bold__ to <b>', () => {
+      expect(markdownToHtml('This is __bold__ text')).toBe(
+        'This is <b>bold</b> text',
+      );
+    });
+
+    it('converts *italic* to <i>', () => {
+      expect(markdownToHtml('This is *italic* text')).toBe(
+        'This is <i>italic</i> text',
+      );
+    });
+
+    it('converts _italic_ to <i>', () => {
+      expect(markdownToHtml('This is _italic_ text')).toBe(
+        'This is <i>italic</i> text',
+      );
+    });
+
+    it('converts ~~strikethrough~~ to <s>', () => {
+      expect(markdownToHtml('This is ~~gone~~ text')).toBe(
+        'This is <s>gone</s> text',
+      );
+    });
+
+    it('converts `code` to <tt>', () => {
+      expect(markdownToHtml('Use `npm install` here')).toBe(
+        'Use <tt>npm install</tt> here',
+      );
+    });
+
+    it('handles mixed inline formatting on same line', () => {
+      const result = markdownToHtml('**bold** and *italic* and `code`');
+      expect(result).toBe('<b>bold</b> and <i>italic</i> and <tt>code</tt>');
+    });
+
+    // Unordered lists
+    it('converts - items to <ul><li>', () => {
+      expect(markdownToHtml('- Item 1\n- Item 2')).toBe(
+        '<ul><li>Item 1</li><li>Item 2</li></ul>',
+      );
+    });
+
+    it('converts * items to <ul><li>', () => {
+      expect(markdownToHtml('* Item A\n* Item B')).toBe(
+        '<ul><li>Item A</li><li>Item B</li></ul>',
+      );
+    });
+
+    it('converts + items to <ul><li>', () => {
+      expect(markdownToHtml('+ Item X\n+ Item Y')).toBe(
+        '<ul><li>Item X</li><li>Item Y</li></ul>',
+      );
+    });
+
+    // Ordered lists
+    it('converts 1. items to <ol><li>', () => {
+      expect(markdownToHtml('1. First\n2. Second')).toBe(
+        '<ol><li>First</li><li>Second</li></ol>',
+      );
+    });
+
+    // List grouping and flushing
+    it('groups adjacent list items into single list', () => {
+      const result = markdownToHtml('- A\n- B\n- C');
+      expect(result).toBe('<ul><li>A</li><li>B</li><li>C</li></ul>');
+    });
+
+    it('flushes list when followed by non-list line', () => {
+      const result = markdownToHtml('- Item\nParagraph');
+      expect(result).toBe('<ul><li>Item</li></ul>Paragraph');
+    });
+
+    it('applies inline formatting in list items', () => {
+      expect(markdownToHtml('- **Bold** item')).toBe(
+        '<ul><li><b>Bold</b> item</li></ul>',
+      );
+    });
+
+    // Mixed content
+    it('handles heading + paragraph + list', () => {
+      const md = '# Title\n\nSome text\n\n- Item 1\n- Item 2';
+      const result = markdownToHtml(md);
+      expect(result).toContain('<h1>Title</h1>');
+      expect(result).toContain('Some text');
+      expect(result).toContain('<ul><li>Item 1</li><li>Item 2</li></ul>');
+    });
+
+    it('handles paragraph + blank + paragraph', () => {
+      const result = markdownToHtml('First para\n\nSecond para');
+      expect(result).toBe('First para<br>Second para');
+    });
+
+    // Escaping
+    it('escapes & in plain text', () => {
+      expect(markdownToHtml('Tom & Jerry')).toBe('Tom &amp; Jerry');
+    });
+
+    it('escapes < and > in text', () => {
+      expect(markdownToHtml('a < b > c')).toBe('a &lt; b &gt; c');
+    });
+
+    it('escapes HTML in headings', () => {
+      expect(markdownToHtml('# A & B')).toBe('<h1>A &amp; B</h1>');
+    });
+
+    it('escapes HTML in list items', () => {
+      expect(markdownToHtml('- A & B')).toBe('<ul><li>A &amp; B</li></ul>');
     });
   });
 
