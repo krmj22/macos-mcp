@@ -9,7 +9,7 @@ Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunne
 <div align="center">
 <h3>One prompt. Three apps. Real data.</h3>
 
-<img src="https://github.com/user-attachments/assets/125eef94-f5db-4330-ae83-5208cb9c542f" alt="Demo: Claude reading iMessages, searching Mail, and pulling Contacts from an iPhone" width="350" />
+<img src="https://github.com/user-attachments/assets/81ac3db6-0b1c-4312-a93f-5808f14f939b" alt="Demo: Claude reading iMessages, searching Mail, and pulling Contacts from an iPhone" width="350" />
 
 <em>Claude reading iMessages, searching Mail, and pulling Contacts — from an iPhone, via Cloudflare Tunnel to a Mac Mini.</em>
 </div>
