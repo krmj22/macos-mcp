@@ -195,10 +195,7 @@ describe('Notes Handlers', () => {
     });
 
     it('handles consecutive blank lines', () => {
-      const result = markdownToHtml('A\n\n\nB');
-      expect(result).toContain('<br>');
-      expect(result).toContain('A');
-      expect(result).toContain('B');
+      expect(markdownToHtml('A\n\n\nB')).toBe('A<br><br>B');
     });
 
     // Headings
@@ -308,6 +305,12 @@ describe('Notes Handlers', () => {
     it('applies inline formatting in list items', () => {
       expect(markdownToHtml('- **Bold** item')).toBe(
         '<ul><li><b>Bold</b> item</li></ul>',
+      );
+    });
+
+    it('switches from UL to OL when list type changes', () => {
+      expect(markdownToHtml('- Bullet\n1. Ordered')).toBe(
+        '<ul><li>Bullet</li></ul><ol><li>Ordered</li></ol>',
       );
     });
 

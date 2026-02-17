@@ -43,6 +43,8 @@ function processInline(text: string): string {
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/__(.+?)__/g, '<b>$1</b>')
       // Italic: *text* or _text_
+      // Note: _text_ matches intra-word underscores (e.g. file_name_test).
+      // GFM prevents this but the regex complexity isn't worth it for Notes use cases.
       .replace(/\*(.+?)\*/g, '<i>$1</i>')
       .replace(/_(.+?)_/g, '<i>$1</i>')
       // Strikethrough: ~~text~~
