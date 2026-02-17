@@ -120,11 +120,13 @@ src/
 │   ├── index.ts         # Tool routing
 │   └── handlers/        # Domain handlers (reminderHandlers.ts, notesHandlers.ts, etc.)
 ├── utils/
-│   ├── cliExecutor.ts   # Swift binary execution + permission retry
-│   ├── jxaExecutor.ts   # JXA/AppleScript execution + retry logic
-│   ├── logging.ts       # Structured error logging (tool failures → stderr)
+│   ├── cliExecutor.ts          # Swift binary execution + permission retry
+│   ├── contactResolver.ts      # Cross-tool contact enrichment (name ↔ phone/email)
+│   ├── jxaExecutor.ts          # JXA/AppleScript execution + retry logic
+│   ├── logging.ts              # Structured error logging (tool failures → stderr)
+│   ├── sqliteContactReader.ts  # Contact enrichment cache via AddressBook SQLite (ADR-002)
+│   ├── sqliteMailReader.ts     # Mail SQLite reader (ADR-001)
 │   ├── sqliteMessageReader.ts  # Messages SQLite reader
-│   ├── sqliteMailReader.ts     # Mail SQLite reader
 │   └── preflight.ts            # Startup --check validation
 └── validation/
     └── schemas.ts       # Zod schemas

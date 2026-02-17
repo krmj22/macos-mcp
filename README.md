@@ -4,7 +4,7 @@
 
 A Model Context Protocol (MCP) server that gives Claude genuine access to your macOS personal data — **Reminders**, **Calendar**, **Notes**, **Mail**, **Messages**, and **Contacts**. Six apps, working together: ask Claude about tomorrow's meeting and it pulls the calendar event, finds related emails, and creates a prep note — from your phone, your desktop, or the web.
 
-Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunnel.
+Use with Claude Desktop locally, or Claude iOS/web remotely via Cloudflare Tunnel. **Requires a Mac** — for always-on remote access, a Mac Mini or Mac Studio is recommended.
 
 <div align="center">
 <h3>One prompt. Three apps. Real data.</h3>

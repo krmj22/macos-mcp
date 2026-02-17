@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-13 (Notes list/search/title fixes)
+Last updated: 2026-02-17 (v2.0.3, demo video, .mcp.json cleanup)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 855 unit tests, 35 test files, all passing
+- **Tests**: 856 unit tests, 35 test files, all passing
 - **E2E**: 149 tests across 8 suites — serial runner (#81 fixed), 2 send skipped
   - 124 stdio transport tests (7 suites)
   - 25 HTTP transport tests (1 suite) — validates full Claude iOS/web path
@@ -52,7 +52,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 | Messages enrichment returns raw phone numbers | **Bug #90** — cold contact cache timeout | Fixed: cache warming + negative cache + withTimeout |
 | Mail enrichment shows mixed names/emails | Expected — three-layer fallback (Contact name → Mail DB comment → email) | No code change |
 
-## Recent Work (2026-02-09 to 2026-02-12)
+## Recent Work (2026-02-09 to 2026-02-17)
 
 | Commit | Description |
 |--------|-------------|
@@ -76,10 +76,20 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 | `74f395f` | Enhanced all 9 tool descriptions with behavioral prompting |
 | `b7b383b` | Added structured tool dispatch logging |
 | `83f7edc` | Surfaced Error.message in all modes (not just dev) |
+| `c0231bb` | **fix(mail)**: fall back to sender display name when contact has no email |
+| `0f7b57a` | **chore**: GitHub Actions CI and deploy script (#86) |
+| `530a975` | **feat**: npm release infrastructure (mcp-macos) |
+| `a32b54b` | **fix**: use package root for Swift build paths (not cwd) |
+| `8438cbe` | **fix(config)**: update stale package name in project root detection |
+| `bd51a79` | **chore(release)**: 2.0.2 |
+| `12d5f33` | **fix(config)**: force stdio transport in .mcp.json to avoid port conflict |
+| `dd3b74f` | **chore**: remove project-level .mcp.json to avoid tool duplication |
+| `68bebef` | **chore(release)**: 2.0.3 |
+| `804a190` | **docs(readme)**: demo video — trimmed GIF, centered, auto-playing |
 
 ## Unit Test Assessment
 
-855 tests across 35 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.3%/81.7%/97.8%/95.6%**. All above thresholds. `pnpm test --coverage` exits 0.
+856 tests across 35 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.2%/81.7%/97.8%/95.5%**. All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
@@ -180,11 +190,11 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 | #89 | P3 | **CLOSED** — `node dist/index.js --check` preflight validation |
 | #90 | P1 | **CLOSED** — Contact cache warming + negative cache + withTimeout on all enrichment paths |
 
-### Deferred
+### Previously Deferred (Now Resolved)
 
 | Issue | Priority | Description |
 |-------|----------|-------------|
-| #86 | Deferred | GitHub Actions CI pipeline (test + lint + release) |
+| #86 | ~~Deferred~~ | **CLOSED** `0f7b57a` — GitHub Actions CI pipeline (test + lint + release) |
 
 ## Known Limitations
 
@@ -200,6 +210,8 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 
 ## Infrastructure
 
-- **Production**: LaunchAgent `com.macos-mcp.server` on Mac Mini
-- **Tunnel**: Cloudflare Tunnel `com.cloudflare.macos-mcp-tunnel` at `mcp.kyleos.ai:3847`
+- **Production**: LaunchAgent `com.macos-mcp.server` on Mac Mini (migrated from MacBook 2026-02-13)
+- **Tunnel**: Cloudflare Tunnel `mac-mini-winston` → `mcp.kyleos.ai` → `localhost:3847`
+- **npm**: Published as `mcp-macos` (v2.0.3), install via `npm install -g mcp-macos`
+- **CI**: GitHub Actions — test + lint + release (#86 CLOSED)
 - **After restart**: Always restart both server AND tunnel LaunchAgents
