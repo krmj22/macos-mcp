@@ -17,7 +17,7 @@ pnpm test:e2e:all     # Build + run ALL per-tool E2E suites (serial, no JXA cont
 node dist/index.js --check  # Preflight validation (macOS, Node, FDA, JXA permissions)
 ```
 
-**Note:** `bin/run.cjs` (used by `.mcp.json`) runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
+**Note:** `bin/run.cjs` runs compiled `dist/index.js`. You must `pnpm build` before the server will start. Use `pnpm dev` for quick source-level iteration (stdio transport only — HTTP transport requires compiled output).
 
 ## Current State
 
