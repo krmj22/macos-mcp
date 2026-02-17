@@ -1,3 +1,10 @@
+## [2.0.3](https://github.com/krmj22/macos-mcp/compare/v2.0.2...v2.0.3) (2026-02-17)
+
+
+### Bug Fixes
+
+* **config:** force stdio transport in .mcp.json to avoid port conflict ([12d5f33](https://github.com/krmj22/macos-mcp/commit/12d5f33f64e15021b442347a1733ab11e81b503a))
+
 ## [2.0.2](https://github.com/krmj22/macos-mcp/compare/v2.0.1...v2.0.2) (2026-02-16)
 
 
