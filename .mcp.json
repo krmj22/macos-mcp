@@ -2,7 +2,10 @@
   "mcpServers": {
     "macos": {
       "command": "node",
-      "args": ["bin/run.cjs"]
+      "args": ["bin/run.cjs"],
+      "env": {
+        "MCP_TRANSPORT": "stdio"
+      }
     }
   }
 }
