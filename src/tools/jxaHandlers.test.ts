@@ -142,6 +142,7 @@ describe('Notes Handlers', () => {
   let handleCreateNotesFolder: typeof import('./handlers/notesHandlers.js').handleCreateNotesFolder;
   let handleCreateNote: typeof import('./handlers/notesHandlers.js').handleCreateNote;
   let handleDeleteNote: typeof import('./handlers/notesHandlers.js').handleDeleteNote;
+  let plainTextToHtml: typeof import('./handlers/notesHandlers.js').plainTextToHtml;
 
   beforeAll(async () => {
     const mod = await import('./handlers/notesHandlers.js');
@@ -151,6 +152,50 @@ describe('Notes Handlers', () => {
     handleCreateNotesFolder = mod.handleCreateNotesFolder;
     handleCreateNote = mod.handleCreateNote;
     handleDeleteNote = mod.handleDeleteNote;
+    plainTextToHtml = mod.plainTextToHtml;
+  });
+
+  describe('plainTextToHtml', () => {
+    it('converts newlines to <br> tags', () => {
+      expect(plainTextToHtml('Line 1\nLine 2\nLine 3')).toBe(
+        'Line 1<br>Line 2<br>Line 3',
+      );
+    });
+
+    it('handles Windows-style line endings', () => {
+      expect(plainTextToHtml('Line 1\r\nLine 2\r\nLine 3')).toBe(
+        'Line 1<br>Line 2<br>Line 3',
+      );
+    });
+
+    it('handles bare carriage returns', () => {
+      expect(plainTextToHtml('Line 1\rLine 2')).toBe('Line 1<br>Line 2');
+    });
+
+    it('escapes HTML entities', () => {
+      expect(plainTextToHtml('a & b < c > d')).toBe('a &amp; b &lt; c &gt; d');
+    });
+
+    it('escapes entities AND converts newlines together', () => {
+      expect(plainTextToHtml('A & B\nC < D')).toBe('A &amp; B<br>C &lt; D');
+    });
+
+    it('returns empty string for empty input', () => {
+      expect(plainTextToHtml('')).toBe('');
+    });
+
+    it('returns empty string for falsy input', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(plainTextToHtml(undefined as any)).toBe('');
+    });
+
+    it('passes through plain text without newlines unchanged', () => {
+      expect(plainTextToHtml('Hello world')).toBe('Hello world');
+    });
+
+    it('handles consecutive newlines (blank lines)', () => {
+      expect(plainTextToHtml('A\n\n\nB')).toBe('A<br><br><br>B');
+    });
   });
 
   describe('handleReadNotes', () => {
@@ -294,8 +339,10 @@ describe('Notes Handlers', () => {
       expect(getTextContent(result)).toContain('(appended)');
 
       const script = mockExecuteJxa.mock.calls[0][0];
-      // Append mode uses n.plaintext() to read existing content
+      // Append uses n.plaintext() for length check, n.body() for HTML concat
       expect(script).toContain('n.plaintext()');
+      expect(script).toContain('n.body()');
+      expect(script).toContain('<br>');
       expect(script).toContain('Appended content');
       // Should check combined length against max
       expect(script).toContain('2000');
@@ -381,6 +428,7 @@ describe('Notes Handlers', () => {
 
       const script = mockExecuteJxa.mock.calls[0][0];
       expect(script).toContain('plaintext()');
+      expect(script).toContain('n.body()');
       expect(script).toContain('targetFolder');
     });
   });
@@ -440,6 +488,33 @@ describe('Notes Handlers', () => {
       expect(result.isError).toBe(false);
       const script = mockExecuteJxa.mock.calls[0][0];
       expect(script).toContain('Work');
+    });
+
+    it('converts newlines to HTML in body', async () => {
+      mockExecuteJxa.mockResolvedValue({ id: 'n-html', name: 'Multi Line' });
+
+      await handleCreateNote({
+        action: 'create',
+        title: 'Multi Line',
+        body: 'Line 1\nLine 2\nLine 3',
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('Line 1<br>Line 2<br>Line 3');
+      expect(script).not.toContain('Line 1\\nLine 2');
+    });
+
+    it('escapes HTML entities in body', async () => {
+      mockExecuteJxa.mockResolvedValue({ id: 'n-esc', name: 'Escaped' });
+
+      await handleCreateNote({
+        action: 'create',
+        title: 'Escaped',
+        body: 'a & b < c',
+      });
+
+      const script = mockExecuteJxa.mock.calls[0][0];
+      expect(script).toContain('a &amp; b &lt; c');
     });
 
     it('creates a note with minimal fields (title only)', async () => {

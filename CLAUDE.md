@@ -186,6 +186,15 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 - **Mock CLI**: `src/utils/__mocks__/cliExecutor.ts`
 - **Mock JXA**: `src/tools/jxaHandlers.test.ts`
 
+## Development Workflow
+
+This is a public repository. All changes go through branches and pull requests.
+
+1. **Issue first** — file or reference a GitHub issue before starting work
+2. **Feature branch** — branch off `main` with a descriptive name: `fix/notes-newline-rendering`, `feat/calendar-recurring`
+3. **Pull request** — open a PR against `main`, link the issue (`Closes #XX`), and describe what changed
+4. **No direct commits to `main`** — all changes merge via PR
+
 ## Commits
 
 See `~/.claude/CLAUDE.md` for commit guidelines. Use `/commit` skill.

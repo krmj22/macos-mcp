@@ -22,6 +22,21 @@ import {
 } from '../../validation/schemas.js';
 import { extractAndValidateArgs, formatListMarkdown } from './shared.js';
 
+/**
+ * Converts plain text to HTML for Apple Notes' body property.
+ * Apple Notes stores body as HTML — assigning plain text collapses newlines.
+ * This converts \n to <br> (which Apple normalizes to <div> elements)
+ * and escapes HTML entities to prevent injection.
+ */
+export function plainTextToHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r\n|\r|\n/g, '<br>');
+}
+
 interface NoteItem {
   id: string;
   name: string;
@@ -138,10 +153,10 @@ const APPEND_NOTE_SCRIPT = `
   if (notes.length === 0) throw new Error("Note not found");
   const n = notes[0];
   const titleToSet = "{{hasName}}" === "true" ? "{{newName}}" : n.name();
-  const existing = n.plaintext();
-  const combined = existing + "\\n" + "{{newBody}}";
-  if (combined.length > {{maxBodyLength}}) throw new Error("Combined note body exceeds {{maxBodyLength}} characters (existing: " + existing.length + " + new: " + "{{newBody}}".length + " = " + combined.length + ")");
-  n.body = combined;
+  const existingPlain = n.plaintext();
+  if (existingPlain.length + {{rawNewBodyLength}} + 1 > {{maxBodyLength}}) throw new Error("Combined note body exceeds {{maxBodyLength}} characters (existing: " + existingPlain.length + " + new: " + {{rawNewBodyLength}} + ")");
+  const existingHtml = n.body();
+  n.body = existingHtml + "<br>" + "{{newBody}}";
   n.name = titleToSet;
   %%moveToFolder%%
   return JSON.stringify({id: n.id(), name: n.name(), folder: n.container().name()});
@@ -319,7 +334,7 @@ export async function handleCreateNote(
     const validated = extractAndValidateArgs(args, CreateNoteSchema);
     const script = buildScript(CREATE_NOTE_SCRIPT, {
       title: validated.title,
-      body: validated.body ?? '',
+      body: plainTextToHtml(validated.body ?? ''),
       folder: validated.folder ?? 'Notes',
     });
     const result = await executeJxa<{ id: string; name: string }>(
@@ -350,11 +365,12 @@ export async function handleUpdateNote(
     };
 
     if (useAppend) {
-      scriptParams.newBody = validated.body ?? '';
+      scriptParams.newBody = plainTextToHtml(validated.body ?? '');
+      scriptParams.rawNewBodyLength = String((validated.body ?? '').length);
       scriptParams.maxBodyLength = String(VALIDATION.MAX_NOTE_LENGTH);
     } else {
       scriptParams.hasBody = validated.body !== undefined ? 'true' : 'false';
-      scriptParams.newBody = validated.body ?? '';
+      scriptParams.newBody = plainTextToHtml(validated.body ?? '');
     }
 
     // Build script with data fields (sanitized by buildScript)
