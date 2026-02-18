@@ -12,6 +12,7 @@ import {
 } from '../../utils/contactResolver.js';
 import { handleAsyncOperation } from '../../utils/errorHandling.js';
 import {
+  buildScript,
   executeJxa,
   executeJxaWithRetry,
   sanitizeForJxa,
@@ -175,10 +176,9 @@ export async function handleReadMail(
         // Fetch full content via JXA (SQLite only has summaries)
         let content = msg.preview;
         try {
-          const jxaScript = GET_MAIL_SCRIPT_JXA.replace(
-            /\{\{id\}\}/g,
-            validated.id,
-          );
+          const jxaScript = buildScript(GET_MAIL_SCRIPT_JXA, {
+            id: validated.id,
+          });
           const jxaResult = await executeJxaWithRetry<{
             id: string;
             content: string;
@@ -354,10 +354,9 @@ export async function handleCreateMail(
     let subject = validated.subject;
     let body = validated.body;
     if (validated.replyToId) {
-      const jxaScript = GET_MAIL_SCRIPT_JXA.replace(
-        /\{\{id\}\}/g,
-        validated.replyToId,
-      );
+      const jxaScript = buildScript(GET_MAIL_SCRIPT_JXA, {
+        id: validated.replyToId,
+      });
       const original = await executeJxaWithRetry<{
         id: string;
         content: string;
@@ -422,10 +421,10 @@ export async function handleUpdateMail(
 ): Promise<CallToolResult> {
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, UpdateMailSchema);
-    const script = MARK_READ_SCRIPT.replace(
-      /\{\{id\}\}/g,
-      validated.id,
-    ).replace(/\{\{readStatus\}\}/g, String(validated.read));
+    const script = buildScript(MARK_READ_SCRIPT, {
+      id: validated.id,
+      readStatus: String(validated.read),
+    });
     await executeJxa(script, 10000, 'Mail');
     const status = validated.read ? 'read' : 'unread';
     return `Successfully marked message as ${status}.`;
@@ -437,7 +436,7 @@ export async function handleDeleteMail(
 ): Promise<CallToolResult> {
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, DeleteMailSchema);
-    const script = DELETE_MAIL_SCRIPT.replace(/\{\{id\}\}/g, validated.id);
+    const script = buildScript(DELETE_MAIL_SCRIPT, { id: validated.id });
     await executeJxa(script, 10000, 'Mail');
     return `Successfully deleted mail message with ID: "${validated.id}".`;
   }, 'delete mail');
