@@ -365,4 +365,4 @@ MIT
 
 ## Contributing
 
-Contributions welcome! Please read the contributing guidelines first.
+Contributions welcome! Please read the [contributing guidelines](CONTRIBUTING.md) first.
