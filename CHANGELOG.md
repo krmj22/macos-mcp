@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/krmj22/macos-mcp/compare/v2.1.0...v2.1.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* **readme:** remove demo video with fake-but-real-looking contact data ([fe7d2ab](https://github.com/krmj22/macos-mcp/commit/fe7d2ab64cf0fcf08eb4cee1140f4f368e060094))
+
 # [2.1.0](https://github.com/krmj22/macos-mcp/compare/v2.0.4...v2.1.0) (2026-02-17)
 
 
