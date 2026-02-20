@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/krmj22/macos-mcp/compare/v2.1.2...v2.1.3) (2026-02-20)
+
+
+### Bug Fixes
+
+* **security:** HN review pass 2 — JXA injection, auth bypass, AppleScript escaping ([c8a0daa](https://github.com/krmj22/macos-mcp/commit/c8a0daaa3ac0120a656c8345645d945123a3bc95))
+
 ## [2.1.2](https://github.com/krmj22/macos-mcp/compare/v2.1.1...v2.1.2) (2026-02-20)
 
 
