@@ -115,9 +115,14 @@ export function parseMailboxUrl(url: string): {
   }
 }
 
-/** Escapes a string for safe use in SQLite LIKE/= clauses. */
+/** Escapes a string for safe use in SQLite string literals (doubles single quotes). */
 function escapeSql(str: string): string {
   return str.replace(/'/g, "''");
+}
+
+/** Escapes LIKE wildcard characters so they match literally. Use with ESCAPE '\'. */
+export function escapeLikeWildcards(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 // --- Interfaces ---
@@ -253,16 +258,16 @@ export async function searchMessages(
   limit: number,
   offset: number,
 ): Promise<MailMessage[]> {
-  const escaped = escapeSql(term);
+  const escaped = escapeLikeWildcards(escapeSql(term));
   const query = `
     ${BASE_SELECT}
     WHERE m.deleted = 0
     ${SKIP_MAILBOXES}
     AND (
-      s.subject LIKE '%${escaped}%'
-      OR a.address LIKE '%${escaped}%'
-      OR a.comment LIKE '%${escaped}%'
-      OR sm.summary LIKE '%${escaped}%'
+      s.subject LIKE '%${escaped}%' ESCAPE '\\'
+      OR a.address LIKE '%${escaped}%' ESCAPE '\\'
+      OR a.comment LIKE '%${escaped}%' ESCAPE '\\'
+      OR sm.summary LIKE '%${escaped}%' ESCAPE '\\'
     )
     ORDER BY m.date_received DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -282,7 +287,10 @@ export async function searchBySenderEmails(
   if (emails.length === 0) return [];
 
   const conditions = emails
-    .map((e) => `a.address LIKE '%${escapeSql(e)}%'`)
+    .map(
+      (e) =>
+        `a.address LIKE '%${escapeLikeWildcards(escapeSql(e))}%' ESCAPE '\\'`,
+    )
     .join(' OR ');
 
   const query = `
@@ -306,12 +314,12 @@ export async function searchBySenderName(
   name: string,
   limit: number,
 ): Promise<MailMessage[]> {
-  const escaped = escapeSql(name);
+  const escaped = escapeLikeWildcards(escapeSql(name));
   const query = `
     ${BASE_SELECT}
     WHERE m.deleted = 0
     ${SKIP_MAILBOXES}
-    AND a.comment LIKE '%${escaped}%'
+    AND a.comment LIKE '%${escaped}%' ESCAPE '\\'
     ORDER BY m.date_received DESC
     LIMIT ${limit}
   `;

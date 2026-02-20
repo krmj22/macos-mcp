@@ -11,6 +11,7 @@ jest.mock('node:child_process');
 
 import { execFile } from 'node:child_process';
 import {
+  escapeLikeWildcards,
   getMessageById,
   listInboxMessages,
   listMailboxes,
@@ -218,6 +219,28 @@ describe('sqliteMailReader utilities', () => {
   });
 });
 
+describe('escapeLikeWildcards', () => {
+  it('escapes % wildcard', () => {
+    expect(escapeLikeWildcards('50%')).toBe('50\\%');
+  });
+
+  it('escapes _ wildcard', () => {
+    expect(escapeLikeWildcards('foo_bar')).toBe('foo\\_bar');
+  });
+
+  it('escapes backslash', () => {
+    expect(escapeLikeWildcards('path\\to')).toBe('path\\\\to');
+  });
+
+  it('escapes all wildcards together', () => {
+    expect(escapeLikeWildcards('50% off_sale\\')).toBe('50\\% off\\_sale\\\\');
+  });
+
+  it('returns plain text unchanged', () => {
+    expect(escapeLikeWildcards('hello world')).toBe('hello world');
+  });
+});
+
 describe('listInboxMessages', () => {
   it('returns mapped messages from SQLite', async () => {
     const row = makeRawMailRow();
@@ -307,6 +330,26 @@ describe('searchMessages', () => {
 
     expect(results).toEqual([]);
   });
+
+  it('escapes LIKE wildcards in search term', async () => {
+    mockSqliteSuccess([]);
+
+    await searchMessages('50% off', 10, 0);
+
+    const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
+    // % should be escaped so it doesn't act as a wildcard
+    expect(sqlQuery[3]).toContain('50\\% off');
+    expect(sqlQuery[3]).toContain("ESCAPE '\\'");
+  });
+
+  it('escapes underscore wildcard in search term', async () => {
+    mockSqliteSuccess([]);
+
+    await searchMessages('foo_bar', 10, 0);
+
+    const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
+    expect(sqlQuery[3]).toContain('foo\\_bar');
+  });
 });
 
 describe('searchBySenderEmails', () => {
@@ -342,6 +385,16 @@ describe('searchBySenderEmails', () => {
     expect(sqlQuery[3]).toContain("a.address LIKE '%b@test.com%'");
     expect(sqlQuery[3]).toContain(' OR ');
   });
+
+  it('escapes LIKE wildcards in email addresses', async () => {
+    mockSqliteSuccess([]);
+
+    await searchBySenderEmails(['user%test@example.com'], 10);
+
+    const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
+    expect(sqlQuery[3]).toContain('user\\%test@example.com');
+    expect(sqlQuery[3]).toContain("ESCAPE '\\'");
+  });
 });
 
 describe('searchBySenderName', () => {
@@ -368,6 +421,16 @@ describe('searchBySenderName', () => {
 
     const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
     expect(sqlQuery[3]).toContain("a.comment LIKE '%Karen Schrader%'");
+  });
+
+  it('escapes LIKE wildcards in sender name', async () => {
+    mockSqliteSuccess([]);
+
+    await searchBySenderName('100% Match_Co', 10);
+
+    const sqlQuery = (mockExecFile.mock.calls[0] as unknown[])[1] as string[];
+    expect(sqlQuery[3]).toContain('100\\% Match\\_Co');
+    expect(sqlQuery[3]).toContain("ESCAPE '\\'");
   });
 });
 

@@ -244,6 +244,11 @@ export function buildDateFilter(
   return clauses.map((c) => `AND ${c}`).join(' ');
 }
 
+/** Escapes LIKE wildcard characters so they match literally. Use with ESCAPE '\'. */
+export function escapeLikeWildcards(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export interface ReadMessageResult {
   id: string;
   text: string;
@@ -316,7 +321,7 @@ export async function searchMessages(
     }
   >
 > {
-  const escapedTerm = searchTerm.replace(/'/g, "''");
+  const escapedTerm = escapeLikeWildcards(searchTerm.replace(/'/g, "''"));
   const dateFilter = buildDateFilter(dateRange);
   const query = `
     SELECT m.ROWID, m.text, m.is_from_me, m.date,
@@ -329,8 +334,8 @@ export async function searchMessages(
     LEFT JOIN handle h ON m.handle_id = h.ROWID
     JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
     JOIN chat c ON c.ROWID = cmj.chat_id
-    WHERE (m.text LIKE '%${escapedTerm}%'
-       OR CAST(m.attributedBody AS TEXT) LIKE '%${escapedTerm}%')
+    WHERE (m.text LIKE '%${escapedTerm}%' ESCAPE '\\'
+       OR CAST(m.attributedBody AS TEXT) LIKE '%${escapedTerm}%' ESCAPE '\\')
     ${dateFilter}
     ORDER BY m.date DESC
     LIMIT ${limit}
@@ -372,15 +377,17 @@ export async function listChats(
   // Build optional search filter for chat name or participant handle
   let searchFilter = '';
   if (search) {
-    const escapedSearch = search.replace(/'/g, "''").toLowerCase();
+    const escapedSearch = escapeLikeWildcards(
+      search.replace(/'/g, "''").toLowerCase(),
+    );
     searchFilter = `
     AND (
-      LOWER(COALESCE(c.display_name, '')) LIKE '%${escapedSearch}%'
+      LOWER(COALESCE(c.display_name, '')) LIKE '%${escapedSearch}%' ESCAPE '\\'
       OR EXISTS (
         SELECT 1 FROM chat_handle_join chj
         JOIN handle h ON h.ROWID = chj.handle_id
         WHERE chj.chat_id = c.ROWID
-        AND LOWER(h.id) LIKE '%${escapedSearch}%'
+        AND LOWER(h.id) LIKE '%${escapedSearch}%' ESCAPE '\\'
       )
     )`;
   }
@@ -506,8 +513,8 @@ export async function readMessagesByHandles(
         return `h.id = '${escaped}'`;
       }
       // For phone numbers, match last 10 digits using LIKE
-      const last10 = h.slice(-10);
-      return `h.id LIKE '%${last10}'`;
+      const last10 = escapeLikeWildcards(h.slice(-10));
+      return `h.id LIKE '%${last10}' ESCAPE '\\'`;
     })
     .join(' OR ');
 

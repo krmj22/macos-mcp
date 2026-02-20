@@ -110,10 +110,10 @@ export const handleReadReminders = async (
   return handleAsyncOperation(async () => {
     const validatedArgs = extractAndValidateArgs(args, ReadRemindersSchema);
 
-    // Check if id is provided in args (before validation)
-    // because id might be filtered out by schema validation if it's optional
-    if (args.id) {
-      const reminder = await reminderRepository.findReminderById(args.id);
+    if (validatedArgs.id) {
+      const reminder = await reminderRepository.findReminderById(
+        validatedArgs.id,
+      );
       const tz = getSystemTimezone();
       const markdownLines: string[] = [
         '### Reminder',
