@@ -17,9 +17,9 @@ pnpm release:preview  # Dry-run semantic-release (shows next version + changelog
 
 `bin/run.cjs` runs compiled `dist/index.js` — requires `pnpm build`. Use `pnpm dev` for source-level iteration (stdio only).
 
-## Current State
+## Session State
 
-See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, and known limitations.
+Run `git log --notes=state -1` for the latest session handoff note. Performance baselines: `git log --notes=baselines -1`.
 
 ## Known Gotchas
 
@@ -31,6 +31,9 @@ See [STATE.md](STATE.md) for tool matrix, open issues, performance baselines, an
 - **Mail reads**: Use SQLite (`~/Library/Mail/V10/MailData/Envelope Index`), JXA for writes only. See ADR-001
 - **Gmail labels**: Messages live in `[Gmail]/All Mail`. Folder membership is in the `labels` join table. Both `listInboxMessages()` and `listMailboxMessages()` check this. See ADR-001 addendum
 - **JXA rule**: Always use `whose()` predicates for search, never JS iteration over collections
+- **Notes title**: Apple re-derives `n.name()` from body on every `n.body =` — update/append scripts re-set name after body assignment
+- **EventKit date range**: `predicateForEvents` cannot span >4 years. Both `findEventById` and `findEvents` default to ±2 years
+- **Contact enrichment at scale**: Per-handle JXA lookups don't scale beyond ~10 participants
 
 ## Architecture
 
@@ -83,6 +86,16 @@ src/
 - **JXA safety**: Always use `sanitizeForJxa()` before interpolating user input
 - **Date formats**: `YYYY-MM-DD HH:mm:ss` for local time, ISO 8601 for UTC
 
+### Contact Enrichment
+
+Cross-tool layer resolves phone numbers and emails to contact names (Messages, Mail, Calendar).
+
+- **Handle→name**: SQLite bulk cache from AddressBook DB (<50ms for 1100+ entries). See ADR-002
+- **Name→handles**: Targeted JXA `whose()` search — O(log n)
+- **Startup**: `warmCache()` called fire-and-forget, prevents cold cache timeouts
+- **Safety**: All enrichment paths protected by `withTimeout(5000ms)`
+- **Toggle**: `enrichContacts` param (default: true)
+
 ### HTTP Transport Design
 
 - **Stateless mode**: Required for multi-client support
@@ -107,6 +120,14 @@ This is a public repository.
 ## Releasing
 
 Before any release, run `pnpm release:preview` and verify the version bump matches intent. `fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major.
+
+## Infrastructure
+
+- **Production**: LaunchAgent `com.macos-mcp.server` on Mac Mini (Winston)
+- **Tunnel**: Cloudflare `mac-mini-winston` → `mcp.kyleos.ai` → `localhost:3847`
+- **npm**: Published as `mcp-macos`
+- **CI**: GitHub Actions — test + lint + release (#86)
+- **After restart**: Always restart both server AND tunnel LaunchAgents
 
 ## Commits
 
