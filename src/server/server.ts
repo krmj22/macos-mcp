@@ -3,11 +3,16 @@
  * Server configuration and startup logic
  */
 
-import 'exit-on-epipe';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { ServerConfig } from '../types/index.js';
 import { registerHandlers } from './handlers.js';
+
+// Gracefully exit on EPIPE (broken pipe) when the MCP client disconnects.
+// Replaces the `exit-on-epipe` npm package with an inline equivalent.
+process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE') process.exit(0);
+});
 
 /**
  * Server configuration interface for createServer

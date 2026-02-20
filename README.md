@@ -53,7 +53,7 @@ All tools support both underscore (`reminders_tasks`) and dot (`reminders.tasks`
 
 ### Prerequisites
 
-- **Node.js 18 or later**
+- **Node.js 20 or later**
 - **macOS** (required for EventKit and JXA)
 - **Xcode Command Line Tools** (required for compiling Swift code)
 - **pnpm** (recommended for package management)
@@ -347,9 +347,9 @@ Run `pnpm test -- src/server/prompts.test.ts` to validate prompt metadata and sc
 
 ### Dependencies
 
-**Runtime:** `@modelcontextprotocol/sdk`, `exit-on-epipe`, `tsx`, `zod`
+**Runtime:** `@modelcontextprotocol/sdk`, `express`, `jose`, `zod`
 
-**Dev:** `typescript`, `jest`, `ts-jest`, `babel-jest`, `@biomejs/biome`
+**Dev:** `typescript`, `tsx`, `jest`, `ts-jest`, `babel-jest`, `@biomejs/biome`
 
 ## License
 

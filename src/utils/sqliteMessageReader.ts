@@ -25,7 +25,7 @@ function runSqlite(query: string, timeoutMs = 15000): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       '/usr/bin/sqlite3',
-      ['-json', CHAT_DB_PATH, query],
+      ['-json', '-readonly', CHAT_DB_PATH, query],
       { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {

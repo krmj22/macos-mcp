@@ -325,7 +325,9 @@ export async function searchBySenderName(
 export async function getMessageById(
   rowId: string,
 ): Promise<MailMessageFull | null> {
-  const escaped = escapeSql(rowId);
+  if (!/^\d+$/.test(rowId))
+    throw new SqliteMailAccessError('Invalid message ID', false);
+  const rowIdNum = Number.parseInt(rowId, 10);
   const query = `
     SELECT m.ROWID, s.subject, a.address, a.comment, m.date_received,
            m.read, mb.url as mailbox_url, sm.summary,
@@ -346,7 +348,7 @@ export async function getMessageById(
     LEFT JOIN addresses a ON m.sender = a.ROWID
     LEFT JOIN mailboxes mb ON m.mailbox = mb.ROWID
     LEFT JOIN summaries sm ON m.summary = sm.ROWID
-    WHERE m.ROWID = ${escaped}
+    WHERE m.ROWID = ${rowIdNum}
   `;
   const output = await runSqlite(query, 10000);
   const rows = parseSqliteJson<RawMailFullRow>(output);

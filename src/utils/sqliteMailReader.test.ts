@@ -411,6 +411,19 @@ describe('getMessageById', () => {
     expect(result?.ccRecipients).toEqual([]);
   });
 
+  it('throws SqliteMailAccessError for non-integer ROWID', async () => {
+    await expect(getMessageById('abc')).rejects.toThrow(SqliteMailAccessError);
+    await expect(getMessageById('abc')).rejects.toThrow('Invalid message ID');
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('throws SqliteMailAccessError for injection attempt in ROWID', async () => {
+    await expect(getMessageById('1; DROP TABLE messages--')).rejects.toThrow(
+      'Invalid message ID',
+    );
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
   it('handles null to_addresses and cc_addresses', async () => {
     const row = makeRawMailFullRow({
       to_addresses: null,

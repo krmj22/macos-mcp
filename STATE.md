@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-02-17 (v2.0.3, demo video, .mcp.json cleanup)
+Last updated: 2026-02-20 (v2.1.0, HN hardening pass)
 
 ## Overview
 
@@ -9,7 +9,7 @@ macOS MCP server providing native integration with Reminders, Calendar, Notes, M
 ## Codebase
 
 - **Source**: ~10k LOC TypeScript across `src/`
-- **Tests**: 856 unit tests, 35 test files, all passing
+- **Tests**: 895 unit tests, 35 test files, all passing
 - **E2E**: 149 tests across 8 suites — serial runner (#81 fixed), 2 send skipped
   - 124 stdio transport tests (7 suites)
   - 25 HTTP transport tests (1 suite) — validates full Claude iOS/web path
@@ -89,7 +89,7 @@ Real-world testing from Claude iOS via Cloudflare Tunnel (`mcp.kyleos.ai`). 26 t
 
 ## Unit Test Assessment
 
-856 tests across 35 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines) — actual: **95.2%/81.7%/97.8%/95.5%**. All above thresholds. `pnpm test --coverage` exits 0.
+895 tests across 35 files. Coverage thresholds: 95/80/95/95 (stmts/branches/functions/lines). All above thresholds. `pnpm test --coverage` exits 0.
 
 | Layer | Confidence | Why |
 |-------|-----------|-----|
@@ -212,6 +212,6 @@ HTTP tests run separately: `pnpm test:e2e:http` (spawns HTTP server on port 4847
 
 - **Production**: LaunchAgent `com.macos-mcp.server` on Mac Mini (migrated from MacBook 2026-02-13)
 - **Tunnel**: Cloudflare Tunnel `mac-mini-winston` → `mcp.kyleos.ai` → `localhost:3847`
-- **npm**: Published as `mcp-macos` (v2.0.3), install via `npm install -g mcp-macos`
+- **npm**: Published as `mcp-macos` (v2.1.0), install via `npm install -g mcp-macos`
 - **CI**: GitHub Actions — test + lint + release (#86 CLOSED)
 - **After restart**: Always restart both server AND tunnel LaunchAgents
