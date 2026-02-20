@@ -5,16 +5,21 @@
 
 import { z } from 'zod/v3';
 import {
+  CreateMailSchema,
   CreateReminderListSchema,
   CreateReminderSchema,
+  DeleteMailSchema,
   DeleteReminderSchema,
+  ReadMailSchema,
   ReadRemindersSchema,
   RecurrenceSchema,
   RequiredListNameSchema,
   SafeDateSchema,
+  SafeMailIdSchema,
   SafeNoteSchema,
   SafeTextSchema,
   SafeUrlSchema,
+  UpdateMailSchema,
   UpdateReminderListSchema,
   UpdateReminderSchema,
   ValidationError,
@@ -352,6 +357,72 @@ describe('ValidationSchemas', () => {
       );
 
       schema.parse = originalParse;
+    });
+  });
+
+  describe('SafeMailIdSchema', () => {
+    it('accepts numeric strings', () => {
+      expect(() => SafeMailIdSchema.parse('12345')).not.toThrow();
+      expect(() => SafeMailIdSchema.parse('1')).not.toThrow();
+      expect(() => SafeMailIdSchema.parse('999999')).not.toThrow();
+    });
+
+    it('rejects empty string', () => {
+      expect(() => SafeMailIdSchema.parse('')).toThrow();
+    });
+
+    it('rejects non-numeric strings', () => {
+      expect(() => SafeMailIdSchema.parse('abc')).toThrow();
+      expect(() => SafeMailIdSchema.parse('12abc')).toThrow();
+      expect(() => SafeMailIdSchema.parse('12.34')).toThrow();
+      expect(() => SafeMailIdSchema.parse('-1')).toThrow();
+    });
+
+    it('rejects injection attempts', () => {
+      expect(() => SafeMailIdSchema.parse('1}); delete(')).toThrow();
+      expect(() => SafeMailIdSchema.parse('1", "name": "pwned')).toThrow();
+    });
+
+    it('is used by UpdateMailSchema', () => {
+      expect(() => UpdateMailSchema.parse({ id: 'abc', read: true })).toThrow(
+        /Mail ID must be numeric/,
+      );
+      expect(() =>
+        UpdateMailSchema.parse({ id: '123', read: true }),
+      ).not.toThrow();
+    });
+
+    it('is used by DeleteMailSchema', () => {
+      expect(() => DeleteMailSchema.parse({ id: 'abc' })).toThrow(
+        /Mail ID must be numeric/,
+      );
+      expect(() => DeleteMailSchema.parse({ id: '123' })).not.toThrow();
+    });
+
+    it('is used by ReadMailSchema.id when provided', () => {
+      expect(() => ReadMailSchema.parse({ id: 'abc' })).toThrow(
+        /Mail ID must be numeric/,
+      );
+      expect(() => ReadMailSchema.parse({ id: '123' })).not.toThrow();
+    });
+
+    it('is used by CreateMailSchema.replyToId when provided', () => {
+      expect(() =>
+        CreateMailSchema.parse({
+          subject: 'Test',
+          body: 'Body',
+          to: ['a@b.com'],
+          replyToId: 'abc',
+        }),
+      ).toThrow(/Mail ID must be numeric/);
+      expect(() =>
+        CreateMailSchema.parse({
+          subject: 'Test',
+          body: 'Body',
+          to: ['a@b.com'],
+          replyToId: '123',
+        }),
+      ).not.toThrow();
     });
   });
 

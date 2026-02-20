@@ -732,7 +732,7 @@ describe('Mail Handlers', () => {
   describe('handleReadMail', () => {
     it('returns single mail by ID', async () => {
       mockMailGetMessageById.mockResolvedValue({
-        id: 'm1',
+        id: '1001',
         subject: 'Test',
         sender: 'a@b.com',
         senderName: '',
@@ -746,11 +746,11 @@ describe('Mail Handlers', () => {
       });
       // JXA fallback for full content
       mockExecuteJxaWithRetry.mockResolvedValue({
-        id: 'm1',
+        id: '1001',
         content: 'Hello full content',
       });
 
-      const result = await handleReadMail({ action: 'read', id: 'm1' });
+      const result = await handleReadMail({ action: 'read', id: '1001' });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('### Mail: Test');
     });
@@ -791,7 +791,7 @@ describe('Mail Handlers', () => {
       ]);
       mockMailListMailboxMessages.mockResolvedValue([
         {
-          id: 'm2',
+          id: '1002',
           subject: 'Sent Mail',
           sender: 'me@x.com',
           senderName: '',
@@ -833,7 +833,7 @@ describe('Mail Handlers', () => {
     it('falls back gracefully when contact enrichment times out', async () => {
       mockMailListInboxMessages.mockResolvedValue([
         {
-          id: 'm1',
+          id: '1001',
           subject: 'Slow enrichment',
           sender: 'slow@example.com',
           senderName: '',
@@ -870,7 +870,7 @@ describe('Mail Handlers', () => {
     it('shows senderName when enrichment returns empty and senderName is populated', async () => {
       mockMailListInboxMessages.mockResolvedValue([
         {
-          id: 'm1',
+          id: '1001',
           subject: 'Fallback test',
           sender: 'someone@example.com',
           senderName: 'Someone Display',
@@ -896,7 +896,7 @@ describe('Mail Handlers', () => {
     it('shows raw email when enrichment returns empty and senderName is empty', async () => {
       mockMailListInboxMessages.mockResolvedValue([
         {
-          id: 'm1',
+          id: '1001',
           subject: 'Raw fallback',
           sender: 'raw@example.com',
           senderName: '',
@@ -963,12 +963,12 @@ describe('Mail Handlers', () => {
     it('sends a reply', async () => {
       // JXA returns full content for reply
       mockExecuteJxaWithRetry.mockResolvedValue({
-        id: 'm1',
+        id: '1001',
         content: 'Original body',
       });
       // SQLite returns metadata for reply header
       mockMailGetMessageById.mockResolvedValue({
-        id: 'm1',
+        id: '1001',
         subject: 'Original',
         sender: 'a@b.com',
         senderName: '',
@@ -987,7 +987,7 @@ describe('Mail Handlers', () => {
         subject: 'Reply',
         body: 'Thanks',
         to: ['a@b.com'],
-        replyToId: 'm1',
+        replyToId: '1001',
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Re: Original');
@@ -1028,7 +1028,7 @@ describe('Mail Handlers', () => {
 
       const result = await handleUpdateMail({
         action: 'update',
-        id: 'm1',
+        id: '1001',
         read: true,
       });
       expect(result.isError).toBe(false);
@@ -1040,11 +1040,21 @@ describe('Mail Handlers', () => {
 
       const result = await handleUpdateMail({
         action: 'update',
-        id: 'm1',
+        id: '1001',
         read: false,
       });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('marked message as unread');
+    });
+
+    it('rejects non-numeric mail ID', async () => {
+      const result = await handleUpdateMail({
+        action: 'update',
+        id: 'abc',
+        read: true,
+      });
+      expect(result.isError).toBe(true);
+      expect(getTextContent(result)).toContain('Mail ID must be numeric');
     });
   });
 
@@ -1052,7 +1062,7 @@ describe('Mail Handlers', () => {
     it('deletes a message', async () => {
       mockExecuteJxa.mockResolvedValue({ deleted: true });
 
-      const result = await handleDeleteMail({ action: 'delete', id: 'm1' });
+      const result = await handleDeleteMail({ action: 'delete', id: '1001' });
       expect(result.isError).toBe(false);
       expect(getTextContent(result)).toContain('Successfully deleted');
     });
@@ -1859,6 +1869,42 @@ describe('Messages Handlers', () => {
       expect(mockExecuteAppleScript).toHaveBeenCalled();
     });
 
+    it('sanitizes backslashes and quotes in to/text fields via AppleScript', async () => {
+      const mockExecuteAppleScript = jest.requireMock('../utils/jxaExecutor.js')
+        .executeAppleScript as jest.Mock;
+      mockExecuteAppleScript.mockResolvedValue('');
+
+      await handleCreateMessage({
+        action: 'create',
+        to: '+15551234567',
+        text: 'He said \\"hello\\" and used a backslash\\',
+      });
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      // sanitizeForJxa escapes backslashes before quotes
+      expect(script).toContain('\\\\');
+      expect(script).toContain('\\"');
+      // Should NOT contain unescaped raw quotes
+      expect(script).not.toMatch(/send "[^"]*[^\\]"[^"]*" to targetBuddy/);
+    });
+
+    it('sanitizes special chars in to field via AppleScript', async () => {
+      const mockExecuteAppleScript = jest.requireMock('../utils/jxaExecutor.js')
+        .executeAppleScript as jest.Mock;
+      mockExecuteAppleScript.mockResolvedValue('');
+
+      await handleCreateMessage({
+        action: 'create',
+        to: 'user@example.com',
+        text: "O'Brien's message with $var",
+      });
+
+      const script = mockExecuteAppleScript.mock.calls[0][0];
+      // sanitizeForJxa handles single quotes, dollar signs
+      expect(script).toContain("\\'");
+      expect(script).toContain('\\$');
+    });
+
     it('errors when neither to nor chatId provided', async () => {
       const result = await handleCreateMessage({
         action: 'create',
@@ -2179,21 +2225,21 @@ describe('Schema Validation', () => {
         to: ['a@b.com'],
         cc: ['c@d.com'],
         bcc: ['e@f.com'],
-        replyToId: 'msg123',
+        replyToId: '123',
       });
       expect(result.cc).toEqual(['c@d.com']);
       expect(result.bcc).toEqual(['e@f.com']);
-      expect(result.replyToId).toBe('msg123');
+      expect(result.replyToId).toBe('123');
     });
 
     it('UpdateMailSchema requires id and read', () => {
-      const result = UpdateMailSchema.parse({ id: 'm1', read: true });
-      expect(result.id).toBe('m1');
+      const result = UpdateMailSchema.parse({ id: '1001', read: true });
+      expect(result.id).toBe('1001');
       expect(result.read).toBe(true);
     });
 
     it('UpdateMailSchema rejects missing read', () => {
-      expect(() => UpdateMailSchema.parse({ id: 'm1' })).toThrow();
+      expect(() => UpdateMailSchema.parse({ id: '1001' })).toThrow();
     });
 
     it('DeleteMailSchema requires id', () => {

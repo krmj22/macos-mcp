@@ -224,7 +224,7 @@ describe('Middleware', () => {
 
     beforeEach(() => {
       app = express();
-      app.set('trust proxy', true);
+      app.set('trust proxy', 1);
       // Very low limit for testing
       app.use(createRateLimiter(3, 60000));
       app.get('/test', (_req, res) => res.json({ ok: true }));
@@ -429,11 +429,19 @@ describe('HTTP Transport Integration', () => {
       registerHealthRoutes(healthRouter, testConfig);
       app.use(healthRouter);
 
-      // MCP endpoint (with auth)
-      app.use('/mcp', createAuthMiddleware(testConfig.http?.cloudflareAccess!));
-      app.post('/mcp', (req, res) => {
+      // MCP endpoints (with auth) — mirrors production setup
+      const cfAccess = testConfig.http?.cloudflareAccess;
+      if (!cfAccess) throw new Error('test config missing cloudflareAccess');
+      const authMiddleware = createAuthMiddleware(cfAccess);
+      app.use('/mcp', authMiddleware);
+      app.post('/', authMiddleware);
+      app.delete('/', authMiddleware);
+
+      const mcpHandler = (req: express.Request, res: express.Response) => {
         res.json({ result: 'ok', method: req.method });
-      });
+      };
+      app.all('/mcp', mcpHandler);
+      app.all('/', mcpHandler);
     });
 
     it('allows health endpoint without auth', async () => {
@@ -459,6 +467,39 @@ describe('HTTP Transport Integration', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.result).toBe('ok');
+    });
+
+    it('returns 401 on root / POST without auth', async () => {
+      const response = await request(app).post('/').send({ test: true });
+
+      expect(response.status).toBe(401);
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    it('allows root / POST with valid auth token', async () => {
+      const validToken = await createTestJwt({ email: 'user@example.com' });
+
+      const response = await request(app)
+        .post('/')
+        .set('Cf-Access-Jwt-Assertion', validToken)
+        .send({ test: true });
+
+      expect(response.status).toBe(200);
+      expect(response.body.result).toBe('ok');
+    });
+
+    it('returns 401 on root / DELETE without auth', async () => {
+      const response = await request(app).delete('/');
+
+      expect(response.status).toBe(401);
+      expect(response.body.error).toBe('Unauthorized');
+    });
+
+    it('allows GET / without auth (health uses GET)', async () => {
+      const response = await request(app).get('/');
+
+      // GET on root goes to mcpHandler (not health), but no auth middleware blocks it
+      expect(response.status).toBe(200);
     });
 
     it('returns 401 on /mcp with expired token', async () => {
