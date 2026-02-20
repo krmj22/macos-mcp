@@ -134,8 +134,9 @@ const BaseReminderFields = {
 
 export const SafeIdSchema = z.string().min(1, 'ID cannot be empty');
 
-/** Mail IDs are SQLite ROWIDs — always numeric. Defense-in-depth against JXA injection. */
-export const SafeMailIdSchema = z
+/** Mail IDs are SQLite ROWIDs — always numeric. Defense-in-depth against JXA injection.
+ *  Coerces number inputs to strings (LLMs sometimes send numeric IDs as JSON numbers). */
+export const SafeMailIdSchema = z.coerce
   .string()
   .min(1, 'Mail ID cannot be empty')
   .regex(/^\d+$/, 'Mail ID must be numeric');
