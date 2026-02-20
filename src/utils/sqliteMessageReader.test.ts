@@ -536,14 +536,14 @@ describe('sqliteMessageReader reader functions', () => {
       mockSqliteSuccess(JSON.stringify([]));
       await readMessagesByHandles(['user@example.com'], 10);
       expect(mockExecFile).toHaveBeenCalledTimes(1);
-      const queryArg = mockExecFile.mock.calls[0][1][2] as string;
+      const queryArg = mockExecFile.mock.calls[0][1][3] as string;
       expect(queryArg).toContain("h.id = 'user@example.com'");
     });
 
     it('handles phone numbers with LIKE suffix match', async () => {
       mockSqliteSuccess(JSON.stringify([]));
       await readMessagesByHandles(['+15551234567'], 10);
-      const queryArg = mockExecFile.mock.calls[0][1][2] as string;
+      const queryArg = mockExecFile.mock.calls[0][1][3] as string;
       expect(queryArg).toContain("h.id LIKE '%5551234567'");
     });
   });
