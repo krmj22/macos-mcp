@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/krmj22/macos-mcp/compare/v2.1.1...v2.1.2) (2026-02-20)
+
+
+### Bug Fixes
+
+* **security:** HN hardening pass — readonly SQLite, inline EPIPE, trim deps ([a758b21](https://github.com/krmj22/macos-mcp/commit/a758b21bc30eda0040e50afcb901f197ddd3ceb3))
+
 ## [2.1.1](https://github.com/krmj22/macos-mcp/compare/v2.1.0...v2.1.1) (2026-02-19)
 
 
