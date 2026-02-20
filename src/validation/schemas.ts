@@ -134,6 +134,12 @@ const BaseReminderFields = {
 
 export const SafeIdSchema = z.string().min(1, 'ID cannot be empty');
 
+/** Mail IDs are SQLite ROWIDs — always numeric. Defense-in-depth against JXA injection. */
+export const SafeMailIdSchema = z
+  .string()
+  .min(1, 'Mail ID cannot be empty')
+  .regex(/^\d+$/, 'Mail ID must be numeric');
+
 /**
  * Tool-specific validation schemas
  */
@@ -280,7 +286,7 @@ export const CreateNotesFolderSchema = z.object({
 // --- Mail Schemas ---
 
 export const ReadMailSchema = z.object({
-  id: z.string().optional(),
+  id: SafeMailIdSchema.optional(),
   search: SafeSearchSchema,
   mailbox: createOptionalSafeTextSchema(
     VALIDATION.MAX_LIST_NAME_LENGTH,
@@ -304,16 +310,16 @@ export const CreateMailSchema = z.object({
   to: z.array(z.string().email()).min(1, 'At least one recipient required'),
   cc: z.array(z.string().email()).optional(),
   bcc: z.array(z.string().email()).optional(),
-  replyToId: z.string().optional(),
+  replyToId: SafeMailIdSchema.optional(),
 });
 
 export const UpdateMailSchema = z.object({
-  id: SafeIdSchema,
+  id: SafeMailIdSchema,
   read: z.boolean(),
 });
 
 export const DeleteMailSchema = z.object({
-  id: SafeIdSchema,
+  id: SafeMailIdSchema,
 });
 
 // --- Messages Schemas ---

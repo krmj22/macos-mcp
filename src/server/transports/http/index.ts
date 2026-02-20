@@ -63,8 +63,9 @@ export function createHttpTransport(
 ): HttpTransportInstance {
   const app = express();
 
-  // Trust proxy for rate limiting behind Cloudflare Tunnel
-  app.set('trust proxy', true);
+  // Trust only the first proxy hop (Cloudflare) for rate limiting.
+  // Using `1` instead of `true` prevents X-Forwarded-For spoofing from direct access.
+  app.set('trust proxy', 1);
 
   // Apply global middleware
   // express.json() is required to pre-parse the body for the SDK's parsedBody parameter.
@@ -80,9 +81,14 @@ export function createHttpTransport(
   registerHealthRoutes(healthRouter, config);
   app.use(healthRouter);
 
-  // Apply auth middleware to MCP endpoint if Cloudflare Access is configured
+  // Apply auth middleware to MCP endpoints if Cloudflare Access is configured.
+  // Root `/` also serves MCP (Claude.ai expects it) — must also be protected.
+  // Use method-specific middleware on `/` so GET /health (registered above) is unaffected.
   if (httpConfig.cloudflareAccess) {
-    app.use('/mcp', createAuthMiddleware(httpConfig.cloudflareAccess));
+    const authMiddleware = createAuthMiddleware(httpConfig.cloudflareAccess);
+    app.use('/mcp', authMiddleware);
+    app.post('/', authMiddleware);
+    app.delete('/', authMiddleware);
   }
 
   // MCP endpoint handler — creates a fresh server + transport per request

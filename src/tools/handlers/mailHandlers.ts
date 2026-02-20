@@ -88,7 +88,7 @@ const GET_MAIL_SCRIPT_JXA = `
   for (let a = 0; a < accounts.length; a++) {
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length; b++) {
-      const msgs = mailboxes[b].messages.whose({id: {{id}}})();
+      const msgs = mailboxes[b].messages.whose({id: "{{id}}"})();
       if (msgs.length > 0) {
         const m = msgs[0];
         return JSON.stringify({
@@ -109,10 +109,10 @@ const MARK_READ_SCRIPT = `
   for (let a = 0; a < accounts.length; a++) {
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length; b++) {
-      const msgs = mailboxes[b].messages.whose({id: {{id}}})();
+      const msgs = mailboxes[b].messages.whose({id: "{{id}}"})();
       if (msgs.length > 0) {
         msgs[0].readStatus = {{readStatus}};
-        return JSON.stringify({updated: true, id: {{id}}, read: {{readStatus}}});
+        return JSON.stringify({updated: true, id: "{{id}}", read: {{readStatus}}});
       }
     }
   }
@@ -127,10 +127,10 @@ const DELETE_MAIL_SCRIPT = `
   for (let a = 0; a < accounts.length; a++) {
     const mailboxes = accounts[a].mailboxes();
     for (let b = 0; b < mailboxes.length; b++) {
-      const msgs = mailboxes[b].messages.whose({id: {{id}}})();
+      const msgs = mailboxes[b].messages.whose({id: "{{id}}"})();
       if (msgs.length > 0) {
         Mail.delete(msgs[0]);
-        return JSON.stringify({deleted: true, id: {{id}}});
+        return JSON.stringify({deleted: true, id: "{{id}}"});
       }
     }
   }

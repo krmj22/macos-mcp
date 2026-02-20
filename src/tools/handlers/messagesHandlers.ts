@@ -15,6 +15,7 @@ import {
   buildScript,
   executeAppleScript,
   executeJxa,
+  sanitizeForJxa,
 } from '../../utils/jxaExecutor.js';
 import {
   type DateRange,
@@ -563,8 +564,8 @@ export async function handleCreateMessage(
 
     const appleScript = `tell application "Messages"
     set targetService to 1st account whose service type = iMessage
-    set targetBuddy to participant "${validated.to.replace(/"/g, '\\"')}" of targetService
-    send "${validated.text.replace(/"/g, '\\"')}" to targetBuddy
+    set targetBuddy to participant "${sanitizeForJxa(validated.to)}" of targetService
+    send "${sanitizeForJxa(validated.text)}" to targetBuddy
 end tell`;
     await executeAppleScript(appleScript, 15000, 'Messages');
     return `Successfully sent message to ${validated.to}.`;
