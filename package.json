@@ -1,6 +1,6 @@
 {
   "name": "mcp-macos",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "description": "MCP server that provides native integration with Apple Reminders, Calendar, Notes, Mail, and Messages on macOS.",
   "author": "Kyle Jensen",
   "contributors": [

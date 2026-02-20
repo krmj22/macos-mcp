@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/krmj22/macos-mcp/compare/v2.1.3...v2.1.4) (2026-02-20)
+
+
+### Bug Fixes
+
+* **security:** HN review pass 3 — LIKE wildcards, schema gaps, validation consistency ([#103](https://github.com/krmj22/macos-mcp/issues/103)) ([a67fe69](https://github.com/krmj22/macos-mcp/commit/a67fe69a0e36caade973e9181d11f7cb6d813285))
+
 ## [2.1.3](https://github.com/krmj22/macos-mcp/compare/v2.1.2...v2.1.3) (2026-02-20)
 
 
