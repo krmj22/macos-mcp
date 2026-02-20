@@ -14,6 +14,7 @@ pnpm lint             # Lint and format with Biome
 pnpm dev              # Run from source via tsx (stdio only, no build needed)
 pnpm test:e2e         # Build + run functional E2E tests (node:test, real OS calls)
 pnpm test:e2e:all     # Build + run ALL per-tool E2E suites (serial, no JXA contention)
+pnpm release:preview  # Dry-run semantic-release (shows next version + changelog)
 node dist/index.js --check  # Preflight validation (macOS, Node, FDA, JXA permissions)
 ```
 
@@ -188,12 +189,21 @@ osascript -l JavaScript -e 'Application("Contacts").people.slice(0,5).map(p=>p.n
 
 ## Development Workflow
 
-This is a public repository. All changes go through branches and pull requests.
+This is a public repository.
 
-1. **Issue first** — file or reference a GitHub issue before starting work
-2. **Feature branch** — branch off `main` with a descriptive name: `fix/notes-newline-rendering`, `feat/calendar-recurring`
-3. **Pull request** — open a PR against `main`, link the issue (`Closes #XX`), and describe what changed
-4. **No direct commits to `main`** — all changes merge via PR
+- **Features and fixes** → branch + PR. Issue first, descriptive branch name (`fix/notes-newline-rendering`, `feat/calendar-recurring`), link the issue (`Closes #XX`)
+- **Chores, docs, config** → direct to `main` is fine. No PR ceremony for trivial changes
+- The pre-push hook (`scripts/hooks/pre-push`) runs tests + build automatically — that's the safety net, not the PR process
+
+## Releasing
+
+Before any release (version bump, `chore(release):` commit, or npm publish):
+
+1. **Run `pnpm release:preview`** — this dry-runs semantic-release and shows what version will be created and which commits drive it
+2. **Verify the version bump is intentional** — a `fix:` commit triggers a patch, `feat:` triggers a minor, `BREAKING CHANGE:` triggers a major. If the bump doesn't match intent, fix the commit messages on the branch before merging
+3. **Never skip this step** — catching a wrong version bump after merge means a follow-up release to fix it
+
+The pre-push hook runs `pnpm test` + `pnpm build` automatically. You do not need to run those manually before pushing.
 
 ## Commits
 

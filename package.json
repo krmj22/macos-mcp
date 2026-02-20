@@ -59,7 +59,9 @@
     "test:e2e:all": "pnpm build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/*.test.mts",
     "lint": "pnpm exec biome check --write --unsafe && pnpm exec tsc --noEmit --project tsconfig.json",
     "postinstall": "node -e \"process.platform === 'darwin' && require('child_process').execSync('node scripts/build-swift.mjs', {stdio: 'inherit'})\"",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepare": "git config core.hooksPath scripts/hooks",
+    "prepublishOnly": "pnpm build && pnpm test",
+    "release:preview": "npx semantic-release --dry-run"
   },
   "engines": {
     "node": ">=20.0.0"
