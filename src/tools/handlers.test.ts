@@ -135,6 +135,10 @@ describe('Tool Handlers', () => {
       });
       const content = _getTextContent(result.content);
 
+      // Verify the validated id is passed to the repository (not raw args.id)
+      expect(mockReminderRepository.findReminderById).toHaveBeenCalledWith(
+        '456',
+      );
       expect(content).toContain('### Reminder');
       expect(content).toContain('- [x] Completed Task');
       expect(content).toContain('- List: Done');

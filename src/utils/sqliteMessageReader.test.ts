@@ -8,6 +8,7 @@ import {
   buildDateFilter,
   type DateRange,
   dateToAppleTimestamp,
+  escapeLikeWildcards,
   listChats,
   readChatMessages,
   readMessagesByHandles,
@@ -236,6 +237,24 @@ describe('sqliteMessageReader date utilities', () => {
       const result = buildDateFilter(dateRange, 'm');
       expect(result).toContain('m.date >=');
     });
+  });
+});
+
+describe('escapeLikeWildcards', () => {
+  it('escapes % wildcard', () => {
+    expect(escapeLikeWildcards('50%')).toBe('50\\%');
+  });
+
+  it('escapes _ wildcard', () => {
+    expect(escapeLikeWildcards('foo_bar')).toBe('foo\\_bar');
+  });
+
+  it('escapes backslash', () => {
+    expect(escapeLikeWildcards('path\\to')).toBe('path\\\\to');
+  });
+
+  it('returns plain text unchanged', () => {
+    expect(escapeLikeWildcards('hello')).toBe('hello');
   });
 });
 
@@ -478,6 +497,14 @@ describe('sqliteMessageReader reader functions', () => {
       mockSqliteSuccess('');
       const result = await searchMessages('nonexistent', 10);
       expect(result).toEqual([]);
+    });
+
+    it('escapes LIKE wildcards in search term', async () => {
+      mockSqliteSuccess(JSON.stringify([]));
+      await searchMessages('50% off', 10);
+      const queryArg = mockExecFile.mock.calls[0][1][3] as string;
+      expect(queryArg).toContain('50\\% off');
+      expect(queryArg).toContain("ESCAPE '\\'");
     });
 
     it('uses chat_guid as chatName fallback when chat_name is empty', async () => {

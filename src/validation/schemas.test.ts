@@ -6,11 +6,13 @@
 import { z } from 'zod/v3';
 import {
   CreateMailSchema,
+  CreateMessageSchema,
   CreateReminderListSchema,
   CreateReminderSchema,
   DeleteMailSchema,
   DeleteReminderSchema,
   ReadMailSchema,
+  ReadMessagesSchema,
   ReadRemindersSchema,
   RecurrenceSchema,
   RequiredListNameSchema,
@@ -423,6 +425,68 @@ describe('ValidationSchemas', () => {
           replyToId: '123',
         }),
       ).not.toThrow();
+    });
+  });
+
+  describe('CreateMessageSchema', () => {
+    it('accepts valid message with "to"', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+        to: '+15551234567',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts valid message with "chatId"', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+        chatId: 'iMessage;-;+15551234567',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects when both "to" and "chatId" are missing', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain(
+          'Either "to" or "chatId" is required',
+        );
+      }
+    });
+
+    it('rejects chatId exceeding 200 characters', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+        chatId: 'x'.repeat(201),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects "to" exceeding 200 characters', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+        to: 'x'.repeat(201),
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('ReadMessagesSchema', () => {
+    it('rejects chatId exceeding 200 characters', () => {
+      const result = ReadMessagesSchema.safeParse({
+        chatId: 'x'.repeat(201),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts chatId within 200 characters', () => {
+      const result = ReadMessagesSchema.safeParse({
+        chatId: 'iMessage;-;+15551234567',
+      });
+      expect(result.success).toBe(true);
     });
   });
 

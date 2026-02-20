@@ -558,16 +558,15 @@ export async function handleCreateMessage(
       return `Successfully sent message to chat "${validated.chatId}".`;
     }
 
-    if (!validated.to) {
-      throw new Error('Either "to" or "chatId" is required to send a message.');
-    }
-
+    // validated.to is guaranteed by CreateMessageSchema.refine() (to || chatId required)
+    // TypeScript can't narrow from .refine(), but chatId was checked above so to must exist
+    const recipient = validated.to as string;
     const appleScript = `tell application "Messages"
     set targetService to 1st account whose service type = iMessage
-    set targetBuddy to participant "${sanitizeForJxa(validated.to)}" of targetService
+    set targetBuddy to participant "${sanitizeForJxa(recipient)}" of targetService
     send "${sanitizeForJxa(validated.text)}" to targetBuddy
 end tell`;
     await executeAppleScript(appleScript, 15000, 'Messages');
-    return `Successfully sent message to ${validated.to}.`;
+    return `Successfully sent message to ${recipient}.`;
   }, 'send message');
 }

@@ -325,7 +325,7 @@ export const DeleteMailSchema = z.object({
 // --- Messages Schemas ---
 
 export const ReadMessagesSchema = z.object({
-  chatId: z.string().optional(),
+  chatId: z.string().max(200).optional(),
   search: SafeSearchSchema,
   searchMessages: z.boolean().optional(),
   enrichContacts: z.boolean().optional().default(true),
@@ -341,11 +341,15 @@ export const ReadMessagesSchema = z.object({
   ...PaginationFields,
 });
 
-export const CreateMessageSchema = z.object({
-  text: z.string().min(1, 'Message text cannot be empty').max(10000),
-  to: z.string().optional(),
-  chatId: z.string().optional(),
-});
+export const CreateMessageSchema = z
+  .object({
+    text: z.string().min(1, 'Message text cannot be empty').max(10000),
+    to: z.string().max(200).optional(),
+    chatId: z.string().max(200).optional(),
+  })
+  .refine((data) => data.to || data.chatId, {
+    message: 'Either "to" or "chatId" is required to send a message',
+  });
 
 // --- Contacts Schemas ---
 
