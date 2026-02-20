@@ -1,15 +1,15 @@
 version: 2
 updates:
+  # open-pull-requests-limit: 0 disables routine version bump PRs.
+  # Security vulnerability PRs are still opened regardless of this limit.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
-    groups:
-      dev-dependencies:
-        patterns: ["*"]
-        dependency-type: "development"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
