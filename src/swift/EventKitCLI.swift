@@ -558,7 +558,10 @@ private func formatDueDateWithTimezone(from dateComponents: DateComponents?, tim
     if components.hour != nil {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
     } else {
-        formatter.dateFormat = "yyyy-MM-ddZZZZZ"
+        // Date-only (all-day) reminder: bare ISO 8601 date, no offset. See the
+        // note in formatEventDate — an offset on a date-only string is invalid
+        // ISO 8601 and silently misparses in Python.
+        formatter.dateFormat = "yyyy-MM-dd"
     }
 
     return formatter.string(from: date)
@@ -588,7 +591,11 @@ private func formatEventDate(_ date: Date, preferredTimeZone: TimeZone, includeT
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.calendar = Calendar(identifier: .gregorian)
     formatter.timeZone = preferredTimeZone
-    formatter.dateFormat = includeTime ? "yyyy-MM-dd'T'HH:mm:ssZZZZZ" : "yyyy-MM-ddZZZZZ"
+    // All-day events are timezone-independent: emit a bare ISO 8601 calendar
+    // date. Appending an offset ("2026-08-23-04:00") is not valid ISO 8601 —
+    // JS Date() rejects it, and Python's fromisoformat() silently reads the
+    // offset as a time of day, turning an all-day event into a 4am one.
+    formatter.dateFormat = includeTime ? "yyyy-MM-dd'T'HH:mm:ssZZZZZ" : "yyyy-MM-dd"
     return formatter.string(from: date)
 }
 
