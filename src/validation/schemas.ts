@@ -12,7 +12,7 @@ import { VALIDATION } from '../utils/constants.js';
 // Allows standard printable ASCII, extended Latin, CJK, plus newlines/tabs for notes.
 // Blocks: control chars (0x00-0x1F except \n\r\t), DEL, dangerous delimiters, Unicode line separators
 // This keeps Chinese/Unicode names working while remaining safe with AppleScript quoting.
-const SAFE_TEXT_PATTERN = /^[\u0020-\u007E\u00A0-\uFFFF\n\r\t]*$/u;
+const SAFE_TEXT_PATTERN = /^[\u0020-\u007E\u00A0-\u{10FFFF}\n\r\t]*$/u;
 // Support multiple date formats: YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, or ISO 8601
 // Basic validation - detailed parsing handled by Swift
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}.*$/;

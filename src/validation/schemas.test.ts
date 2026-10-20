@@ -105,6 +105,11 @@ describe('ValidationSchemas', () => {
         const longName = 'a'.repeat(101);
         expect(() => RequiredListNameSchema.parse(longName)).toThrow();
       });
+
+      it('should allow emoji and other characters outside the BMP', () => {
+        expect(() => RequiredListNameSchema.parse('🦞&🥔')).not.toThrow();
+        expect(() => SafeTextSchema.parse('Trip 🏖️ planning')).not.toThrow();
+      });
     });
 
     describe('SafeDateSchema', () => {
