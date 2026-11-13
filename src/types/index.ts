@@ -290,6 +290,8 @@ export interface MessagesToolArgs extends BaseToolArgs {
   endDate?: string;
   /** Convenience shortcut for common date ranges (resolves to startDate/endDate) */
   dateRange?: DateRangeShortcut;
+  /** Preview/simulate send without dispatching live message (dry run mode) */
+  dryRun?: boolean;
 }
 
 // --- Contacts ---

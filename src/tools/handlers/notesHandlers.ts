@@ -375,7 +375,7 @@ export async function handleReadNotes(
         `- Modified: ${note.modificationDate}`,
         '',
         '**Content:**',
-        note.body,
+        `<external_note_content untrusted="true">\n${note.body}\n</external_note_content>`,
       ].join('\n');
     }
 

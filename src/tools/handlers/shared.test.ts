@@ -15,6 +15,7 @@ import {
   formatListMarkdown,
   formatSuccessMessage,
   withTimeout,
+  wrapUntrustedContent,
 } from './shared.js';
 
 describe('formatListMarkdown', () => {
@@ -57,6 +58,26 @@ describe('formatListMarkdown', () => {
     );
     expect(result).toContain('Showing 11\u201313');
     expect(result).not.toContain('timezone');
+  });
+});
+
+describe('wrapUntrustedContent', () => {
+  it('wraps content in external_user_message tag by default', () => {
+    const wrapped = wrapUntrustedContent('Hello World');
+    expect(wrapped).toBe(
+      '<external_user_message untrusted="true">\nHello World\n</external_user_message>',
+    );
+  });
+
+  it('supports custom tag names', () => {
+    const wrapped = wrapUntrustedContent('Email body', 'external_mail_content');
+    expect(wrapped).toBe(
+      '<external_mail_content untrusted="true">\nEmail body\n</external_mail_content>',
+    );
+  });
+
+  it('returns empty string for falsy/empty content', () => {
+    expect(wrapUntrustedContent('')).toBe('');
   });
 });
 

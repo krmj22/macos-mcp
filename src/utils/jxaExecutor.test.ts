@@ -13,6 +13,7 @@ import {
   executeJxa,
   executeJxaWithRetry,
   JxaError,
+  sanitizeForAppleScript,
   sanitizeForJxa,
 } from './jxaExecutor.js';
 
@@ -61,6 +62,30 @@ describe('sanitizeForJxa', () => {
     const longStr = 'a'.repeat(100_000);
     const result = sanitizeForJxa(longStr);
     expect(result.length).toBe(100_000);
+  });
+});
+
+describe('sanitizeForAppleScript', () => {
+  it('wraps simple string in double quotes', () => {
+    expect(sanitizeForAppleScript('hello')).toBe('"hello"');
+  });
+
+  it('escapes quotes, backslashes, single quotes, and dollars', () => {
+    const result = sanitizeForAppleScript(`He said "it's $100\\n"`);
+    expect(result).toBe('"He said \\"it\\\'s \\$100\\\\n\\""');
+  });
+
+  it('splits newlines and joins with AppleScript linefeed', () => {
+    const result = sanitizeForAppleScript('Line 1\nLine 2\r\nLine 3');
+    expect(result).toBe('"Line 1" & linefeed & "Line 2" & linefeed & "Line 3"');
+  });
+
+  it('strips null bytes', () => {
+    expect(sanitizeForAppleScript('a\0b')).toBe('"ab"');
+  });
+
+  it('preserves unicode characters', () => {
+    expect(sanitizeForAppleScript('Halo Dunia 🌍')).toBe('"Halo Dunia 🌍"');
   });
 });
 

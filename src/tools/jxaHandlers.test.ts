@@ -1869,6 +1869,30 @@ describe('Messages Handlers', () => {
       expect(mockExecuteAppleScript).toHaveBeenCalled();
     });
 
+    it('simulates message sending in dryRun mode without executing scripts', async () => {
+      const mockExecuteAppleScript = jest.requireMock('../utils/jxaExecutor.js')
+        .executeAppleScript as jest.Mock;
+      const mockExecuteJxaLocal = jest.requireMock('../utils/jxaExecutor.js')
+        .executeJxa as jest.Mock;
+      mockExecuteAppleScript.mockClear();
+      mockExecuteJxaLocal.mockClear();
+
+      const result = await handleCreateMessage({
+        action: 'create',
+        to: '+15551234567',
+        text: 'Preview only',
+        dryRun: true,
+      });
+
+      expect(result.isError).toBe(false);
+      expect(getTextContent(result)).toContain('[Dry Run]');
+      expect(getTextContent(result)).toContain(
+        'Not sent (dry run mode enabled)',
+      );
+      expect(mockExecuteAppleScript).not.toHaveBeenCalled();
+      expect(mockExecuteJxaLocal).not.toHaveBeenCalled();
+    });
+
     it('sanitizes backslashes and quotes in to/text fields via AppleScript', async () => {
       const mockExecuteAppleScript = jest.requireMock('../utils/jxaExecutor.js')
         .executeAppleScript as jest.Mock;
