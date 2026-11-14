@@ -40,6 +40,25 @@ export function sanitizeForJxa(input: string): string {
 }
 
 /**
+ * Escapes a string for safe interpolation into AppleScript expressions.
+ * Wraps strings in double quotes, escapes quotes/backslashes, and preserves
+ * line breaks via AppleScript's native `& linefeed &` expression.
+ */
+export function sanitizeForAppleScript(input: string): string {
+  const stripped = input.replace(/\0/g, '');
+  const lines = stripped.split(/\r\n|\r|\n/);
+  const escapedLines = lines.map(
+    (line) =>
+      `"${line
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/'/g, "\\'")
+        .replace(/\$/g, '\\$')}"`,
+  );
+  return escapedLines.join(' & linefeed & ');
+}
+
+/**
  * Builds a JXA script by replacing {{paramName}} placeholders with sanitized values.
  */
 export function buildScript(

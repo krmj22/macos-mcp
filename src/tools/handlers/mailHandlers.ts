@@ -150,7 +150,9 @@ function formatMailMarkdown(msg: MailMessage): string[] {
   lines.push(`  - Account: ${msg.account}`);
   if (msg.preview) {
     const preview = msg.preview.replace(/\n/g, ' ').substring(0, 150);
-    lines.push(`  - Preview: ${preview}...`);
+    lines.push(
+      `  - Preview: <external_mail_preview untrusted="true">${preview}</external_mail_preview>...`,
+    );
   }
   return lines;
 }
@@ -210,7 +212,7 @@ export async function handleReadMail(
           `- Account: ${msg.account}`,
           '',
           '**Content:**',
-          content,
+          `<external_mail_content untrusted="true">\n${content}\n</external_mail_content>`,
           '',
           `*User timezone: ${formatTimezoneInfo(tz)}*`,
         ]

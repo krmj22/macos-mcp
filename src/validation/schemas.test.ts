@@ -445,6 +445,18 @@ describe('ValidationSchemas', () => {
       expect(result.success).toBe(true);
     });
 
+    it('accepts valid message with dryRun flag', () => {
+      const result = CreateMessageSchema.safeParse({
+        text: 'Hello',
+        to: '+15551234567',
+        dryRun: true,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.dryRun).toBe(true);
+      }
+    });
+
     it('rejects when both "to" and "chatId" are missing', () => {
       const result = CreateMessageSchema.safeParse({
         text: 'Hello',

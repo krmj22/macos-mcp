@@ -15,7 +15,7 @@ import {
   buildScript,
   executeAppleScript,
   executeJxa,
-  sanitizeForJxa,
+  sanitizeForAppleScript,
 } from '../../utils/jxaExecutor.js';
 import {
   type DateRange,
@@ -298,13 +298,19 @@ function formatChatMarkdown(chat: ChatItem): string[] {
 
 function formatMessageMarkdown(msg: MessageItem): string[] {
   const sender = msg.isFromMe ? 'Me' : msg.sender;
-  return [`- [${msg.date}] **${sender}**: ${msg.text}`];
+  const text = msg.isFromMe
+    ? msg.text
+    : `<external_message untrusted="true">${msg.text}</external_message>`;
+  return [`- [${msg.date}] **${sender}**: ${text}`];
 }
 
 function formatSearchMessageMarkdown(msg: SearchMessageResult): string[] {
   const sender = msg.isFromMe ? 'Me' : msg.sender;
+  const text = msg.isFromMe
+    ? msg.text
+    : `<external_message untrusted="true">${msg.text}</external_message>`;
   return [
-    `- [${msg.date}] **${sender}** in *${msg.chatName}*: ${msg.text}`,
+    `- [${msg.date}] **${sender}** in *${msg.chatName}*: ${text}`,
     `  - Chat ID: ${msg.chatId}`,
   ];
 }
@@ -549,6 +555,13 @@ export async function handleCreateMessage(
   return handleAsyncOperation(async () => {
     const validated = extractAndValidateArgs(args, CreateMessageSchema);
 
+    if (validated.dryRun) {
+      const destination = validated.chatId
+        ? `chat "${validated.chatId}"`
+        : `recipient "${validated.to}"`;
+      return `[Dry Run] Simulated sending message to ${destination}.\n- Text: "${validated.text}"\n- Status: Not sent (dry run mode enabled)`;
+    }
+
     if (validated.chatId) {
       const script = buildScript(SEND_TO_CHAT_SCRIPT, {
         chatId: validated.chatId,
@@ -561,10 +574,12 @@ export async function handleCreateMessage(
     // validated.to is guaranteed by CreateMessageSchema.refine() (to || chatId required)
     // TypeScript can't narrow from .refine(), but chatId was checked above so to must exist
     const recipient = validated.to as string;
+    const recipientEscaped = sanitizeForAppleScript(recipient);
+    const textEscaped = sanitizeForAppleScript(validated.text);
     const appleScript = `tell application "Messages"
     set targetService to 1st account whose service type = iMessage
-    set targetBuddy to participant "${sanitizeForJxa(recipient)}" of targetService
-    send "${sanitizeForJxa(validated.text)}" to targetBuddy
+    set targetBuddy to participant ${recipientEscaped} of targetService
+    send ${textEscaped} to targetBuddy
 end tell`;
     await executeAppleScript(appleScript, 15000, 'Messages');
     return `Successfully sent message to ${recipient}.`;

@@ -347,6 +347,7 @@ export const CreateMessageSchema = z
     text: z.string().min(1, 'Message text cannot be empty').max(10000),
     to: z.string().max(200).optional(),
     chatId: z.string().max(200).optional(),
+    dryRun: z.boolean().optional(),
   })
   .refine((data) => data.to || data.chatId, {
     message: 'Either "to" or "chatId" is required to send a message',

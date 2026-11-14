@@ -508,7 +508,7 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
   {
     name: 'messages_chat',
     description:
-      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId. (6) "Show today\'s messages" → read with dateRange="today" (shortcuts: today, yesterday, this_week, last_7_days, last_30_days). (7) "Show messages from a specific range" → read with startDate/endDate for custom date ranges. If both dateRange and startDate/endDate are provided, explicit startDate/endDate take precedence. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset. Related tools: Combine with calendar_events to cross-reference conversations with scheduled events. Use contacts_people for full contact details, though the contact param here handles name-to-phone resolution automatically.',
+      'Manages Apple Messages (iMessage/SMS). Only read and create are supported — message deletion and editing are NOT available through the Apple Messages API. ⚠️ CAUTION: An iMessage send is immediate, outward-facing, and cannot be undone. Always verify the recipient and message text with the user before calling create, or test with dryRun=true first. Common actions: (1) "Show messages from John" → read with contact param (looks up contact by name, finds all their phone numbers, and returns matching messages — this is the EASIEST way to find messages from a person, no need to look up phone numbers first). (2) "Search messages for keyword" → read with search param AND searchMessages=true (without searchMessages, search only matches chat names/participants, not message content). (3) "List my chats" → read with no params (returns chats sorted by most recent, with last message preview). (4) "Read chat history" → read with chatId (returns messages newest-first). (5) "Send a message" → create with text and either to (phone/email) or chatId (use dryRun=true to simulate). (6) "Show today\'s messages" → read with dateRange="today" (shortcuts: today, yesterday, this_week, last_7_days, last_30_days). (7) "Show messages from a specific range" → read with startDate/endDate for custom date ranges. If both dateRange and startDate/endDate are provided, explicit startDate/endDate take precedence. Use enrichContacts=true (default) to show contact names instead of raw phone numbers. Paginated: use limit (default 50, max 200) and offset. Related tools: Combine with calendar_events to cross-reference conversations with scheduled events. Use contacts_people for full contact details, though the contact param here handles name-to-phone resolution automatically.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -560,6 +560,11 @@ const _EXTENDED_TOOLS: ExtendedTool[] = [
         text: {
           type: 'string',
           description: 'The message text to send (REQUIRED for create).',
+        },
+        dryRun: {
+          type: 'boolean',
+          description:
+            'When true, simulates sending the message without actually dispatching it. Recommended for previewing or confirming outward communications before live delivery.',
         },
         dateRange: {
           type: 'string',

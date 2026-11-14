@@ -40,6 +40,18 @@ export const extractAndValidateArgs = <T>(
 };
 
 /**
+ * Wraps untrusted external data (such as emails, text messages, notes content)
+ * in protective XML-style boundaries to defend against indirect prompt injection.
+ */
+export const wrapUntrustedContent = (
+  content: string,
+  tag = 'external_user_message',
+): string => {
+  if (!content) return '';
+  return `<${tag} untrusted="true">\n${content}\n</${tag}>`;
+};
+
+/**
  * Options for formatListMarkdown
  */
 export interface FormatListOptions {
